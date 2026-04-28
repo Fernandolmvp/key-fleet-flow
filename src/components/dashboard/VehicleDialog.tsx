@@ -14,7 +14,23 @@ const STATUSES = ["ativo","manutencao","vendido","parado","sinistrado"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
 
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
-  const { currentCompanyId } = useAuth();
+  const { currentCompanyId, refreshCompanies } = useAuth();
+
+  const resolveCompany = async (): Promise<string | null> => {
+    if (currentCompanyId) return currentCompanyId;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data: prof } = await supabase
+      .from("profiles").select("current_company_id").eq("id", user.id).maybeSingle();
+    let cid = prof?.current_company_id ?? null;
+    if (!cid) {
+      const { data: mem } = await supabase
+        .from("company_members").select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
+      cid = mem?.company_id ?? null;
+    }
+    if (cid) await refreshCompanies();
+    return cid;
+  };
   const isEdit = !!vehicle;
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -55,11 +71,12 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
   const removePhoto = (idx: number) => setForm((f: any) => ({ ...f, photos: f.photos.filter((_: any, i: number) => i !== idx) }));
 
   const aiFill = async (file: File) => {
-    if (!currentCompanyId) return toast.error("Selecione uma empresa");
+    const companyId = await resolveCompany();
+    if (!companyId) return toast.error("Nenhuma empresa vinculada à sua conta");
     setAiBusy(true);
     try {
       const { data, archivedUrl } = await extractDocument({
-        type: "vehicle", file, bucket: "vehicle-docs", companyId: currentCompanyId,
+        type: "vehicle", file, bucket: "vehicle-docs", companyId,
       });
       setForm((f: any) => ({
         ...f,
