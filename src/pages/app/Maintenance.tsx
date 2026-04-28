@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Wrench, Pencil, Trash2, AlertTriangle, CalendarClock, DollarSign, Activity } from "lucide-react";
+import { Plus, Search, Wrench, Pencil, Trash2, AlertTriangle, CalendarClock, DollarSign, Activity, CalendarDays, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import KpiCard from "@/components/dashboard/KpiCard";
 import MaintenanceDialog from "@/components/dashboard/MaintenanceDialog";
 import { STATUS_TONE, TYPE_TONE, SCHEDULE_STATUS_TONE, fmtBRL } from "@/lib/maintenance";
+import { Label } from "@/components/ui/label";
 
 interface MRec {
   id: string; vehicle_id: string; type: string; status: string; category: string | null;
@@ -29,24 +30,44 @@ export default function Maintenance() {
   const [records, setRecords] = useState<MRec[]>([]);
   const [schedules, setSchedules] = useState<Sched[]>([]);
   const [vehicles, setVehicles] = useState<Record<string, { plate: string; current_km: number }>>({});
+  const [lastFuelKm, setLastFuelKm] = useState<Record<string, { km: number; at: string }>>({});
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MRec | null>(null);
   const [loading, setLoading] = useState(true);
+  const intervalKey = `maint_interval_km:${currentCompanyId ?? "_"}`;
+  const [intervalKm, setIntervalKm] = useState<number>(10000);
+
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    const saved = localStorage.getItem(intervalKey);
+    setIntervalKm(saved ? Number(saved) || 10000 : 10000);
+  }, [currentCompanyId]);
+
+  const saveInterval = (n: number) => {
+    setIntervalKm(n);
+    localStorage.setItem(intervalKey, String(n));
+  };
 
   const load = async () => {
     if (!currentCompanyId) return;
     setLoading(true);
-    const [{ data: r }, { data: s }, { data: v }] = await Promise.all([
+    const [{ data: r }, { data: s }, { data: v }, { data: f }] = await Promise.all([
       supabase.from("maintenance_records").select("*").eq("company_id", currentCompanyId).order("service_at", { ascending: false }),
       supabase.from("maintenance_schedules").select("*").eq("company_id", currentCompanyId).neq("status", "concluida"),
       supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId),
+      supabase.from("fuel_records").select("vehicle_id,km_at_fueling,fueled_at").eq("company_id", currentCompanyId).order("fueled_at", { ascending: false }),
     ]);
     setRecords((r ?? []) as MRec[]);
     setSchedules((s ?? []) as Sched[]);
     const map: Record<string, any> = {};
     (v ?? []).forEach((x: any) => { map[x.id] = { plate: x.plate, current_km: x.current_km }; });
     setVehicles(map);
+    const fuelMap: Record<string, { km: number; at: string }> = {};
+    (f ?? []).forEach((row: any) => {
+      if (!fuelMap[row.vehicle_id]) fuelMap[row.vehicle_id] = { km: row.km_at_fueling, at: row.fueled_at };
+    });
+    setLastFuelKm(fuelMap);
     setLoading(false);
   };
 
@@ -98,6 +119,31 @@ export default function Maintenance() {
       .slice(0, 5);
   }, [records, vehicles]);
 
+  // Preventive maintenance forecast per vehicle
+  const calendar = useMemo(() => {
+    return Object.entries(vehicles).map(([id, v]) => {
+      // last preventive service for this vehicle
+      const lastPrev = records
+        .filter((r) => r.vehicle_id === id && r.type === "preventiva" && r.km_at_service != null)
+        .sort((a, b) => new Date(b.service_at).getTime() - new Date(a.service_at).getTime())[0];
+      const fuel = lastFuelKm[id];
+      const currentKm = Math.max(v.current_km ?? 0, fuel?.km ?? 0);
+      const baseKm = lastPrev?.km_at_service ?? 0;
+      const nextKm = baseKm + intervalKm;
+      const remaining = nextKm - currentKm;
+      let tone = "bg-success/20 text-success border-success/30";
+      let label = "Em dia";
+      if (remaining < 0) { tone = "bg-destructive/20 text-destructive border-destructive/30"; label = "Vencida"; }
+      else if (remaining <= 1000) { tone = "bg-warning/20 text-warning border-warning/30"; label = "Próxima"; }
+      return {
+        id, plate: v.plate, currentKm, fuelKm: fuel?.km ?? null, fuelAt: fuel?.at ?? null,
+        lastPrevKm: lastPrev?.km_at_service ?? null,
+        lastPrevAt: lastPrev?.service_at ?? null,
+        nextKm, remaining, tone, label,
+      };
+    }).sort((a, b) => a.remaining - b.remaining);
+  }, [vehicles, records, lastFuelKm, intervalKm]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -121,6 +167,7 @@ export default function Maintenance() {
         <TabsList>
           <TabsTrigger value="records">Histórico</TabsTrigger>
           <TabsTrigger value="schedules">Agendamentos {overdue + upcoming > 0 && <Badge className="ml-2 bg-warning/30 text-warning">{overdue + upcoming}</Badge>}</TabsTrigger>
+          <TabsTrigger value="calendar">Calendário Preventivo</TabsTrigger>
           <TabsTrigger value="costs">Custos por veículo</TabsTrigger>
         </TabsList>
 
@@ -245,6 +292,80 @@ export default function Maintenance() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4 space-y-4">
+          <div className="surface-card rounded-xl p-4 flex flex-wrap items-end gap-4">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-primary" />
+              <div>
+                <Label className="text-xs">Intervalo padrão preventiva (KM)</Label>
+                <Input
+                  type="number"
+                  min={1000}
+                  step={500}
+                  className="w-40 mt-1"
+                  value={intervalKm}
+                  onChange={(e) => saveInterval(Number(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground max-w-md">
+              O cálculo usa a última manutenção preventiva registrada + intervalo, comparando com o KM atual do veículo cruzado com o último abastecimento.
+            </p>
+          </div>
+
+          {calendar.length === 0 ? (
+            <div className="surface-card rounded-xl p-12 text-center">
+              <CalendarDays className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <h3 className="font-display font-semibold">Nenhum veículo cadastrado</h3>
+            </div>
+          ) : (
+            <div className="surface-card rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead className="text-right">KM atual</TableHead>
+                    <TableHead className="text-right">Último abast. (KM)</TableHead>
+                    <TableHead className="text-right">Última preventiva</TableHead>
+                    <TableHead className="text-right">Próxima em (KM)</TableHead>
+                    <TableHead className="text-right">Restante</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {calendar.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-mono text-primary">{c.plate}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{c.currentKm.toLocaleString("pt-BR")}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {c.fuelKm != null ? (
+                          <>
+                            {c.fuelKm.toLocaleString("pt-BR")}
+                            <div className="text-[10px] text-muted-foreground">{c.fuelAt ? new Date(c.fuelAt).toLocaleDateString("pt-BR") : ""}</div>
+                          </>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {c.lastPrevKm != null ? (
+                          <>
+                            {c.lastPrevKm.toLocaleString("pt-BR")}
+                            <div className="text-[10px] text-muted-foreground">{c.lastPrevAt ? new Date(c.lastPrevAt).toLocaleDateString("pt-BR") : ""}</div>
+                          </>
+                        ) : <span className="text-muted-foreground">nunca</span>}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">{c.nextKm.toLocaleString("pt-BR")}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-semibold">
+                        {c.remaining.toLocaleString("pt-BR")} km
+                      </TableCell>
+                      <TableCell><Badge className={`border ${c.tone}`}>{c.label}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </TabsContent>
