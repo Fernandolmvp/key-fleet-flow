@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, Camera, Gauge, ShieldCheck, ShieldAlert } from "lucide-react";
 import { FUELS, PAYMENTS } from "@/lib/fuel";
+import { extractDocument } from "@/lib/ai-extract";
 
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
@@ -28,9 +29,12 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const [drivers, setDrivers] = useState<any[]>([]);
   const [form, setForm] = useState<any>(blank());
   const [uploading, setUploading] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState<"plate" | "odometer" | null>(null);
+  const [plateCheck, setPlateCheck] = useState<{ plate: string; ok: boolean; vehicleId?: string } | null>(null);
 
   useEffect(() => {
     if (!open || !currentCompanyId) return;
+    setPlateCheck(null);
     (async () => {
       const [{ data: v }, { data: d }] = await Promise.all([
         supabase.from("vehicles").select("id,plate,brand,model,current_km,fuel_type,tank_capacity").eq("company_id", currentCompanyId).order("plate"),
@@ -66,6 +70,53 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     }));
   };
 
+  const normalizePlate = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+  const onPlatePhoto = async (file: File) => {
+    setAiBusy("plate");
+    setPlateCheck(null);
+    try {
+      const { data } = await extractDocument({ type: "plate", file });
+      const plate = normalizePlate(String(data.plate ?? ""));
+      if (!plate) {
+        toast.error("Não consegui ler a placa. Tente outra foto.");
+        return;
+      }
+      const match = vehicles.find((v) => normalizePlate(v.plate) === plate);
+      if (!match) {
+        setPlateCheck({ plate, ok: false });
+        toast.error(`Placa ${plate} não cadastrada na frota. Abastecimento bloqueado.`);
+        setForm((f: any) => ({ ...f, vehicle_id: "" }));
+        return;
+      }
+      setPlateCheck({ plate, ok: true, vehicleId: match.id });
+      onVehicleChange(match.id);
+      toast.success(`Placa ${plate} validada — ${match.brand} ${match.model}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao validar placa");
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const onOdometerPhoto = async (file: File) => {
+    setAiBusy("odometer");
+    try {
+      const { data } = await extractDocument({ type: "odometer", file });
+      const km = Number(data.km);
+      if (!km || isNaN(km)) {
+        toast.error("Não consegui ler o KM do painel.");
+        return;
+      }
+      setForm((f: any) => ({ ...f, km_at_fueling: String(km) }));
+      toast.success(`KM lido: ${km.toLocaleString("pt-BR")}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao ler hodômetro");
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
   const upload = async (field: string, file: File) => {
     if (!currentCompanyId) return;
     setUploading(field);
@@ -80,6 +131,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const save = async () => {
     if (!currentCompanyId) return;
     if (!form.vehicle_id) return toast.error("Selecione um veículo");
+    if (plateCheck && !plateCheck.ok) return toast.error("Placa não autorizada — abastecimento bloqueado");
     if (!form.liters || !form.price_per_liter || !form.km_at_fueling) return toast.error("Litros, valor/L e KM são obrigatórios");
     setBusy(true);
     const payload: any = {
