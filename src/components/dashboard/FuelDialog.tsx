@@ -185,6 +185,39 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-display text-2xl">{record ? "Editar abastecimento" : "Novo abastecimento"}</DialogTitle></DialogHeader>
 
+        {!record && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Camera className="h-4 w-4 text-primary" />
+              <h3 className="font-display font-semibold text-sm">Validação por IA</h3>
+              <span className="text-xs text-muted-foreground">Foto da placa libera o abastecimento + foto do painel preenche o KM</span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="cursor-pointer">
+                <div className="flex items-center justify-center gap-2 border border-dashed border-primary/40 rounded-lg py-3 text-sm hover:border-primary hover:bg-primary/10 transition-colors">
+                  {aiBusy === "plate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  <span>Foto da placa</span>
+                </div>
+                <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onPlatePhoto(f); e.currentTarget.value = ""; }} />
+              </label>
+              <label className="cursor-pointer">
+                <div className="flex items-center justify-center gap-2 border border-dashed border-primary/40 rounded-lg py-3 text-sm hover:border-primary hover:bg-primary/10 transition-colors">
+                  {aiBusy === "odometer" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gauge className="h-4 w-4" />}
+                  <span>Foto do hodômetro (KM)</span>
+                </div>
+                <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onOdometerPhoto(f); e.currentTarget.value = ""; }} />
+              </label>
+            </div>
+            {plateCheck && (
+              <div className={`flex items-center gap-2 text-xs rounded-lg px-3 py-2 border ${plateCheck.ok ? "bg-success/10 text-success border-success/30" : "bg-destructive/10 text-destructive border-destructive/30"}`}>
+                {plateCheck.ok ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                <span className="font-mono font-bold">{plateCheck.plate}</span>
+                <span>{plateCheck.ok ? "autorizada — abastecimento liberado" : "não cadastrada — abastecimento bloqueado"}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label>Veículo *</Label>
