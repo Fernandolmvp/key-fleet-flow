@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, Camera, Gauge, ShieldCheck, ShieldAlert } from "lucide-react";
 import { FUELS, PAYMENTS } from "@/lib/fuel";
+import { extractDocument } from "@/lib/ai-extract";
 
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
@@ -28,9 +29,12 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const [drivers, setDrivers] = useState<any[]>([]);
   const [form, setForm] = useState<any>(blank());
   const [uploading, setUploading] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState<"plate" | "odometer" | null>(null);
+  const [plateCheck, setPlateCheck] = useState<{ plate: string; ok: boolean; vehicleId?: string } | null>(null);
 
   useEffect(() => {
     if (!open || !currentCompanyId) return;
+    setPlateCheck(null);
     (async () => {
       const [{ data: v }, { data: d }] = await Promise.all([
         supabase.from("vehicles").select("id,plate,brand,model,current_km,fuel_type,tank_capacity").eq("company_id", currentCompanyId).order("plate"),
@@ -66,6 +70,53 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     }));
   };
 
+  const normalizePlate = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+  const onPlatePhoto = async (file: File) => {
+    setAiBusy("plate");
+    setPlateCheck(null);
+    try {
+      const { data } = await extractDocument({ type: "plate", file });
+      const plate = normalizePlate(String(data.plate ?? ""));
+      if (!plate) {
+        toast.error("Não consegui ler a placa. Tente outra foto.");
+        return;
+      }
+      const match = vehicles.find((v) => normalizePlate(v.plate) === plate);
+      if (!match) {
+        setPlateCheck({ plate, ok: false });
+        toast.error(`Placa ${plate} não cadastrada na frota. Abastecimento bloqueado.`);
+        setForm((f: any) => ({ ...f, vehicle_id: "" }));
+        return;
+      }
+      setPlateCheck({ plate, ok: true, vehicleId: match.id });
+      onVehicleChange(match.id);
+      toast.success(`Placa ${plate} validada — ${match.brand} ${match.model}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao validar placa");
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const onOdometerPhoto = async (file: File) => {
+    setAiBusy("odometer");
+    try {
+      const { data } = await extractDocument({ type: "odometer", file });
+      const km = Number(data.km);
+      if (!km || isNaN(km)) {
+        toast.error("Não consegui ler o KM do painel.");
+        return;
+      }
+      setForm((f: any) => ({ ...f, km_at_fueling: String(km) }));
+      toast.success(`KM lido: ${km.toLocaleString("pt-BR")}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao ler hodômetro");
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
   const upload = async (field: string, file: File) => {
     if (!currentCompanyId) return;
     setUploading(field);
@@ -80,6 +131,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const save = async () => {
     if (!currentCompanyId) return;
     if (!form.vehicle_id) return toast.error("Selecione um veículo");
+    if (plateCheck && !plateCheck.ok) return toast.error("Placa não autorizada — abastecimento bloqueado");
     if (!form.liters || !form.price_per_liter || !form.km_at_fueling) return toast.error("Litros, valor/L e KM são obrigatórios");
     setBusy(true);
     const payload: any = {
@@ -132,6 +184,39 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-display text-2xl">{record ? "Editar abastecimento" : "Novo abastecimento"}</DialogTitle></DialogHeader>
+
+        {!record && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Camera className="h-4 w-4 text-primary" />
+              <h3 className="font-display font-semibold text-sm">Validação por IA</h3>
+              <span className="text-xs text-muted-foreground">Foto da placa libera o abastecimento + foto do painel preenche o KM</span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="cursor-pointer">
+                <div className="flex items-center justify-center gap-2 border border-dashed border-primary/40 rounded-lg py-3 text-sm hover:border-primary hover:bg-primary/10 transition-colors">
+                  {aiBusy === "plate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  <span>Foto da placa</span>
+                </div>
+                <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onPlatePhoto(f); e.currentTarget.value = ""; }} />
+              </label>
+              <label className="cursor-pointer">
+                <div className="flex items-center justify-center gap-2 border border-dashed border-primary/40 rounded-lg py-3 text-sm hover:border-primary hover:bg-primary/10 transition-colors">
+                  {aiBusy === "odometer" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gauge className="h-4 w-4" />}
+                  <span>Foto do hodômetro (KM)</span>
+                </div>
+                <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onOdometerPhoto(f); e.currentTarget.value = ""; }} />
+              </label>
+            </div>
+            {plateCheck && (
+              <div className={`flex items-center gap-2 text-xs rounded-lg px-3 py-2 border ${plateCheck.ok ? "bg-success/10 text-success border-success/30" : "bg-destructive/10 text-destructive border-destructive/30"}`}>
+                {plateCheck.ok ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                <span className="font-mono font-bold">{plateCheck.plate}</span>
+                <span>{plateCheck.ok ? "autorizada — abastecimento liberado" : "não cadastrada — abastecimento bloqueado"}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">

@@ -7,7 +7,7 @@ const corsHeaders = {
 // Extrai dados estruturados de imagens/PDFs (CRLV de veículos, CNH de motoristas)
 // usando Lovable AI Gateway com tool calling.
 
-type DocType = "vehicle" | "driver";
+type DocType = "vehicle" | "driver" | "plate" | "odometer";
 
 const TOOL_VEHICLE = {
   type: "function",
@@ -60,6 +60,40 @@ const TOOL_DRIVER = {
   },
 };
 
+const TOOL_PLATE = {
+  type: "function",
+  function: {
+    name: "extract_plate",
+    description: "Extrai a placa visível em uma foto de veículo brasileiro (formato Mercosul ABC1D23 ou antigo ABC1234).",
+    parameters: {
+      type: "object",
+      properties: {
+        plate: { type: ["string", "null"], description: "Placa em maiúsculas, sem hífen nem espaços" },
+        confidence: { type: ["number", "null"], description: "Confiança 0-1" },
+      },
+      required: ["plate"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const TOOL_ODOMETER = {
+  type: "function",
+  function: {
+    name: "extract_odometer",
+    description: "Extrai a quilometragem (KM) exibida no painel/hodômetro de um veículo. Apenas o número inteiro de KM total (não trip).",
+    parameters: {
+      type: "object",
+      properties: {
+        km: { type: ["integer", "null"], description: "KM total como inteiro" },
+        confidence: { type: ["number", "null"], description: "Confiança 0-1" },
+      },
+      required: ["km"],
+      additionalProperties: false,
+    },
+  },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -80,12 +114,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const isVehicle = type === "vehicle";
-    const tool = isVehicle ? TOOL_VEHICLE : TOOL_DRIVER;
-    const fnName = isVehicle ? "extract_vehicle" : "extract_driver";
-    const sys = isVehicle
-      ? "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). Extraia os dados do documento com precisão. Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen."
-      : "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. Extraia os dados com precisão. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
+    let tool: any, fnName: string, sys: string;
+    if (type === "vehicle") {
+      tool = TOOL_VEHICLE; fnName = "extract_vehicle";
+      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). Extraia os dados do documento com precisão. Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen.";
+    } else if (type === "driver") {
+      tool = TOOL_DRIVER; fnName = "extract_driver";
+      sys = "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. Extraia os dados com precisão. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
+    } else if (type === "plate") {
+      tool = TOOL_PLATE; fnName = "extract_plate";
+      sys = "Você lê placas veiculares brasileiras em fotos. Retorne apenas a placa do veículo principal, em letras maiúsculas, sem hífen ou espaços. Formatos válidos: ABC1234 (antigo) ou ABC1D23 (Mercosul).";
+    } else {
+      tool = TOOL_ODOMETER; fnName = "extract_odometer";
+      sys = "Você lê painéis/hodômetros de veículos. Retorne a quilometragem total (odômetro), nunca o trip parcial. Apenas o número inteiro em KM.";
+    }
 
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
 
