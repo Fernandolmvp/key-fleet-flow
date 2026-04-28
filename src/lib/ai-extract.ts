@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type DocType = "vehicle" | "driver";
+export type DocType = "vehicle" | "driver" | "plate" | "odometer";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -22,8 +22,8 @@ function fileToBase64(file: File): Promise<string> {
 export async function extractDocument(opts: {
   type: DocType;
   file: File;
-  bucket: string;
-  companyId: string;
+  bucket?: string;
+  companyId?: string;
 }): Promise<{ data: Record<string, any>; archivedUrl: string | null }> {
   const { type, file, bucket, companyId } = opts;
   const base64 = await fileToBase64(file);
@@ -35,20 +35,22 @@ export async function extractDocument(opts: {
   if (error) throw new Error(error.message);
   if (!result?.data) throw new Error("Sem dados extraídos");
 
-  // 2) Arquivar arquivo
+  // 2) Arquivar arquivo (opcional)
   let archivedUrl: string | null = null;
-  try {
-    const path = `${companyId}/${type}/${crypto.randomUUID()}-${file.name}`;
-    const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
-      contentType: file.type || undefined,
-      upsert: false,
-    });
-    if (!upErr) {
-      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
-      archivedUrl = pub.publicUrl;
+  if (bucket && companyId) {
+    try {
+      const path = `${companyId}/${type}/${crypto.randomUUID()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
+        contentType: file.type || undefined,
+        upsert: false,
+      });
+      if (!upErr) {
+        const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+        archivedUrl = pub.publicUrl;
+      }
+    } catch (e) {
+      console.warn("archive failed", e);
     }
-  } catch (e) {
-    console.warn("archive failed", e);
   }
 
   return { data: result.data as Record<string, any>, archivedUrl };
