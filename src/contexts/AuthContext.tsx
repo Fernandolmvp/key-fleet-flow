@@ -1,0 +1,87 @@
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+
+type CompanyMembership = { id: string; name: string; cnpj: string | null; logo_url: string | null };
+
+interface AuthCtx {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  companies: CompanyMembership[];
+  currentCompanyId: string | null;
+  setCurrentCompany: (id: string) => Promise<void>;
+  refreshCompanies: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthCtx | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<CompanyMembership[]>([]);
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
+
+  const loadCompanies = async (uid: string) => {
+    const { data: members } = await supabase
+      .from("company_members")
+      .select("company_id, companies:company_id(id,name,cnpj,logo_url)")
+      .eq("user_id", uid);
+    const list: CompanyMembership[] = (members ?? [])
+      .map((m: any) => m.companies)
+      .filter(Boolean);
+    setCompanies(list);
+
+    const { data: profile } = await supabase
+      .from("profiles").select("current_company_id").eq("id", uid).maybeSingle();
+    let current = profile?.current_company_id ?? null;
+    if (!current && list.length) current = list[0].id;
+    if (current && current !== profile?.current_company_id) {
+      await supabase.from("profiles").update({ current_company_id: current }).eq("id", uid);
+    }
+    setCurrentCompanyId(current);
+  };
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, sess) => {
+      setSession(sess);
+      setUser(sess?.user ?? null);
+      if (sess?.user) {
+        setTimeout(() => loadCompanies(sess.user.id), 0);
+      } else {
+        setCompanies([]); setCurrentCompanyId(null);
+      }
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) loadCompanies(session.user.id).finally(() => setLoading(false));
+      else setLoading(false);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const setCurrentCompany = async (id: string) => {
+    if (!user) return;
+    await supabase.from("profiles").update({ current_company_id: id }).eq("id", user.id);
+    setCurrentCompanyId(id);
+  };
+
+  const refreshCompanies = async () => { if (user) await loadCompanies(user.id); };
+
+  const signOut = async () => { await supabase.auth.signOut(); };
+
+  return (
+    <AuthContext.Provider value={{ user, session, loading, companies, currentCompanyId, setCurrentCompany, refreshCompanies, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be inside AuthProvider");
+  return ctx;
+};
