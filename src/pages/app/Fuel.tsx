@@ -65,10 +65,19 @@ export default function Fuel() {
     });
     const totalCost = monthRows.reduce((s, r) => s + Number(r.total_value), 0);
     const totalLiters = monthRows.reduce((s, r) => s + Number(r.liters), 0);
-    const withKml = rows.filter((r) => r.km_per_liter);
-    const avgKml = withKml.length ? withKml.reduce((s, r) => s + Number(r.km_per_liter), 0) / withKml.length : 0;
+    // Consumo médio ponderado por litros, ignorando outliers/anomalias de KM
+    const valid = rows.filter(
+      (r) =>
+        r.km_per_liter != null &&
+        Number(r.km_per_liter) > 0 &&
+        Number(r.km_per_liter) < 30 && // limite físico realista (km/L)
+        !(r.anomalies?.includes("km_regressivo")),
+    );
+    const sumKm = valid.reduce((s, r) => s + Number(r.km_per_liter) * Number(r.liters), 0);
+    const sumL = valid.reduce((s, r) => s + Number(r.liters), 0);
+    const avgKml = sumL > 0 ? sumKm / sumL : 0;
     const anomalies = rows.filter((r) => (r.anomalies?.length ?? 0) > 0).length;
-    return { totalCost, totalLiters, avgKml, anomalies, monthCount: monthRows.length };
+    return { totalCost, totalLiters, avgKml, anomalies, monthCount: monthRows.length, validCount: valid.length };
   }, [rows]);
 
   // gráfico: custo por mês (últimos 6)
@@ -115,7 +124,13 @@ export default function Fuel() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Custo do mês" value={fmtMoney(stats.totalCost)} icon={DollarSign} tone="primary" hint={`${stats.monthCount} abastecimentos`} />
         <KpiCard label="Litros do mês" value={fmtNum(stats.totalLiters, { maximumFractionDigits: 1 })} icon={FuelIcon} hint="L" />
-        <KpiCard label="Consumo médio" value={`${stats.avgKml.toFixed(1)} km/L`} icon={stats.avgKml >= 8 ? TrendingUp : TrendingDown} tone={stats.avgKml >= 8 ? "success" : "warning"} />
+        <KpiCard
+          label="Consumo médio"
+          value={stats.avgKml > 0 ? `${stats.avgKml.toFixed(1)} km/L` : "—"}
+          icon={stats.avgKml >= 8 ? TrendingUp : TrendingDown}
+          tone={stats.avgKml >= 8 ? "success" : "warning"}
+          hint={stats.validCount > 0 ? `${stats.validCount} lançamento(s) válidos` : "Precisa de 2+ abastecimentos sequenciais"}
+        />
         <KpiCard label="Anomalias detectadas" value={stats.anomalies} icon={AlertTriangle} tone={stats.anomalies > 0 ? "warning" : "success"} hint="lançamentos com alerta" />
       </div>
 

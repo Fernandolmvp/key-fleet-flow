@@ -1,0 +1,1 @@
+UPDATE public.fuel_records SET km_per_liter = NULL WHERE TRUE;
