@@ -598,6 +598,156 @@ export type Database = {
           },
         ]
       }
+      tire_movements: {
+        Row: {
+          company_id: string
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          from_position: string | null
+          id: string
+          invoice_url: string | null
+          movement_type: Database["public"]["Enums"]["tire_movement_type"]
+          notes: string | null
+          occurred_at: string
+          pressure_psi: number | null
+          reason: string | null
+          tire_id: string
+          to_position: string | null
+          tread_mm: number | null
+          vehicle_id: string | null
+          vehicle_km: number | null
+        }
+        Insert: {
+          company_id: string
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          from_position?: string | null
+          id?: string
+          invoice_url?: string | null
+          movement_type: Database["public"]["Enums"]["tire_movement_type"]
+          notes?: string | null
+          occurred_at?: string
+          pressure_psi?: number | null
+          reason?: string | null
+          tire_id: string
+          to_position?: string | null
+          tread_mm?: number | null
+          vehicle_id?: string | null
+          vehicle_km?: number | null
+        }
+        Update: {
+          company_id?: string
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          from_position?: string | null
+          id?: string
+          invoice_url?: string | null
+          movement_type?: Database["public"]["Enums"]["tire_movement_type"]
+          notes?: string | null
+          occurred_at?: string
+          pressure_psi?: number | null
+          reason?: string | null
+          tire_id?: string
+          to_position?: string | null
+          tread_mm?: number | null
+          vehicle_id?: string | null
+          vehicle_km?: number | null
+        }
+        Relationships: []
+      }
+      tires: {
+        Row: {
+          attachments: string[]
+          brand: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          current_position: string | null
+          current_tread_mm: number | null
+          current_vehicle_id: string | null
+          dot: string | null
+          id: string
+          initial_tread_mm: number | null
+          invoice_number: string | null
+          invoice_url: string | null
+          kind: Database["public"]["Enums"]["tire_kind"]
+          km_accumulated: number
+          km_target: number | null
+          min_tread_mm: number | null
+          model: string | null
+          notes: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          recap_count: number
+          serial: string | null
+          size: string
+          status: Database["public"]["Enums"]["tire_status"]
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachments?: string[]
+          brand: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          current_position?: string | null
+          current_tread_mm?: number | null
+          current_vehicle_id?: string | null
+          dot?: string | null
+          id?: string
+          initial_tread_mm?: number | null
+          invoice_number?: string | null
+          invoice_url?: string | null
+          kind?: Database["public"]["Enums"]["tire_kind"]
+          km_accumulated?: number
+          km_target?: number | null
+          min_tread_mm?: number | null
+          model?: string | null
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          recap_count?: number
+          serial?: string | null
+          size: string
+          status?: Database["public"]["Enums"]["tire_status"]
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachments?: string[]
+          brand?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_position?: string | null
+          current_tread_mm?: number | null
+          current_vehicle_id?: string | null
+          dot?: string | null
+          id?: string
+          initial_tread_mm?: number | null
+          invoice_number?: string | null
+          invoice_url?: string | null
+          kind?: Database["public"]["Enums"]["tire_kind"]
+          km_accumulated?: number
+          km_target?: number | null
+          min_tread_mm?: number | null
+          model?: string | null
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          recap_count?: number
+          serial?: string | null
+          size?: string
+          status?: Database["public"]["Enums"]["tire_status"]
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           company_id: string
@@ -629,6 +779,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicle_axle_layouts: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          layout: Database["public"]["Enums"]["axle_layout"]
+          positions: string[]
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          layout?: Database["public"]["Enums"]["axle_layout"]
+          positions?: string[]
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          layout?: Database["public"]["Enums"]["axle_layout"]
+          positions?: string[]
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: []
       }
       vehicles: {
         Row: {
@@ -779,6 +959,13 @@ export type Database = {
         | "financeiro"
         | "motorista"
         | "auditor"
+      axle_layout:
+        | "moto_2"
+        | "carro_4"
+        | "truck_6"
+        | "truck_10"
+        | "carreta_18"
+        | "custom"
       driver_status: "ativo" | "inativo" | "ferias" | "afastado"
       fuel_anomaly:
         | "km_regressivo"
@@ -813,6 +1000,17 @@ export type Database = {
         | "faturado"
         | "outro"
       schedule_status: "pendente" | "proxima" | "vencida" | "concluida"
+      tire_kind: "novo" | "recapado" | "remold"
+      tire_movement_type:
+        | "instalacao"
+        | "remocao"
+        | "rodizio"
+        | "recapagem"
+        | "descarte"
+        | "calibragem"
+        | "inspecao"
+        | "compra"
+      tire_status: "estoque" | "instalado" | "recapagem" | "descartado"
       vehicle_status:
         | "ativo"
         | "manutencao"
@@ -954,6 +1152,14 @@ export const Constants = {
         "motorista",
         "auditor",
       ],
+      axle_layout: [
+        "moto_2",
+        "carro_4",
+        "truck_6",
+        "truck_10",
+        "carreta_18",
+        "custom",
+      ],
       driver_status: ["ativo", "inativo", "ferias", "afastado"],
       fuel_anomaly: [
         "km_regressivo",
@@ -992,6 +1198,18 @@ export const Constants = {
         "outro",
       ],
       schedule_status: ["pendente", "proxima", "vencida", "concluida"],
+      tire_kind: ["novo", "recapado", "remold"],
+      tire_movement_type: [
+        "instalacao",
+        "remocao",
+        "rodizio",
+        "recapagem",
+        "descarte",
+        "calibragem",
+        "inspecao",
+        "compra",
+      ],
+      tire_status: ["estoque", "instalado", "recapagem", "descartado"],
       vehicle_status: [
         "ativo",
         "manutencao",

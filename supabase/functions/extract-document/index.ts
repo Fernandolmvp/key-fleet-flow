@@ -7,7 +7,7 @@ const corsHeaders = {
 // Extrai dados estruturados de imagens/PDFs (CRLV de veículos, CNH de motoristas)
 // usando Lovable AI Gateway com tool calling.
 
-type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice";
+type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice" | "tire_invoice";
 
 const TOOL_VEHICLE = {
   type: "function",
@@ -137,6 +137,46 @@ const TOOL_MAINT = {
   },
 };
 
+const TOOL_TIRE = {
+  type: "function",
+  function: {
+    name: "extract_tire_invoice",
+    description:
+      "Extrai dados de nota fiscal de compra/recapagem de pneus. Cada item é um pneu individual com marca, modelo, medida, DOT (se houver), preço e quantidade.",
+    parameters: {
+      type: "object",
+      properties: {
+        supplier: { type: ["string", "null"], description: "Razão social do fornecedor/recapadora" },
+        supplier_cnpj: { type: ["string", "null"] },
+        invoice_number: { type: ["string", "null"] },
+        purchase_date: { type: ["string", "null"], description: "YYYY-MM-DD" },
+        total_value: { type: ["number", "null"] },
+        kind: { type: ["string", "null"], enum: ["novo", "recapado", "remold", null] },
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              brand: { type: ["string", "null"] },
+              model: { type: ["string", "null"] },
+              size: { type: ["string", "null"], description: "Ex.: 295/80 R22.5 ou 175/65 R14" },
+              dot: { type: ["string", "null"] },
+              serial: { type: ["string", "null"] },
+              qty: { type: ["integer", "null"] },
+              unit_price: { type: ["number", "null"] },
+              total: { type: ["number", "null"] },
+            },
+            required: ["brand", "size"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    },
+  },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -170,6 +210,9 @@ Deno.serve(async (req) => {
     } else if (type === "odometer") {
       tool = TOOL_ODOMETER; fnName = "extract_odometer";
       sys = "Você lê painéis/hodômetros de veículos. Retorne a quilometragem total (odômetro), nunca o trip parcial. Apenas o número inteiro em KM.";
+    } else if (type === "tire_invoice") {
+      tool = TOOL_TIRE; fnName = "extract_tire_invoice";
+      sys = "Você lê notas fiscais de pneus (compra ou recapagem). Cada item é um pneu individual: marca, modelo, medida (ex.: 295/80 R22.5), DOT, preço unitário. Datas em ISO YYYY-MM-DD.";
     } else {
       tool = TOOL_MAINT; fnName = "extract_maintenance_invoice";
       sys = "Você é um especialista em notas fiscais e ordens de serviço de oficinas mecânicas brasileiras. Extraia dados de oficina, valores (mão de obra, peças, total), data, e itens individuais. Datas em ISO YYYY-MM-DD.";
