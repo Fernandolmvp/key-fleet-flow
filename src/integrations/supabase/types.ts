@@ -598,6 +598,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bootstrap_company: {
+        Args: { _company_name: string; _full_name: string }
+        Returns: string
+      }
       can_manage_fleet: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
