@@ -268,6 +268,146 @@ export type Database = {
           },
         ]
       }
+      fuel_records: {
+        Row: {
+          anomalies: Database["public"]["Enums"]["fuel_anomaly"][]
+          anomaly_notes: string | null
+          anomaly_severity: string | null
+          card_number: string | null
+          city: string | null
+          company_id: string
+          cost_center_id: string | null
+          cost_per_km: number | null
+          created_at: string
+          created_by: string | null
+          dashboard_photo_url: string | null
+          driver_id: string | null
+          fuel_type: Database["public"]["Enums"]["fuel_type"]
+          fueled_at: string
+          full_tank: boolean
+          id: string
+          invoice_url: string | null
+          km_at_fueling: number
+          km_driven: number | null
+          km_per_liter: number | null
+          latitude: number | null
+          liters: number
+          longitude: number | null
+          notes: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          price_per_liter: number
+          pump_photo_url: string | null
+          receipt_url: string | null
+          state: string | null
+          station_cnpj: string | null
+          station_name: string | null
+          total_value: number
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          anomalies?: Database["public"]["Enums"]["fuel_anomaly"][]
+          anomaly_notes?: string | null
+          anomaly_severity?: string | null
+          card_number?: string | null
+          city?: string | null
+          company_id: string
+          cost_center_id?: string | null
+          cost_per_km?: number | null
+          created_at?: string
+          created_by?: string | null
+          dashboard_photo_url?: string | null
+          driver_id?: string | null
+          fuel_type: Database["public"]["Enums"]["fuel_type"]
+          fueled_at?: string
+          full_tank?: boolean
+          id?: string
+          invoice_url?: string | null
+          km_at_fueling: number
+          km_driven?: number | null
+          km_per_liter?: number | null
+          latitude?: number | null
+          liters: number
+          longitude?: number | null
+          notes?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          price_per_liter: number
+          pump_photo_url?: string | null
+          receipt_url?: string | null
+          state?: string | null
+          station_cnpj?: string | null
+          station_name?: string | null
+          total_value: number
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          anomalies?: Database["public"]["Enums"]["fuel_anomaly"][]
+          anomaly_notes?: string | null
+          anomaly_severity?: string | null
+          card_number?: string | null
+          city?: string | null
+          company_id?: string
+          cost_center_id?: string | null
+          cost_per_km?: number | null
+          created_at?: string
+          created_by?: string | null
+          dashboard_photo_url?: string | null
+          driver_id?: string | null
+          fuel_type?: Database["public"]["Enums"]["fuel_type"]
+          fueled_at?: string
+          full_tank?: boolean
+          id?: string
+          invoice_url?: string | null
+          km_at_fueling?: number
+          km_driven?: number | null
+          km_per_liter?: number | null
+          latitude?: number | null
+          liters?: number
+          longitude?: number | null
+          notes?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          price_per_liter?: number
+          pump_photo_url?: string | null
+          receipt_url?: string | null
+          state?: string | null
+          station_cnpj?: string | null
+          station_name?: string | null
+          total_value?: number
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_records_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_records_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -484,6 +624,15 @@ export type Database = {
         | "motorista"
         | "auditor"
       driver_status: "ativo" | "inativo" | "ferias" | "afastado"
+      fuel_anomaly:
+        | "km_regressivo"
+        | "consumo_alto"
+        | "consumo_baixo"
+        | "tanque_excedido"
+        | "duplicado"
+        | "valor_atipico"
+        | "horario_suspeito"
+        | "cidade_incomum"
       fuel_type:
         | "gasolina"
         | "etanol"
@@ -493,6 +642,14 @@ export type Database = {
         | "gnv"
         | "eletrico"
         | "hibrido"
+      payment_method:
+        | "cartao_frota"
+        | "dinheiro"
+        | "pix"
+        | "credito"
+        | "debito"
+        | "faturado"
+        | "outro"
       vehicle_status:
         | "ativo"
         | "manutencao"
@@ -635,6 +792,16 @@ export const Constants = {
         "auditor",
       ],
       driver_status: ["ativo", "inativo", "ferias", "afastado"],
+      fuel_anomaly: [
+        "km_regressivo",
+        "consumo_alto",
+        "consumo_baixo",
+        "tanque_excedido",
+        "duplicado",
+        "valor_atipico",
+        "horario_suspeito",
+        "cidade_incomum",
+      ],
       fuel_type: [
         "gasolina",
         "etanol",
@@ -644,6 +811,15 @@ export const Constants = {
         "gnv",
         "eletrico",
         "hibrido",
+      ],
+      payment_method: [
+        "cartao_frota",
+        "dinheiro",
+        "pix",
+        "credito",
+        "debito",
+        "faturado",
+        "outro",
       ],
       vehicle_status: [
         "ativo",
