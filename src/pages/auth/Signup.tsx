@@ -39,14 +39,23 @@ export default function Signup() {
     if (error) { setBusy(false); return toast.error(error.message); }
     if (!auth.user) { setBusy(false); return toast.error("Falha ao criar usuário"); }
 
-    // Criar empresa, membership e papel admin (bootstrap)
-    const { data: company, error: cErr } = await supabase
-      .from("companies").insert({ name: form.companyName }).select().single();
-    if (cErr || !company) { setBusy(false); return toast.error(cErr?.message || "Erro ao criar empresa"); }
+    // Garantir sessão (caso confirmação de e-mail esteja ativa, faz signIn imediato)
+    if (!auth.session) {
+      const { error: sErr } = await supabase.auth.signInWithPassword({
+        email: form.email, password: form.password,
+      });
+      if (sErr) {
+        setBusy(false);
+        return toast.error("Conta criada. Verifique seu e-mail para confirmar e depois faça login.");
+      }
+    }
 
-    await supabase.from("company_members").insert({ company_id: company.id, user_id: auth.user.id });
-    await supabase.from("user_roles").insert({ company_id: company.id, user_id: auth.user.id, role: "admin" });
-    await supabase.from("profiles").update({ current_company_id: company.id, full_name: form.fullName }).eq("id", auth.user.id);
+    // Bootstrap empresa + membership + role + profile (atômico via RPC SECURITY DEFINER)
+    const { error: rpcErr } = await supabase.rpc("bootstrap_company", {
+      _company_name: form.companyName,
+      _full_name: form.fullName,
+    });
+    if (rpcErr) { setBusy(false); return toast.error(rpcErr.message); }
 
     setBusy(false);
     toast.success("Conta criada! Bem-vindo ao FrotaOps");
