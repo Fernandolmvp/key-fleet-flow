@@ -17,7 +17,7 @@ const schema = z.object({
 });
 
 export default function Signup() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshCompanies } = useAuth();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ fullName: "", companyName: "", email: "", password: "" });
@@ -57,6 +57,7 @@ export default function Signup() {
     });
     if (rpcErr) { setBusy(false); return toast.error(rpcErr.message); }
 
+    await refreshCompanies();
     setBusy(false);
     toast.success("Conta criada! Bem-vindo ao FrotaOps");
     nav("/app");
