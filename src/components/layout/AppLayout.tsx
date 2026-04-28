@@ -16,7 +16,7 @@ const nav = [
   { to: "/app/drivers", label: "Motoristas", icon: Users },
   { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
   { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
-  { to: "/app/tires", label: "Pneus", icon: CircleDot, soon: true },
+  { to: "/app/tires", label: "Pneus", icon: CircleDot },
   { to: "/app/documents", label: "Documentação", icon: FileText, soon: true },
   { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
