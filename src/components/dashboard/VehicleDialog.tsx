@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, FileText } from "lucide-react";
+import { extractDocument } from "@/lib/ai-extract";
 
 const STATUSES = ["ativo","manutencao","vendido","parado","sinistrado"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
@@ -17,6 +18,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
   const isEdit = !!vehicle;
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [archivedDoc, setArchivedDoc] = useState<string | null>(null);
   const [form, setForm] = useState<any>({
     plate: "", renavam: "", chassis: "", brand: "", model: "",
     year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
@@ -34,6 +37,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
     });
+    setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle, open]);
 
@@ -49,6 +53,36 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
   };
 
   const removePhoto = (idx: number) => setForm((f: any) => ({ ...f, photos: f.photos.filter((_: any, i: number) => i !== idx) }));
+
+  const aiFill = async (file: File) => {
+    if (!currentCompanyId) return toast.error("Selecione uma empresa");
+    setAiBusy(true);
+    try {
+      const { data, archivedUrl } = await extractDocument({
+        type: "vehicle", file, bucket: "vehicle-docs", companyId: currentCompanyId,
+      });
+      setForm((f: any) => ({
+        ...f,
+        plate: data.plate ? String(data.plate).toUpperCase().replace(/[^A-Z0-9]/g, "") : f.plate,
+        renavam: data.renavam ?? f.renavam,
+        chassis: data.chassis ?? f.chassis,
+        brand: data.brand ?? f.brand,
+        model: data.model ?? f.model,
+        year_manufacture: data.year_manufacture ?? f.year_manufacture,
+        year_model: data.year_model ?? f.year_model,
+        color: data.color ?? f.color,
+        fuel_type: data.fuel_type ?? f.fuel_type,
+        vehicle_type: data.vehicle_type ?? f.vehicle_type,
+        documents: archivedUrl ? [...(f.documents ?? []), archivedUrl] : (f.documents ?? []),
+      }));
+      setArchivedDoc(archivedUrl);
+      toast.success("Dados preenchidos pela IA. Revise antes de salvar.");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao processar documento");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const save = async () => {
     if (!currentCompanyId) return toast.error("Selecione uma empresa");
@@ -82,6 +116,35 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">{isEdit ? "Editar veículo" : "Novo veículo"}</DialogTitle>
         </DialogHeader>
+
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-gradient-primary grid place-items-center shrink-0">
+            <Sparkles className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Preencher com IA</p>
+            <p className="text-xs text-muted-foreground">Envie a foto ou PDF do CRLV/CRV — extraímos os dados e arquivamos o documento.</p>
+          </div>
+          <label>
+            <Button type="button" size="sm" disabled={aiBusy} asChild className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow cursor-pointer">
+              <span>
+                {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                {aiBusy ? "Lendo..." : "Enviar CRLV"}
+              </span>
+            </Button>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) aiFill(f); e.currentTarget.value = ""; }}
+            />
+          </label>
+        </div>
+        {archivedDoc && (
+          <a href={archivedDoc} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
+            <FileText className="h-3 w-3" /> Documento arquivado
+          </a>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2"><Label>Placa *</Label><Input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} className="font-mono uppercase" /></div>
