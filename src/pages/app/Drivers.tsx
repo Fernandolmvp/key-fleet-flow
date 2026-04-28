@@ -4,7 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle } from "lucide-react";
+import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle, Sparkles, FileText } from "lucide-react";
+import { extractDocument } from "@/lib/ai-extract";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +27,8 @@ export default function Drivers() {
   const [editing, setEditing] = useState<Driver | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [archivedDoc, setArchivedDoc] = useState<string | null>(null);
   const [form, setForm] = useState<any>(blank());
 
   function blank() {
@@ -42,8 +45,8 @@ export default function Drivers() {
   };
   useEffect(() => { load(); }, [currentCompanyId]);
 
-  const openNew = () => { setEditing(null); setForm(blank()); setOpen(true); };
-  const openEdit = (d: Driver) => { setEditing(d); setForm({ ...blank(), ...d }); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(blank()); setArchivedDoc(null); setOpen(true); };
+  const openEdit = (d: Driver) => { setEditing(d); setForm({ ...blank(), ...d }); setArchivedDoc(null); setOpen(true); };
 
   const upload = async (file: File) => {
     if (!currentCompanyId) return;
@@ -54,6 +57,32 @@ export default function Drivers() {
     const { data: pub } = supabase.storage.from("driver-photos").getPublicUrl(path);
     setForm((f: any) => ({ ...f, photo_url: pub.publicUrl }));
     setUploading(false);
+  };
+
+  const aiFill = async (file: File) => {
+    if (!currentCompanyId) return toast.error("Selecione uma empresa");
+    setAiBusy(true);
+    try {
+      const { data, archivedUrl } = await extractDocument({
+        type: "driver", file, bucket: "driver-photos", companyId: currentCompanyId,
+      });
+      setForm((f: any) => ({
+        ...f,
+        full_name: data.full_name ?? f.full_name,
+        cpf: data.cpf ? String(data.cpf).replace(/\D/g, "") : f.cpf,
+        cnh_number: data.cnh_number ?? f.cnh_number,
+        cnh_category: data.cnh_category ?? f.cnh_category,
+        cnh_expires_at: data.cnh_expires_at ?? f.cnh_expires_at,
+        medical_exam_expires_at: data.medical_exam_expires_at ?? f.medical_exam_expires_at,
+        address: data.address ?? f.address,
+      }));
+      setArchivedDoc(archivedUrl);
+      toast.success("Dados preenchidos pela IA. Revise antes de salvar.");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao processar documento");
+    } finally {
+      setAiBusy(false);
+    }
   };
 
   const save = async () => {
@@ -151,6 +180,34 @@ export default function Drivers() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-display text-2xl">{editing ? "Editar motorista" : "Novo motorista"}</DialogTitle></DialogHeader>
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-gradient-primary grid place-items-center shrink-0">
+              <Sparkles className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Preencher com IA</p>
+              <p className="text-xs text-muted-foreground">Envie a foto ou PDF da CNH — extraímos os dados e arquivamos.</p>
+            </div>
+            <label>
+              <Button type="button" size="sm" disabled={aiBusy} asChild className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow cursor-pointer">
+                <span>
+                  {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                  {aiBusy ? "Lendo..." : "Enviar CNH"}
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                hidden
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) aiFill(f); e.currentTarget.value = ""; }}
+              />
+            </label>
+          </div>
+          {archivedDoc && (
+            <a href={archivedDoc} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
+              <FileText className="h-3 w-3" /> Documento arquivado
+            </a>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2 space-y-2">
               <Label>Foto</Label>
