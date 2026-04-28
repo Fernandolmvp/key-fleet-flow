@@ -20,7 +20,7 @@ interface Driver {
 const STATUSES = ["ativo","inativo","ferias","afastado"];
 
 export default function Drivers() {
-  const { currentCompanyId } = useAuth();
+  const { currentCompanyId, refreshCompanies } = useAuth();
   const [items, setItems] = useState<Driver[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -60,11 +60,27 @@ export default function Drivers() {
   };
 
   const aiFill = async (file: File) => {
-    if (!currentCompanyId) return toast.error("Selecione uma empresa");
+    let companyId = currentCompanyId;
+    if (!companyId) {
+      // Fallback: tenta resolver a empresa do usuário diretamente
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase
+          .from("profiles").select("current_company_id").eq("id", user.id).maybeSingle();
+        companyId = prof?.current_company_id ?? null;
+        if (!companyId) {
+          const { data: mem } = await supabase
+            .from("company_members").select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
+          companyId = mem?.company_id ?? null;
+        }
+        if (companyId) await refreshCompanies();
+      }
+    }
+    if (!companyId) return toast.error("Nenhuma empresa vinculada à sua conta");
     setAiBusy(true);
     try {
       const { data, archivedUrl } = await extractDocument({
-        type: "driver", file, bucket: "driver-photos", companyId: currentCompanyId,
+        type: "driver", file, bucket: "driver-photos", companyId,
       });
       setForm((f: any) => ({
         ...f,
