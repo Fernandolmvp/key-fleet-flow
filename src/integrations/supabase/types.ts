@@ -408,6 +408,158 @@ export type Database = {
           },
         ]
       }
+      maintenance_records: {
+        Row: {
+          attachments: string[]
+          category: string | null
+          city: string | null
+          company_id: string
+          cost_center_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_id: string | null
+          id: string
+          invoice_url: string | null
+          km_at_service: number | null
+          labor_value: number
+          next_service_at: string | null
+          next_service_km: number | null
+          notes: string | null
+          parts: Json
+          parts_value: number
+          service_at: string
+          state: string | null
+          status: Database["public"]["Enums"]["maintenance_status"]
+          total_value: number
+          type: Database["public"]["Enums"]["maintenance_type"]
+          updated_at: string
+          vehicle_id: string
+          workshop_cnpj: string | null
+          workshop_name: string | null
+        }
+        Insert: {
+          attachments?: string[]
+          category?: string | null
+          city?: string | null
+          company_id: string
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          invoice_url?: string | null
+          km_at_service?: number | null
+          labor_value?: number
+          next_service_at?: string | null
+          next_service_km?: number | null
+          notes?: string | null
+          parts?: Json
+          parts_value?: number
+          service_at?: string
+          state?: string | null
+          status?: Database["public"]["Enums"]["maintenance_status"]
+          total_value?: number
+          type: Database["public"]["Enums"]["maintenance_type"]
+          updated_at?: string
+          vehicle_id: string
+          workshop_cnpj?: string | null
+          workshop_name?: string | null
+        }
+        Update: {
+          attachments?: string[]
+          category?: string | null
+          city?: string | null
+          company_id?: string
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          invoice_url?: string | null
+          km_at_service?: number | null
+          labor_value?: number
+          next_service_at?: string | null
+          next_service_km?: number | null
+          notes?: string | null
+          parts?: Json
+          parts_value?: number
+          service_at?: string
+          state?: string | null
+          status?: Database["public"]["Enums"]["maintenance_status"]
+          total_value?: number
+          type?: Database["public"]["Enums"]["maintenance_type"]
+          updated_at?: string
+          vehicle_id?: string
+          workshop_cnpj?: string | null
+          workshop_name?: string | null
+        }
+        Relationships: []
+      }
+      maintenance_schedules: {
+        Row: {
+          category: string
+          company_id: string
+          completed_record_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          interval_days: number | null
+          interval_km: number | null
+          status: Database["public"]["Enums"]["schedule_status"]
+          target_date: string | null
+          target_km: number | null
+          type: Database["public"]["Enums"]["maintenance_type"]
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          category: string
+          company_id: string
+          completed_record_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          interval_days?: number | null
+          interval_km?: number | null
+          status?: Database["public"]["Enums"]["schedule_status"]
+          target_date?: string | null
+          target_km?: number | null
+          type?: Database["public"]["Enums"]["maintenance_type"]
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          completed_record_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          interval_days?: number | null
+          interval_km?: number | null
+          status?: Database["public"]["Enums"]["schedule_status"]
+          target_date?: string | null
+          target_km?: number | null
+          type?: Database["public"]["Enums"]["maintenance_type"]
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_schedules_completed_record_id_fkey"
+            columns: ["completed_record_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -646,6 +798,12 @@ export type Database = {
         | "gnv"
         | "eletrico"
         | "hibrido"
+      maintenance_status:
+        | "agendada"
+        | "em_andamento"
+        | "concluida"
+        | "cancelada"
+      maintenance_type: "preventiva" | "corretiva" | "pneus" | "sinistro"
       payment_method:
         | "cartao_frota"
         | "dinheiro"
@@ -654,6 +812,7 @@ export type Database = {
         | "debito"
         | "faturado"
         | "outro"
+      schedule_status: "pendente" | "proxima" | "vencida" | "concluida"
       vehicle_status:
         | "ativo"
         | "manutencao"
@@ -816,6 +975,13 @@ export const Constants = {
         "eletrico",
         "hibrido",
       ],
+      maintenance_status: [
+        "agendada",
+        "em_andamento",
+        "concluida",
+        "cancelada",
+      ],
+      maintenance_type: ["preventiva", "corretiva", "pneus", "sinistro"],
       payment_method: [
         "cartao_frota",
         "dinheiro",
@@ -825,6 +991,7 @@ export const Constants = {
         "faturado",
         "outro",
       ],
+      schedule_status: ["pendente", "proxima", "vencida", "concluida"],
       vehicle_status: [
         "ativo",
         "manutencao",

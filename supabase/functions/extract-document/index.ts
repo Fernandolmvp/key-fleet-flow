@@ -7,7 +7,7 @@ const corsHeaders = {
 // Extrai dados estruturados de imagens/PDFs (CRLV de veículos, CNH de motoristas)
 // usando Lovable AI Gateway com tool calling.
 
-type DocType = "vehicle" | "driver" | "plate" | "odometer";
+type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice";
 
 const TOOL_VEHICLE = {
   type: "function",
@@ -94,6 +94,49 @@ const TOOL_ODOMETER = {
   },
 };
 
+const TOOL_MAINT = {
+  type: "function",
+  function: {
+    name: "extract_maintenance_invoice",
+    description:
+      "Extrai dados de nota fiscal/orçamento de manutenção/oficina. Itens detalhados de peças e serviços. Use null para campos ausentes.",
+    parameters: {
+      type: "object",
+      properties: {
+        workshop_name: { type: ["string", "null"], description: "Razão social da oficina" },
+        workshop_cnpj: { type: ["string", "null"], description: "Apenas dígitos" },
+        city: { type: ["string", "null"] },
+        state: { type: ["string", "null"], description: "UF" },
+        service_at: { type: ["string", "null"], description: "Data do serviço YYYY-MM-DD" },
+        plate: { type: ["string", "null"], description: "Placa do veículo, se constar" },
+        km_at_service: { type: ["integer", "null"] },
+        category: { type: ["string", "null"], description: "Ex.: óleo, freios, suspensão, motor, elétrica, pneus, funilaria" },
+        description: { type: ["string", "null"], description: "Resumo do serviço executado" },
+        labor_value: { type: ["number", "null"], description: "Total de mão de obra" },
+        parts_value: { type: ["number", "null"], description: "Total de peças" },
+        total_value: { type: ["number", "null"] },
+        parts: {
+          type: "array",
+          description: "Itens de peças/serviços",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              qty: { type: ["number", "null"] },
+              unit_value: { type: ["number", "null"] },
+              total: { type: ["number", "null"] },
+            },
+            required: ["name"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["total_value"],
+      additionalProperties: false,
+    },
+  },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -124,9 +167,12 @@ Deno.serve(async (req) => {
     } else if (type === "plate") {
       tool = TOOL_PLATE; fnName = "extract_plate";
       sys = "Você lê placas veiculares brasileiras em fotos. Retorne apenas a placa do veículo principal, em letras maiúsculas, sem hífen ou espaços. Formatos válidos: ABC1234 (antigo) ou ABC1D23 (Mercosul).";
-    } else {
+    } else if (type === "odometer") {
       tool = TOOL_ODOMETER; fnName = "extract_odometer";
       sys = "Você lê painéis/hodômetros de veículos. Retorne a quilometragem total (odômetro), nunca o trip parcial. Apenas o número inteiro em KM.";
+    } else {
+      tool = TOOL_MAINT; fnName = "extract_maintenance_invoice";
+      sys = "Você é um especialista em notas fiscais e ordens de serviço de oficinas mecânicas brasileiras. Extraia dados de oficina, valores (mão de obra, peças, total), data, e itens individuais. Datas em ISO YYYY-MM-DD.";
     }
 
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
