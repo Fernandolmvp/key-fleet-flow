@@ -14,7 +14,7 @@ const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/app/vehicles", label: "Veículos", icon: Truck },
   { to: "/app/drivers", label: "Motoristas", icon: Users },
-  { to: "/app/fuel", label: "Abastecimentos", icon: Fuel, soon: true },
+  { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
   { to: "/app/maintenance", label: "Manutenção", icon: Wrench, soon: true },
   { to: "/app/tires", label: "Pneus", icon: CircleDot, soon: true },
   { to: "/app/documents", label: "Documentação", icon: FileText, soon: true },
