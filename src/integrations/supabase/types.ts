@@ -190,6 +190,78 @@ export type Database = {
           },
         ]
       }
+      documents: {
+        Row: {
+          ai_extracted: Json
+          ai_validation: Json
+          company_id: string
+          created_at: string
+          created_by: string | null
+          doc_type: Database["public"]["Enums"]["document_type"]
+          document_number: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["document_entity"]
+          expires_at: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string
+          issue_date: string | null
+          issuer: string | null
+          mime_type: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["document_status"]
+          title: string | null
+          updated_at: string
+          validation_warning: string | null
+        }
+        Insert: {
+          ai_extracted?: Json
+          ai_validation?: Json
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          doc_type: Database["public"]["Enums"]["document_type"]
+          document_number?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["document_entity"]
+          expires_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          issue_date?: string | null
+          issuer?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          title?: string | null
+          updated_at?: string
+          validation_warning?: string | null
+        }
+        Update: {
+          ai_extracted?: Json
+          ai_validation?: Json
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          doc_type?: Database["public"]["Enums"]["document_type"]
+          document_number?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["document_entity"]
+          expires_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          issue_date?: string | null
+          issuer?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          title?: string | null
+          updated_at?: string
+          validation_warning?: string | null
+        }
+        Relationships: []
+      }
       drivers: {
         Row: {
           address: string | null
@@ -1078,6 +1150,22 @@ export type Database = {
         | "truck_10"
         | "carreta_18"
         | "custom"
+      document_entity: "vehicle" | "driver"
+      document_status: "valido" | "vencendo" | "vencido" | "sem_validade"
+      document_type:
+        | "crlv"
+        | "ipva"
+        | "licenciamento"
+        | "seguro"
+        | "rastreador"
+        | "laudo_veiculo"
+        | "outro_veiculo"
+        | "cnh"
+        | "exame_medico"
+        | "exame_toxicologico"
+        | "curso_mopp"
+        | "curso_transporte_passageiros"
+        | "outro_motorista"
       driver_status: "ativo" | "inativo" | "ferias" | "afastado"
       fuel_anomaly:
         | "km_regressivo"
@@ -1278,6 +1366,23 @@ export const Constants = {
         "truck_10",
         "carreta_18",
         "custom",
+      ],
+      document_entity: ["vehicle", "driver"],
+      document_status: ["valido", "vencendo", "vencido", "sem_validade"],
+      document_type: [
+        "crlv",
+        "ipva",
+        "licenciamento",
+        "seguro",
+        "rastreador",
+        "laudo_veiculo",
+        "outro_veiculo",
+        "cnh",
+        "exame_medico",
+        "exame_toxicologico",
+        "curso_mopp",
+        "curso_transporte_passageiros",
+        "outro_motorista",
       ],
       driver_status: ["ativo", "inativo", "ferias", "afastado"],
       fuel_anomaly: [
