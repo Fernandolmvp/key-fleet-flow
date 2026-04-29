@@ -346,21 +346,79 @@ export type Database = {
           },
         ]
       }
+      fuel_authorization_items: {
+        Row: {
+          authorization_id: string
+          company_id: string
+          created_at: string
+          description: string
+          fuel_type: string | null
+          id: string
+          is_fuel: boolean
+          quantity: number
+          total_value: number
+          unit_value: number
+        }
+        Insert: {
+          authorization_id: string
+          company_id: string
+          created_at?: string
+          description: string
+          fuel_type?: string | null
+          id?: string
+          is_fuel?: boolean
+          quantity?: number
+          total_value?: number
+          unit_value?: number
+        }
+        Update: {
+          authorization_id?: string
+          company_id?: string
+          created_at?: string
+          description?: string
+          fuel_type?: string | null
+          id?: string
+          is_fuel?: boolean
+          quantity?: number
+          total_value?: number
+          unit_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_authorization_items_authorization_id_fkey"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_authorizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fuel_authorizations: {
         Row: {
           approved_at: string | null
           approved_by: string | null
           authorization_code: string | null
+          cnpj_match: boolean | null
           company_id: string
+          confirmed_at: string | null
           created_at: string
           driver_id: string | null
           estimated_liters: number | null
           estimated_value: number | null
           expires_at: string | null
           fuel_record_id: string | null
+          fuel_station_id: string | null
           fuel_type: string | null
           id: string
+          km_at_request: number | null
+          km_photo_url: string | null
           notes: string | null
+          plate_photo_url: string | null
+          plate_recognized: string | null
+          receipt_cnpj: string | null
+          receipt_extracted: Json
+          receipt_photo_url: string | null
+          receipt_total: number | null
           requested_at: string
           requested_by: string
           station_name: string | null
@@ -373,16 +431,27 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           authorization_code?: string | null
+          cnpj_match?: boolean | null
           company_id: string
+          confirmed_at?: string | null
           created_at?: string
           driver_id?: string | null
           estimated_liters?: number | null
           estimated_value?: number | null
           expires_at?: string | null
           fuel_record_id?: string | null
+          fuel_station_id?: string | null
           fuel_type?: string | null
           id?: string
+          km_at_request?: number | null
+          km_photo_url?: string | null
           notes?: string | null
+          plate_photo_url?: string | null
+          plate_recognized?: string | null
+          receipt_cnpj?: string | null
+          receipt_extracted?: Json
+          receipt_photo_url?: string | null
+          receipt_total?: number | null
           requested_at?: string
           requested_by: string
           station_name?: string | null
@@ -395,16 +464,27 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           authorization_code?: string | null
+          cnpj_match?: boolean | null
           company_id?: string
+          confirmed_at?: string | null
           created_at?: string
           driver_id?: string | null
           estimated_liters?: number | null
           estimated_value?: number | null
           expires_at?: string | null
           fuel_record_id?: string | null
+          fuel_station_id?: string | null
           fuel_type?: string | null
           id?: string
+          km_at_request?: number | null
+          km_photo_url?: string | null
           notes?: string | null
+          plate_photo_url?: string | null
+          plate_recognized?: string | null
+          receipt_cnpj?: string | null
+          receipt_extracted?: Json
+          receipt_photo_url?: string | null
+          receipt_total?: number | null
           requested_at?: string
           requested_by?: string
           station_name?: string | null
