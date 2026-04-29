@@ -203,7 +203,7 @@ export default function DocumentDialog({
         if (ext.issue_date) vehicleUpdate.crlv_issue_date = ext.issue_date;
         if (Object.keys(vehicleUpdate).length > 0) {
           const { error: vErr } = await supabase
-            .from("vehicles").update(vehicleUpdate).eq("id", form.entity_id);
+            .from("vehicles").update(vehicleUpdate as any).eq("id", form.entity_id);
           if (vErr) console.warn("vehicle sync failed:", vErr.message);
         }
       }
