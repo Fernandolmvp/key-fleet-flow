@@ -12,9 +12,10 @@ import {
 interface Counts {
   total: number; ativo: number; manutencao: number; parado: number;
   drivers: number; cnhVencendo: number;
+  docsVencidos: number; docsVencendo: number;
 }
 
-const defaultCounts: Counts = { total: 0, ativo: 0, manutencao: 0, parado: 0, drivers: 0, cnhVencendo: 0 };
+const defaultCounts: Counts = { total: 0, ativo: 0, manutencao: 0, parado: 0, drivers: 0, cnhVencendo: 0, docsVencidos: 0, docsVencendo: 0 };
 
 export default function Dashboard() {
   const { currentCompanyId } = useAuth();
@@ -25,12 +26,14 @@ export default function Dashboard() {
     if (!currentCompanyId) return;
     (async () => {
       setLoading(true);
-      const [{ data: vehicles }, { data: drivers }] = await Promise.all([
+      const [{ data: vehicles }, { data: drivers }, { data: documents }] = await Promise.all([
         supabase.from("vehicles").select("status").eq("company_id", currentCompanyId),
         supabase.from("drivers").select("cnh_expires_at").eq("company_id", currentCompanyId),
+        supabase.from("documents").select("status").eq("company_id", currentCompanyId),
       ]);
       const vs = vehicles ?? [];
       const ds = drivers ?? [];
+      const docs = documents ?? [];
       const in30 = new Date(); in30.setDate(in30.getDate() + 30);
       setCounts({
         total: vs.length,
@@ -39,6 +42,8 @@ export default function Dashboard() {
         parado: vs.filter((v: any) => v.status === "parado").length,
         drivers: ds.length,
         cnhVencendo: ds.filter((d: any) => d.cnh_expires_at && new Date(d.cnh_expires_at) <= in30).length,
+        docsVencidos: docs.filter((d: any) => d.status === "vencido").length,
+        docsVencendo: docs.filter((d: any) => d.status === "vencendo").length,
       });
       setLoading(false);
     })();
@@ -73,7 +78,13 @@ export default function Dashboard() {
         <KpiCard label="Custo médio /km" value="R$ 1,42" icon={Gauge} trend="↓ 6% vs mês anterior" />
         <KpiCard label="Consumo médio" value="9,8 km/L" icon={Fuel} trend="↑ 3% vs mês anterior" tone="success" />
         <KpiCard label="Alertas críticos" value={counts.cnhVencendo} icon={AlertTriangle} tone="warning" hint="CNH vencendo em 30 dias" />
-        <KpiCard label="Documentos vencendo" value="—" icon={FileWarning} hint="módulo em construção" />
+          <KpiCard
+            label="Documentos vencendo"
+            value={loading ? "—" : counts.docsVencendo + counts.docsVencidos}
+            icon={FileWarning}
+            tone={counts.docsVencidos > 0 ? "destructive" : counts.docsVencendo > 0 ? "warning" : undefined}
+            hint={`${counts.docsVencidos} vencidos · ${counts.docsVencendo} a vencer`}
+          />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

@@ -14,6 +14,7 @@ import Fuel from "./pages/app/Fuel";
 import Maintenance from "./pages/app/Maintenance";
 import Tires from "./pages/app/Tires";
 import Colaborador from "./pages/app/Colaborador";
+import Documents from "./pages/app/Documents";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="fuel" element={<Fuel />} />
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="tires" element={<Tires />} />
+              <Route path="documents" element={<Documents />} />
               <Route path="colaborador" element={<Colaborador />} />
             </Route>
             <Route path="*" element={<NotFound />} />
