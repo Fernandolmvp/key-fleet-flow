@@ -42,7 +42,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
     responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
     fipe_value: "", photos: [] as string[],
-    licensing_year: "", owner_name: "", crlv_issue_date: "", crlv_city: "",
+    licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
   });
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
-      licensing_year: "", owner_name: "", crlv_issue_date: "", crlv_city: "",
+      licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
     });
     setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +93,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
         fuel_type: data.fuel_type ?? f.fuel_type,
         vehicle_type: data.vehicle_type ?? f.vehicle_type,
         owner_name: data.owner_name ?? f.owner_name,
+        owner_doc: data.owner_doc ? String(data.owner_doc).replace(/\D/g, "") : f.owner_doc,
         crlv_city: data.crlv_city ?? f.crlv_city,
         crlv_issue_date: data.crlv_issue_date ?? f.crlv_issue_date,
         licensing_year: data.licensing_year ?? f.licensing_year,
@@ -124,6 +125,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       licensing_year: form.licensing_year ? Number(form.licensing_year) : null,
       crlv_issue_date: form.crlv_issue_date || null,
       owner_name: form.owner_name || null,
+      owner_doc: form.owner_doc || null,
       crlv_city: form.crlv_city || null,
     };
     delete payload.id;
@@ -205,6 +207,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           <div className="space-y-2"><Label>Vencimento seguro</Label><Input type="date" value={form.insurance_expires_at} onChange={(e) => setForm({ ...form, insurance_expires_at: e.target.value })} /></div>
           <div className="space-y-2"><Label>Valor FIPE (R$)</Label><Input type="number" step="0.01" value={form.fipe_value} onChange={(e) => setForm({ ...form, fipe_value: e.target.value })} /></div>
           <div className="space-y-2"><Label>Proprietário (CRLV)</Label><Input value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} placeholder="Nome conforme CRLV" /></div>
+          <div className="space-y-2"><Label>CPF / CNPJ do proprietário</Label><Input value={form.owner_doc} onChange={(e) => setForm({ ...form, owner_doc: e.target.value.replace(/\D/g, "") })} placeholder="Somente números" /></div>
           <div className="space-y-2"><Label>Município de emplacamento</Label><Input value={form.crlv_city} onChange={(e) => setForm({ ...form, crlv_city: e.target.value })} /></div>
           <div className="space-y-2"><Label>Data de emissão CRLV</Label><Input type="date" value={form.crlv_issue_date} onChange={(e) => setForm({ ...form, crlv_issue_date: e.target.value })} /></div>
           <div className="space-y-2">

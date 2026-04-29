@@ -191,6 +191,23 @@ export default function DocumentDialog({
         const { error } = await supabase.from("documents").insert(payload);
         if (error) throw error;
       }
+
+      // Se for CRLV de veículo, sincroniza dados extraídos no cadastro do veículo
+      if (form.entity_type === "vehicle" && form.doc_type === "crlv" && form.ai_extracted) {
+        const ext = form.ai_extracted as Record<string, any>;
+        const vehicleUpdate: Record<string, any> = {};
+        if (ext.licensing_year) vehicleUpdate.licensing_year = Number(ext.licensing_year);
+        if (ext.owner_name) vehicleUpdate.owner_name = ext.owner_name;
+        if (ext.owner_doc) vehicleUpdate.owner_doc = String(ext.owner_doc).replace(/\D/g, "");
+        if (ext.crlv_city) vehicleUpdate.crlv_city = ext.crlv_city;
+        if (ext.issue_date) vehicleUpdate.crlv_issue_date = ext.issue_date;
+        if (Object.keys(vehicleUpdate).length > 0) {
+          const { error: vErr } = await supabase
+            .from("vehicles").update(vehicleUpdate as any).eq("id", form.entity_id);
+          if (vErr) console.warn("vehicle sync failed:", vErr.message);
+        }
+      }
+
       toast.success("Documento salvo");
       if (warning) toast.warning(warning);
       onSaved();
