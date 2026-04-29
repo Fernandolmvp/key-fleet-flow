@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, ShieldCheck, Clock, Truck, LogOut, Receipt, CheckCircle2, UserCheck } from "lucide-react";
+import { Loader2, Plus, ShieldCheck, Clock, Truck, LogOut, Receipt, CheckCircle2, UserCheck, Camera, Gauge, Search, AlertTriangle, FileCheck } from "lucide-react";
 import { toast } from "sonner";
+import { extractDocument } from "@/lib/ai-extract";
 
 interface Auth {
   id: string; status: string; authorization_code: string | null;
   vehicle_id: string; estimated_liters: number | null; estimated_value: number | null;
   fuel_type: string | null; station_name: string | null;
   requested_at: string; approved_at: string | null; expires_at: string | null;
+  fuel_station_id: string | null; km_at_request: number | null; plate_recognized: string | null;
+  km_photo_url: string | null; plate_photo_url: string | null; receipt_photo_url: string | null;
+  receipt_cnpj: string | null; receipt_total: number | null; cnpj_match: boolean | null;
+  confirmed_at: string | null;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -25,32 +30,54 @@ const STATUS_TONE: Record<string, string> = {
   cancelada: "bg-muted text-muted-foreground border-border",
 };
 
+const onlyDigits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
+const normalizePlate = (s: string | null | undefined) => (s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
 export default function Colaborador() {
   const { currentCompanyId, user, signOut } = useAuth();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [auths, setAuths] = useState<Auth[]>([]);
   const [driver, setDriver] = useState<any | null>(null);
   const [managerName, setManagerName] = useState<string | null>(null);
+  const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [vehicleId, setVehicleId] = useState("");
+  // Etapas: 1-foto KM, 2-foto placa (IA valida), 3-posto, 4-revisar/enviar
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [kmPhoto, setKmPhoto] = useState<File | null>(null);
+  const [kmPhotoUrl, setKmPhotoUrl] = useState<string | null>(null);
+  const [kmRead, setKmRead] = useState<number | null>(null);
+  const [platePhoto, setPlatePhoto] = useState<File | null>(null);
+  const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
+  const [plateRead, setPlateRead] = useState<string | null>(null);
+  const [matchedVehicle, setMatchedVehicle] = useState<any | null>(null);
+  const [stationSearch, setStationSearch] = useState("");
+  const [stationId, setStationId] = useState("");
   const [estLiters, setEstLiters] = useState("");
   const [estValue, setEstValue] = useState("");
-  const [fuelType, setFuelType] = useState("");
-  const [station, setStation] = useState("");
+
+  // Confirmação pós-abastecimento
+  const [confirmAuthId, setConfirmAuthId] = useState<string | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+
+  const kmInputRef = useRef<HTMLInputElement>(null);
+  const plateInputRef = useRef<HTMLInputElement>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     if (!currentCompanyId || !user) return;
     setLoading(true);
-    const [{ data: v }, { data: a }, { data: drv }] = await Promise.all([
+    const [{ data: v }, { data: a }, { data: drv }, { data: st }] = await Promise.all([
       supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("company_id", currentCompanyId).order("plate"),
       supabase.from("fuel_authorizations").select("*").eq("company_id", currentCompanyId).eq("requested_by", user.id).order("requested_at", { ascending: false }).limit(20),
       supabase.from("drivers").select("id,full_name,auto_fuel_authorized,manager_user_id").eq("company_id", currentCompanyId).eq("user_id", user.id).maybeSingle(),
+      supabase.from("fuel_stations").select("id,name,cnpj,brand,city,state").eq("company_id", currentCompanyId).eq("active", true).order("name"),
     ]);
     setVehicles(v ?? []);
     setAuths((a ?? []) as Auth[]);
     setDriver(drv ?? null);
+    setStations(st ?? []);
 
     if (drv?.manager_user_id) {
       const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", drv.manager_user_id).maybeSingle();
@@ -63,19 +90,82 @@ export default function Colaborador() {
 
   useEffect(() => { load(); }, [currentCompanyId, user?.id]);
 
-  const submit = async () => {
-    if (!currentCompanyId || !user) return;
-    if (!vehicleId) return toast.error("Selecione o veículo");
+  const reset = () => {
+    setStep(1); setKmPhoto(null); setKmPhotoUrl(null); setKmRead(null);
+    setPlatePhoto(null); setPlatePhotoUrl(null); setPlateRead(null); setMatchedVehicle(null);
+    setStationSearch(""); setStationId(""); setEstLiters(""); setEstValue("");
+  };
+
+  // ETAPA 1 — Foto do KM
+  const handleKmPhoto = async (file: File) => {
+    if (!currentCompanyId) return;
     setBusy(true);
+    try {
+      const { data, archivedUrl } = await extractDocument({
+        type: "odometer", file, bucket: "fuel-photos", companyId: currentCompanyId,
+      });
+      const km = data?.km ? Number(data.km) : null;
+      if (!km) throw new Error("Não consegui ler o KM. Aproxime mais a câmera do hodômetro.");
+      setKmPhoto(file); setKmPhotoUrl(archivedUrl); setKmRead(km);
+      setStep(2);
+      toast.success(`KM identificado: ${km.toLocaleString("pt-BR")}`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha ao ler o KM");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ETAPA 2 — Foto da Placa (IA reconhece e bate com cadastro)
+  const handlePlatePhoto = async (file: File) => {
+    if (!currentCompanyId) return;
+    setBusy(true);
+    try {
+      const { data, archivedUrl } = await extractDocument({
+        type: "plate", file, bucket: "fuel-photos", companyId: currentCompanyId,
+      });
+      const plate = normalizePlate(data?.plate as string | null);
+      if (!plate) throw new Error("Não consegui ler a placa. Tente outro ângulo.");
+      const veh = vehicles.find((v) => normalizePlate(v.plate) === plate);
+      if (!veh) {
+        setPlatePhoto(file); setPlatePhotoUrl(archivedUrl); setPlateRead(plate); setMatchedVehicle(null);
+        throw new Error(`Placa ${plate} não está cadastrada. Procure seu gestor.`);
+      }
+      // KM lido tem que ser >= current_km
+      if (kmRead != null && veh.current_km != null && kmRead < veh.current_km) {
+        toast.warning(`Atenção: KM lido (${kmRead}) é menor que o último registrado (${veh.current_km}).`);
+      }
+      setPlatePhoto(file); setPlatePhotoUrl(archivedUrl); setPlateRead(plate); setMatchedVehicle(veh);
+      setStep(3);
+      toast.success(`Veículo identificado: ${veh.plate} ${veh.brand} ${veh.model}`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha ao ler a placa");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ETAPA 4 — Envia solicitação
+  const submit = async () => {
+    if (!currentCompanyId || !user || !matchedVehicle || !stationId || kmRead == null) {
+      return toast.error("Complete todas as etapas");
+    }
+    setBusy(true);
+    const station = stations.find((s) => s.id === stationId);
     const { error } = await supabase.from("fuel_authorizations").insert({
       company_id: currentCompanyId,
-      vehicle_id: vehicleId,
+      vehicle_id: matchedVehicle.id,
       requested_by: user.id,
       driver_id: driver?.id ?? null,
+      fuel_station_id: stationId,
+      station_name: station?.name ?? null,
       estimated_liters: estLiters ? Number(estLiters) : null,
       estimated_value: estValue ? Number(estValue) : null,
-      fuel_type: fuelType || null,
-      station_name: station || null,
+      fuel_type: matchedVehicle.fuel_type || null,
+      km_at_request: kmRead,
+      km_photo_url: kmPhotoUrl,
+      plate_photo_url: platePhotoUrl,
+      plate_recognized: plateRead,
       status: "pendente",
     });
     setBusy(false);
@@ -83,11 +173,87 @@ export default function Colaborador() {
     toast.success(driver?.auto_fuel_authorized
       ? "Autorizado! Use o código gerado abaixo."
       : `Solicitação enviada para ${managerName || "seu gestor"}.`);
-    setVehicleId(""); setEstLiters(""); setEstValue(""); setFuelType(""); setStation("");
+    reset();
     load();
   };
 
+  // CONFIRMAÇÃO PÓS-ABASTECIMENTO — Foto do cupom + IA + valida CNPJ
+  const handleReceiptPhoto = async (auth: Auth, file: File) => {
+    if (!currentCompanyId) return;
+    setReceiptBusy(true);
+    try {
+      const { data, archivedUrl } = await extractDocument({
+        type: "fuel_receipt", file, bucket: "fuel-photos", companyId: currentCompanyId,
+      });
+      const cupomCnpj = onlyDigits(data?.station_cnpj as string | null);
+      let stationCnpj = "";
+      if (auth.fuel_station_id) {
+        const s = stations.find((x) => x.id === auth.fuel_station_id);
+        stationCnpj = onlyDigits(s?.cnpj);
+      }
+      const cnpjMatch = stationCnpj && cupomCnpj ? stationCnpj === cupomCnpj : null;
+
+      const updateData: any = {
+        receipt_photo_url: archivedUrl,
+        receipt_cnpj: cupomCnpj || null,
+        receipt_total: data?.total_value ?? null,
+        receipt_extracted: data,
+        cnpj_match: cnpjMatch,
+        confirmed_at: new Date().toISOString(),
+      };
+      // Bloqueia: se CNPJ não bate, marca como anomalia (status fica pendente revisão pelo gestor)
+      if (cnpjMatch === false) {
+        updateData.status = "pendente";
+        updateData.notes = `[ANOMALIA] CNPJ do cupom (${cupomCnpj}) não confere com o posto selecionado (${stationCnpj}).`;
+      } else {
+        updateData.status = "utilizada";
+      }
+
+      const { error: upErr } = await supabase
+        .from("fuel_authorizations")
+        .update(updateData)
+        .eq("id", auth.id);
+      if (upErr) throw upErr;
+
+      // Insere itens do cupom (motorista não pode editar/excluir depois)
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (items.length) {
+        const rows = items.map((it: any) => ({
+          company_id: currentCompanyId,
+          authorization_id: auth.id,
+          description: String(it.description ?? "Item"),
+          quantity: Number(it.quantity ?? 1),
+          unit_value: Number(it.unit_value ?? 0),
+          total_value: Number(it.total ?? 0),
+          is_fuel: !!it.is_fuel,
+          fuel_type: it.fuel_type ?? null,
+        }));
+        await supabase.from("fuel_authorization_items").insert(rows);
+      }
+
+      if (cnpjMatch === false) {
+        toast.error("CNPJ do cupom não confere com o posto. Solicitação enviada para revisão do gestor.");
+      } else {
+        toast.success("Abastecimento confirmado!");
+      }
+      setConfirmAuthId(null);
+      load();
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha ao processar cupom");
+    } finally {
+      setReceiptBusy(false);
+    }
+  };
+
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
+
+  const filteredStations = useMemo(() => {
+    const q = stationSearch.trim().toLowerCase();
+    if (!q) return stations;
+    return stations.filter((s) =>
+      [s.name, s.brand, s.cnpj, s.city].filter(Boolean).some((v: string) => String(v).toLowerCase().includes(q))
+    );
+  }, [stations, stationSearch]);
 
   return (
     <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-10">
@@ -135,47 +301,137 @@ export default function Colaborador() {
         </div>
       )}
 
-      {/* Form de nova solicitação */}
+      {/* Wizard de nova solicitação */}
       <div className="surface-card rounded-xl p-4 space-y-3">
-        <h3 className="font-display font-semibold flex items-center gap-2 text-sm"><Plus className="h-4 w-4" /> Nova solicitação</h3>
-        <div>
-          <Label className="text-xs">Veículo *</Label>
-          <Select value={vehicleId} onValueChange={(v) => {
-            setVehicleId(v);
-            const veh = vehicles.find((x) => x.id === v);
-            if (veh?.fuel_type) setFuelType(veh.fuel_type);
-          }}>
-            <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-            <SelectContent>
-              {vehicles.map((v) => (
-                <SelectItem key={v.id} value={v.id}>{v.plate} — {v.brand} {v.model}</SelectItem>
+        <div className="flex items-center justify-between">
+          <h3 className="font-display font-semibold flex items-center gap-2 text-sm">
+            <Plus className="h-4 w-4" /> Nova solicitação
+          </h3>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4].map((s) => (
+              <span key={s} className={`h-1.5 w-6 rounded-full ${step >= s ? "bg-primary" : "bg-border"}`} />
+            ))}
+          </div>
+        </div>
+
+        {/* ETAPA 1 — KM */}
+        {step === 1 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+              <Gauge className="h-4 w-4" /> 1. Foto do hodômetro (KM)
+            </div>
+            <p className="text-xs text-muted-foreground">Tire uma foto nítida do painel mostrando o KM total do veículo.</p>
+            <input ref={kmInputRef} type="file" accept="image/*" capture="environment" hidden
+              onChange={(e) => e.target.files?.[0] && handleKmPhoto(e.target.files[0])} />
+            <Button onClick={() => kmInputRef.current?.click()} disabled={busy}
+              className="w-full bg-gradient-primary text-primary-foreground h-12">
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+              Fotografar KM
+            </Button>
+          </div>
+        )}
+
+        {/* ETAPA 2 — Placa */}
+        {step === 2 && (
+          <div className="space-y-3">
+            <div className="rounded-md bg-success/10 border border-success/30 p-2 text-xs flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+              KM: <strong>{kmRead?.toLocaleString("pt-BR")}</strong>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+              <Truck className="h-4 w-4" /> 2. Foto da placa
+            </div>
+            <p className="text-xs text-muted-foreground">Fotografe a placa do veículo. A IA vai validar com o cadastro da empresa.</p>
+            <input ref={plateInputRef} type="file" accept="image/*" capture="environment" hidden
+              onChange={(e) => e.target.files?.[0] && handlePlatePhoto(e.target.files[0])} />
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setStep(1)}>Voltar</Button>
+              <Button onClick={() => plateInputRef.current?.click()} disabled={busy}
+                className="bg-gradient-primary text-primary-foreground">
+                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+                Fotografar placa
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA 3 — Posto */}
+        {step === 3 && matchedVehicle && (
+          <div className="space-y-3">
+            <div className="rounded-md bg-success/10 border border-success/30 p-2 text-xs">
+              <div className="flex items-center gap-2"><Truck className="h-3.5 w-3.5 text-success" />
+                <span className="font-mono font-semibold">{matchedVehicle.plate}</span> · {matchedVehicle.brand} {matchedVehicle.model}
+              </div>
+              <div className="text-muted-foreground mt-0.5">KM: {kmRead?.toLocaleString("pt-BR")}</div>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+              <Search className="h-4 w-4" /> 3. Selecione o posto
+            </div>
+            <Input placeholder="Buscar por nome, CNPJ ou cidade..." value={stationSearch}
+              onChange={(e) => setStationSearch(e.target.value)} />
+            <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-md p-1">
+              {filteredStations.length === 0 ? (
+                <p className="text-center text-xs text-muted-foreground py-4">Nenhum posto encontrado.</p>
+              ) : filteredStations.map((s) => (
+                <button key={s.id} type="button"
+                  onClick={() => setStationId(s.id)}
+                  className={`w-full text-left rounded-md p-2 text-xs transition ${stationId === s.id ? "bg-primary/15 border border-primary/40" : "hover:bg-muted/40 border border-transparent"}`}>
+                  <div className="font-semibold">{s.name}</div>
+                  <div className="text-muted-foreground">{s.brand && `${s.brand} · `}{s.city ?? "—"}{s.state && `/${s.state}`} {s.cnpj && ` · CNPJ ${s.cnpj}`}</div>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs">Litros est.</Label>
-            <Input type="number" step="0.01" inputMode="decimal" value={estLiters} onChange={(e) => setEstLiters(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Litros est.</Label>
+                <Input type="number" step="0.01" inputMode="decimal" value={estLiters} onChange={(e) => setEstLiters(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Valor R$</Label>
+                <Input type="number" step="0.01" inputMode="decimal" value={estValue} onChange={(e) => setEstValue(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
+              <Button onClick={() => setStep(4)} disabled={!stationId} className="bg-gradient-primary text-primary-foreground">
+                Revisar
+              </Button>
+            </div>
           </div>
-          <div>
-            <Label className="text-xs">Valor (R$)</Label>
-            <Input type="number" step="0.01" inputMode="decimal" value={estValue} onChange={(e) => setEstValue(e.target.value)} />
+        )}
+
+        {/* ETAPA 4 — Revisão */}
+        {step === 4 && matchedVehicle && (
+          <div className="space-y-3">
+            <div className="rounded-md border border-border p-3 space-y-1 text-xs">
+              <div><span className="text-muted-foreground">Veículo:</span> <strong>{matchedVehicle.plate}</strong> · {matchedVehicle.brand} {matchedVehicle.model}</div>
+              <div><span className="text-muted-foreground">KM:</span> {kmRead?.toLocaleString("pt-BR")}</div>
+              <div><span className="text-muted-foreground">Posto:</span> {stations.find((s) => s.id === stationId)?.name}</div>
+              {estLiters && <div><span className="text-muted-foreground">Litros est.:</span> {estLiters}</div>}
+              {estValue && <div><span className="text-muted-foreground">Valor est.:</span> R$ {estValue}</div>}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setStep(3)}>Voltar</Button>
+              <Button onClick={submit} disabled={busy} className="bg-gradient-primary text-primary-foreground">
+                {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {driver?.auto_fuel_authorized ? "Gerar código" : "Enviar"}
+              </Button>
+            </div>
+            <Button variant="ghost" size="sm" onClick={reset} className="w-full text-xs">Cancelar</Button>
           </div>
-        </div>
-        <div>
-          <Label className="text-xs">Posto (opcional)</Label>
-          <Input value={station} onChange={(e) => setStation(e.target.value)} placeholder="Nome do posto" />
-        </div>
-        <Button onClick={submit} disabled={busy} className="w-full bg-gradient-primary text-primary-foreground h-11">
-          {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {driver?.auto_fuel_authorized ? "Solicitar e gerar código" : "Enviar para o gestor"}
-        </Button>
+        )}
       </div>
 
       {/* Histórico */}
       <div className="space-y-2">
         <h3 className="font-display font-semibold text-sm px-1">Minhas solicitações</h3>
+        <input ref={receiptInputRef} type="file" accept="image/*" capture="environment" hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            const a = auths.find((x) => x.id === confirmAuthId);
+            if (f && a) handleReceiptPhoto(a, f);
+            e.target.value = "";
+          }} />
         {loading ? (
           <div className="text-center text-xs text-muted-foreground py-6">Carregando...</div>
         ) : auths.length === 0 ? (
@@ -186,6 +442,7 @@ export default function Colaborador() {
         ) : (
           auths.map((a) => {
             const veh = vehicles.find((v) => v.id === a.vehicle_id);
+            const canConfirm = a.status === "aprovada" && !a.confirmed_at;
             return (
               <div key={a.id} className="surface-card rounded-xl p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -193,6 +450,7 @@ export default function Colaborador() {
                     <div className="flex items-center gap-2">
                       <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
                       <span className="font-mono text-primary font-semibold text-sm">{veh?.plate ?? "—"}</span>
+                      {a.km_at_request && <span className="text-[10px] text-muted-foreground">· {a.km_at_request.toLocaleString("pt-BR")} km</span>}
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -204,6 +462,26 @@ export default function Colaborador() {
                 {a.status === "aprovada" && a.authorization_code && (
                   <div className="font-mono text-center text-lg font-bold text-success tracking-widest bg-success/5 rounded-md py-1.5">
                     {a.authorization_code}
+                  </div>
+                )}
+                {canConfirm && (
+                  <Button size="sm" variant="outline" className="w-full"
+                    disabled={receiptBusy}
+                    onClick={() => { setConfirmAuthId(a.id); receiptInputRef.current?.click(); }}>
+                    {receiptBusy && confirmAuthId === a.id
+                      ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Lendo cupom...</>
+                      : <><FileCheck className="h-3.5 w-3.5 mr-1.5" />Confirmar com foto do cupom</>}
+                  </Button>
+                )}
+                {a.confirmed_at && a.cnpj_match === false && (
+                  <div className="rounded-md bg-destructive/10 border border-destructive/40 p-2 text-[11px] flex items-start gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                    <span>CNPJ do cupom não confere com o posto. Em revisão pelo gestor.</span>
+                  </div>
+                )}
+                {a.confirmed_at && a.cnpj_match !== false && (
+                  <div className="text-[11px] text-success flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Confirmado · R$ {Number(a.receipt_total ?? 0).toFixed(2)}
                   </div>
                 )}
               </div>
