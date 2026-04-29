@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store, ClipboardCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ const nav = [
   { to: "/app/drivers", label: "Motoristas", icon: Users },
   { to: "/app/fuel-stations", label: "Postos", icon: Store },
   { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
+  { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals" },
   { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
   { to: "/app/tires", label: "Pneus", icon: CircleDot },
   { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents" },
@@ -31,6 +32,7 @@ export default function AppLayout() {
   const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly } = useAuth();
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
+  const [approvalPending, setApprovalPending] = useState(0);
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -41,6 +43,14 @@ export default function AppLayout() {
         .eq("company_id", currentCompanyId)
         .in("status", ["vencido", "vencendo"]);
       setDocPending(count || 0);
+    })();
+    (async () => {
+      const { count } = await supabase
+        .from("fuel_authorizations")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", currentCompanyId)
+        .eq("status", "pendente");
+      setApprovalPending(count || 0);
     })();
   }, [currentCompanyId, loc.pathname]);
 
@@ -90,6 +100,11 @@ export default function AppLayout() {
               {it.badgeKey === "documents" && docPending > 0 && (
                 <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
                   {docPending}
+                </span>
+              )}
+              {it.badgeKey === "approvals" && approvalPending > 0 && (
+                <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
+                  {approvalPending}
                 </span>
               )}
               {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
