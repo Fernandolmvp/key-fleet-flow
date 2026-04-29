@@ -220,6 +220,49 @@ const TOOL_DOCUMENT = {
   },
 };
 
+const TOOL_FUEL_RECEIPT = {
+  type: "function",
+  function: {
+    name: "extract_fuel_receipt",
+    description:
+      "Extrai dados de cupom fiscal/NFC-e/recibo de posto de combustível brasileiro. Retorna razão social, CNPJ, data, total e TODOS os itens (combustível e extras como aditivo, troca de óleo, etc.).",
+    parameters: {
+      type: "object",
+      properties: {
+        station_name: { type: ["string", "null"], description: "Razão social do posto" },
+        station_cnpj: { type: ["string", "null"], description: "CNPJ apenas dígitos" },
+        city: { type: ["string", "null"] },
+        state: { type: ["string", "null"] },
+        issued_at: { type: ["string", "null"], description: "Data e hora da emissão YYYY-MM-DD HH:MM" },
+        receipt_number: { type: ["string", "null"], description: "Número do cupom/NFC-e" },
+        total_value: { type: ["number", "null"], description: "Valor total do cupom" },
+        items: {
+          type: "array",
+          description: "Itens listados no cupom",
+          items: {
+            type: "object",
+            properties: {
+              description: { type: "string", description: "Descrição do produto" },
+              quantity: { type: ["number", "null"] },
+              unit_value: { type: ["number", "null"] },
+              total: { type: ["number", "null"] },
+              is_fuel: { type: ["boolean", "null"], description: "true se for combustível (gasolina, etanol, diesel, etc.)" },
+              fuel_type: {
+                type: ["string", "null"],
+                enum: ["gasolina", "etanol", "diesel", "diesel_s10", "flex", "gnv", null],
+              },
+            },
+            required: ["description"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["items", "total_value"],
+      additionalProperties: false,
+    },
+  },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -259,6 +302,9 @@ Deno.serve(async (req) => {
     } else if (type === "document") {
       tool = TOOL_DOCUMENT; fnName = "extract_document_generic";
       sys = "Você é um especialista em documentos de frota brasileiros: CRLV, IPVA, Licenciamento, Apólice de Seguro, CNH, Exame Médico, Toxicológico, MOPP. Identifique o tipo do documento e extraia número, emissor, datas e titular (placa ou CPF). Para CRLV, extraia também: proprietário (owner_name), CPF/CNPJ do proprietário (owner_doc, apenas dígitos), município (crlv_city) e ANO DO EXERCÍCIO de licenciamento (licensing_year — número em destaque no topo, ex.: 'EXERCÍCIO 2026'). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
+    } else if (type === "fuel_receipt") {
+      tool = TOOL_FUEL_RECEIPT; fnName = "extract_fuel_receipt";
+      sys = "Você lê cupons fiscais (NFC-e/SAT/ECF) de postos de combustível brasileiros. Extraia razão social, CNPJ (apenas dígitos), data, valor total e TODOS os itens — identifique combustíveis (gasolina, etanol, diesel, S10, GNV) marcando is_fuel=true e o fuel_type. Inclua também itens não-combustível (aditivo, óleo, água, etc.) com is_fuel=false. Quantidade, valor unitário e total exatamente como no cupom.";
     } else {
       tool = TOOL_MAINT; fnName = "extract_maintenance_invoice";
       sys = "Você é um especialista em notas fiscais e ordens de serviço de oficinas mecânicas brasileiras. Extraia dados de oficina, valores (mão de obra, peças, total), data, e itens individuais. Datas em ISO YYYY-MM-DD.";
