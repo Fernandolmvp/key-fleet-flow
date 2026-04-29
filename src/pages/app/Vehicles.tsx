@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,9 @@ export default function Vehicles() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
+  const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("vehicles:view") as "grid" | "list") || "grid");
+
+  useEffect(() => { localStorage.setItem("vehicles:view", view); }, [view]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -105,9 +108,25 @@ export default function Vehicles() {
       </div>
 
       <div className="surface-card rounded-xl p-4">
-        <div className="relative max-w-md">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9 font-mono uppercase" placeholder="Pesquisar por placa, marca, modelo ou proprietário" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9 font-mono uppercase" placeholder="Pesquisar por placa, marca, modelo ou proprietário" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="ml-auto inline-flex rounded-lg border border-border overflow-hidden">
+            <Button
+              type="button" size="sm" variant={view === "grid" ? "default" : "ghost"}
+              className="rounded-none px-3" onClick={() => setView("grid")} title="Visualização em quadrante"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button" size="sm" variant={view === "list" ? "default" : "ghost"}
+              className="rounded-none px-3" onClick={() => setView("list")} title="Visualização em lista"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -119,7 +138,7 @@ export default function Vehicles() {
           <h3 className="font-display font-semibold">Nenhum veículo</h3>
           <p className="text-sm text-muted-foreground mt-1">Cadastre o primeiro veículo da frota.</p>
         </div>
-      ) : (
+      ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((v) => {
             const crlv = findCrlv(v.id);
@@ -194,6 +213,84 @@ export default function Vehicles() {
             </div>
             );
           })}
+        </div>
+      ) : (
+        <div className="surface-card rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3">Veículo</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Licenciamento</th>
+                  <th className="text-left px-4 py-3">Seguro</th>
+                  <th className="text-left px-4 py-3">KM</th>
+                  <th className="text-right px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((v) => {
+                  const crlv = findCrlv(v.id);
+                  const insurance = findInsurance(v.id);
+                  const licensed = v.licensing_year === currentYear;
+                  const insured = isInsured(v);
+                  const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
+                  const insuranceUrl = insurance?.file_url || null;
+                  return (
+                    <tr key={v.id} className="border-t border-border hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-14 rounded bg-muted/30 overflow-hidden grid place-items-center shrink-0">
+                            {v.photos?.[0]
+                              ? <img src={v.photos[0]} alt="" className="h-full w-full object-cover" />
+                              : <Truck className="h-4 w-4 text-muted-foreground" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-mono font-bold text-primary">{v.plate}</div>
+                            <div className="text-xs text-muted-foreground truncate">{v.brand} {v.model} {v.year_model ?? ""}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={`capitalize border ${statusTone[v.status] ?? ""}`}>{v.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
+                          {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                          {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exerc."}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
+                          {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+                          {insured ? "Segurado" : "Sem seguro"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{v.current_km.toLocaleString("pt-BR")}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex gap-1">
+                          <Button size="sm" variant="ghost" disabled={!crlvUrl}
+                            onClick={() => crlvUrl && window.open(crlvUrl, "_blank")} title="Ver CRLV">
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={!insuranceUrl}
+                            onClick={() => insuranceUrl && window.open(insuranceUrl, "_blank")} title="Ver apólice">
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditing(v as any); setOpen(true); }} title="Editar">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(v.id)} title="Excluir">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
