@@ -10,11 +10,13 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
   cnh_number: string | null; cnh_category: string | null; cnh_expires_at: string | null;
   medical_exam_expires_at: string | null; status: string; photo_url: string | null;
+  user_id: string | null; auto_fuel_authorized: boolean | null; manager_user_id: string | null;
 }
 
 const STATUSES = ["ativo","inativo","ferias","afastado"];
@@ -22,6 +24,7 @@ const STATUSES = ["ativo","inativo","ferias","afastado"];
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
   const [items, setItems] = useState<Driver[]>([]);
+  const [managers, setManagers] = useState<{ user_id: string; name: string }[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
@@ -32,7 +35,7 @@ export default function Drivers() {
   const [form, setForm] = useState<any>(blank());
 
   function blank() {
-    return { full_name: "", cpf: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "" };
+    return { full_name: "", cpf: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "" };
   }
 
   const load = async () => {
@@ -42,6 +45,21 @@ export default function Drivers() {
       .order("full_name");
     if (error) toast.error(error.message);
     setItems((data ?? []) as Driver[]);
+
+    // Carrega gestores da empresa (admin/gestor_frota)
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .eq("company_id", currentCompanyId)
+      .in("role", ["admin", "gestor_frota"]);
+    const ids = Array.from(new Set((roles ?? []).map((r: any) => r.user_id)));
+    if (ids.length) {
+      const { data: profs } = await supabase
+        .from("profiles").select("id, full_name").in("id", ids);
+      setManagers((profs ?? []).map((p: any) => ({ user_id: p.id, name: p.full_name || "Gestor" })));
+    } else {
+      setManagers([]);
+    }
   };
   useEffect(() => { load(); }, [currentCompanyId]);
 
@@ -109,6 +127,9 @@ export default function Drivers() {
       ...form, company_id: currentCompanyId,
       cnh_expires_at: form.cnh_expires_at || null,
       medical_exam_expires_at: form.medical_exam_expires_at || null,
+      user_id: form.user_id || null,
+      manager_user_id: form.manager_user_id || null,
+      auto_fuel_authorized: !!form.auto_fuel_authorized,
     };
     delete payload.id; delete payload.created_at; delete payload.updated_at;
     const op = editing
@@ -255,6 +276,36 @@ export default function Drivers() {
             <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
             <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+
+            <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Autorização automática de abastecimento</p>
+                  <p className="text-xs text-muted-foreground">Quando ligado, as solicitações deste colaborador são aprovadas na hora, sem passar pelo gestor.</p>
+                </div>
+                <Switch
+                  checked={!!form.auto_fuel_authorized}
+                  onCheckedChange={(v) => setForm({ ...form, auto_fuel_authorized: v })}
+                />
+              </div>
+
+              {!form.auto_fuel_authorized && (
+                <div className="space-y-2">
+                  <Label>Gestor responsável pela aprovação</Label>
+                  <Select value={form.manager_user_id || ""} onValueChange={(v) => setForm({ ...form, manager_user_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar gestor..." /></SelectTrigger>
+                    <SelectContent>
+                      {managers.length === 0 ? (
+                        <div className="p-2 text-xs text-muted-foreground">Nenhum gestor cadastrado na empresa</div>
+                      ) : managers.map((m) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">O nome aparece para o colaborador no app, indicando quem precisa autorizar.</p>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
