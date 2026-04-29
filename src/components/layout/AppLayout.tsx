@@ -1,5 +1,7 @@
 import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
   CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck
@@ -17,7 +19,7 @@ const nav = [
   { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
   { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
   { to: "/app/tires", label: "Pneus", icon: CircleDot },
-  { to: "/app/documents", label: "Documentação", icon: FileText, soon: true },
+  { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents" },
   { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
   { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true },
@@ -27,6 +29,19 @@ const nav = [
 export default function AppLayout() {
   const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly } = useAuth();
   const loc = useLocation();
+  const [docPending, setDocPending] = useState(0);
+
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    (async () => {
+      const { count } = await supabase
+        .from("documents")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", currentCompanyId)
+        .in("status", ["vencido", "vencendo"]);
+      setDocPending(count || 0);
+    })();
+  }, [currentCompanyId, loc.pathname]);
 
   if (loading) return (
     <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
@@ -71,6 +86,11 @@ export default function AppLayout() {
             >
               <it.icon className="h-4 w-4" />
               <span className="flex-1">{it.label}</span>
+              {it.badgeKey === "documents" && docPending > 0 && (
+                <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
+                  {docPending}
+                </span>
+              )}
               {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
             </NavLink>
           ))}
