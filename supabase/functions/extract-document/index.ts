@@ -32,6 +32,7 @@ const TOOL_VEHICLE = {
         },
         vehicle_type: { type: ["string", "null"], description: "Sedan, utilitário, caminhão, etc" },
         owner_name: { type: ["string", "null"], description: "Nome do proprietário conforme CRLV" },
+        owner_doc: { type: ["string", "null"], description: "CPF ou CNPJ do proprietário, apenas dígitos, sem pontuação" },
         crlv_city: { type: ["string", "null"], description: "Município de emplacamento (cidade) conforme CRLV" },
         crlv_issue_date: { type: ["string", "null"], description: "Data de emissão do CRLV YYYY-MM-DD" },
         licensing_year: { type: ["integer", "null"], description: "Ano do exercício de licenciamento (ex.: 2026)" },
@@ -238,7 +239,7 @@ Deno.serve(async (req) => {
     let tool: any, fnName: string, sys: string;
     if (type === "vehicle") {
       tool = TOOL_VEHICLE; fnName = "extract_vehicle";
-      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). Extraia os dados do documento com precisão. Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen.";
+      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). Extraia TODOS os dados visíveis com precisão, incluindo: PROPRIETÁRIO (nome completo), CPF/CNPJ do proprietário (apenas dígitos), MUNICÍPIO de emplacamento (geralmente próximo ao UF, na seção do proprietário), DATA DE EMISSÃO do CRLV (campo 'Local e Data' ou 'Data Emissão' — fica próximo ao código de barras/autenticação), e EXERCÍCIO (ano do licenciamento, geralmente em destaque no topo, ex.: 'EXERCÍCIO 2026'). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
     } else if (type === "driver") {
       tool = TOOL_DRIVER; fnName = "extract_driver";
       sys = "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. Extraia os dados com precisão. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
@@ -253,7 +254,7 @@ Deno.serve(async (req) => {
       sys = "Você lê notas fiscais de pneus (compra ou recapagem). Cada item é um pneu individual: marca, modelo, medida (ex.: 295/80 R22.5), DOT, preço unitário. Datas em ISO YYYY-MM-DD.";
     } else if (type === "document") {
       tool = TOOL_DOCUMENT; fnName = "extract_document_generic";
-      sys = "Você é um especialista em documentos de frota brasileiros: CRLV, IPVA, Licenciamento, Apólice de Seguro, CNH, Exame Médico, Toxicológico, MOPP. Identifique o tipo do documento e extraia número, emissor, datas e titular (placa ou CPF). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF apenas dígitos.";
+      sys = "Você é um especialista em documentos de frota brasileiros: CRLV, IPVA, Licenciamento, Apólice de Seguro, CNH, Exame Médico, Toxicológico, MOPP. Identifique o tipo do documento e extraia número, emissor, datas e titular (placa ou CPF). Para CRLV, extraia também: proprietário (owner_name), CPF/CNPJ do proprietário (owner_doc, apenas dígitos), município (crlv_city) e ANO DO EXERCÍCIO de licenciamento (licensing_year — número em destaque no topo, ex.: 'EXERCÍCIO 2026'). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
     } else {
       tool = TOOL_MAINT; fnName = "extract_maintenance_invoice";
       sys = "Você é um especialista em notas fiscais e ordens de serviço de oficinas mecânicas brasileiras. Extraia dados de oficina, valores (mão de obra, peças, total), data, e itens individuais. Datas em ISO YYYY-MM-DD.";
