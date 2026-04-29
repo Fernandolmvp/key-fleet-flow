@@ -268,6 +268,75 @@ export type Database = {
           },
         ]
       }
+      fuel_authorizations: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          authorization_code: string | null
+          company_id: string
+          created_at: string
+          driver_id: string | null
+          estimated_liters: number | null
+          estimated_value: number | null
+          expires_at: string | null
+          fuel_record_id: string | null
+          fuel_type: string | null
+          id: string
+          notes: string | null
+          requested_at: string
+          requested_by: string
+          station_name: string | null
+          status: Database["public"]["Enums"]["fuel_auth_status"]
+          updated_at: string
+          used_at: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          authorization_code?: string | null
+          company_id: string
+          created_at?: string
+          driver_id?: string | null
+          estimated_liters?: number | null
+          estimated_value?: number | null
+          expires_at?: string | null
+          fuel_record_id?: string | null
+          fuel_type?: string | null
+          id?: string
+          notes?: string | null
+          requested_at?: string
+          requested_by: string
+          station_name?: string | null
+          status?: Database["public"]["Enums"]["fuel_auth_status"]
+          updated_at?: string
+          used_at?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          authorization_code?: string | null
+          company_id?: string
+          created_at?: string
+          driver_id?: string | null
+          estimated_liters?: number | null
+          estimated_value?: number | null
+          expires_at?: string | null
+          fuel_record_id?: string | null
+          fuel_type?: string | null
+          id?: string
+          notes?: string | null
+          requested_at?: string
+          requested_by?: string
+          station_name?: string | null
+          status?: Database["public"]["Enums"]["fuel_auth_status"]
+          updated_at?: string
+          used_at?: string | null
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
       fuel_records: {
         Row: {
           anomalies: Database["public"]["Enums"]["fuel_anomaly"][]
@@ -407,6 +476,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      maintenance_checklist_items: {
+        Row: {
+          category: string | null
+          checked: boolean
+          company_id: string
+          created_at: string
+          id: string
+          item_key: string
+          item_label: string
+          maintenance_record_id: string
+          notes: string | null
+        }
+        Insert: {
+          category?: string | null
+          checked?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          item_key: string
+          item_label: string
+          maintenance_record_id: string
+          notes?: string | null
+        }
+        Update: {
+          category?: string | null
+          checked?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          item_key?: string
+          item_label?: string
+          maintenance_record_id?: string
+          notes?: string | null
+        }
+        Relationships: []
       }
       maintenance_records: {
         Row: {
@@ -938,6 +1043,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      generate_fuel_auth_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _company_id: string
@@ -976,6 +1082,13 @@ export type Database = {
         | "valor_atipico"
         | "horario_suspeito"
         | "cidade_incomum"
+      fuel_auth_status:
+        | "pendente"
+        | "aprovada"
+        | "recusada"
+        | "utilizada"
+        | "expirada"
+        | "cancelada"
       fuel_type:
         | "gasolina"
         | "etanol"
@@ -1170,6 +1283,14 @@ export const Constants = {
         "valor_atipico",
         "horario_suspeito",
         "cidade_incomum",
+      ],
+      fuel_auth_status: [
+        "pendente",
+        "aprovada",
+        "recusada",
+        "utilizada",
+        "expirada",
+        "cancelada",
       ],
       fuel_type: [
         "gasolina",

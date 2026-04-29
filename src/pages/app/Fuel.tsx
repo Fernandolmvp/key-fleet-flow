@@ -10,6 +10,8 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import { Badge } from "@/components/ui/badge";
 import { ANOMALY_LABEL, SEVERITY_TONE, fmtMoney, fmtNum } from "@/lib/fuel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, X, ShieldCheck, Clock } from "lucide-react";
 
 interface Row {
   id: string; fueled_at: string; station_name: string | null; city: string | null;
@@ -21,12 +23,14 @@ interface Row {
 }
 
 export default function Fuel() {
-  const { currentCompanyId } = useAuth();
+  const { currentCompanyId, user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [auths, setAuths] = useState<any[]>([]);
+  const [authBusy, setAuthBusy] = useState<string | null>(null);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -43,6 +47,31 @@ export default function Fuel() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+
+  const loadAuths = async () => {
+    if (!currentCompanyId) return;
+    const { data } = await supabase
+      .from("fuel_authorizations")
+      .select("*, vehicles:vehicle_id(plate,brand,model)")
+      .eq("company_id", currentCompanyId)
+      .order("requested_at", { ascending: false })
+      .limit(100);
+    setAuths(data ?? []);
+  };
+  useEffect(() => { loadAuths(); }, [currentCompanyId]);
+
+  const updateAuth = async (id: string, status: "aprovada" | "recusada" | "cancelada") => {
+    setAuthBusy(id);
+    const { error } = await supabase.from("fuel_authorizations").update({
+      status, approved_by: user?.id ?? null,
+    }).eq("id", id);
+    setAuthBusy(null);
+    if (error) return toast.error(error.message);
+    toast.success(status === "aprovada" ? "Autorização aprovada com código gerado" : "Solicitação atualizada");
+    loadAuths();
+  };
+
+  const pendingAuths = useMemo(() => auths.filter((a) => a.status === "pendente"), [auths]);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este abastecimento?")) return;
@@ -134,6 +163,16 @@ export default function Fuel() {
         <KpiCard label="Anomalias detectadas" value={stats.anomalies} icon={AlertTriangle} tone={stats.anomalies > 0 ? "warning" : "success"} hint="lançamentos com alerta" />
       </div>
 
+      <Tabs defaultValue="records">
+        <TabsList>
+          <TabsTrigger value="records">Histórico</TabsTrigger>
+          <TabsTrigger value="auths">
+            Autorizações
+            {pendingAuths.length > 0 && <Badge className="ml-2 bg-warning/30 text-warning">{pendingAuths.length}</Badge>}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="records" className="space-y-6 mt-4">
       {monthly.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="surface-card rounded-xl p-6 lg:col-span-2">
@@ -248,6 +287,61 @@ export default function Fuel() {
           </div>
         </div>
       )}
+
+        </TabsContent>
+
+        <TabsContent value="auths" className="mt-4 space-y-3">
+          {auths.length === 0 ? (
+            <div className="surface-card rounded-xl p-12 text-center">
+              <ShieldCheck className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <h3 className="font-display font-semibold">Nenhuma solicitação</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Os motoristas usam a Área do Colaborador para solicitar autorização de abastecimento.
+              </p>
+            </div>
+          ) : (
+            auths.map((a: any) => (
+              <div key={a.id} className="surface-card rounded-xl p-4 flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-primary font-semibold">{a.vehicles?.plate ?? "—"}</span>
+                    <span className="text-xs text-muted-foreground">{a.vehicles?.brand} {a.vehicles?.model}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                    <Clock className="h-3 w-3" />
+                    {new Date(a.requested_at).toLocaleString("pt-BR")}
+                    {a.estimated_liters && <span>· {a.estimated_liters} L</span>}
+                    {a.estimated_value && <span>· R$ {Number(a.estimated_value).toFixed(2)}</span>}
+                    {a.station_name && <span>· {a.station_name}</span>}
+                  </div>
+                </div>
+                {a.authorization_code && (
+                  <div className="font-mono text-lg font-bold text-success tracking-widest px-3 py-1 rounded bg-success/10 border border-success/30">
+                    {a.authorization_code}
+                  </div>
+                )}
+                <Badge className={`capitalize border ${
+                  a.status === "pendente" ? "bg-warning/20 text-warning border-warning/30" :
+                  a.status === "aprovada" ? "bg-success/20 text-success border-success/30" :
+                  a.status === "utilizada" ? "bg-primary/20 text-primary border-primary/30" :
+                  a.status === "recusada" ? "bg-destructive/20 text-destructive border-destructive/30" :
+                  "bg-muted text-muted-foreground"
+                }`}>{a.status}</Badge>
+                {a.status === "pendente" && (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => updateAuth(a.id, "aprovada")} disabled={authBusy === a.id} className="bg-success/20 text-success hover:bg-success/30 border border-success/30">
+                      <Check className="h-4 w-4 mr-1" /> Aprovar
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => updateAuth(a.id, "recusada")} disabled={authBusy === a.id} className="text-destructive">
+                      <X className="h-4 w-4 mr-1" /> Recusar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </TabsContent>
+      </Tabs>
 
       <FuelDialog open={open} onOpenChange={setOpen} record={editing} onSaved={load} />
     </div>

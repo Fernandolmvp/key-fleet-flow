@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Wrench, Pencil, Trash2, AlertTriangle, CalendarClock, DollarSign, Activity, CalendarDays, Settings2 } from "lucide-react";
+import { Plus, Search, Wrench, Pencil, Trash2, AlertTriangle, CalendarClock, DollarSign, Activity, CalendarDays, Settings2, ListChecks, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import KpiCard from "@/components/dashboard/KpiCard";
 import MaintenanceDialog from "@/components/dashboard/MaintenanceDialog";
+import ChecklistDialog from "@/components/dashboard/ChecklistDialog";
 import { STATUS_TONE, TYPE_TONE, SCHEDULE_STATUS_TONE, fmtBRL } from "@/lib/maintenance";
+import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { Label } from "@/components/ui/label";
 
 interface MRec {
@@ -32,16 +34,19 @@ export default function Maintenance() {
   const [vehicles, setVehicles] = useState<Record<string, { plate: string; current_km: number }>>({});
   const [lastFuelKm, setLastFuelKm] = useState<Record<string, { km: number; at: string }>>({});
   const [q, setQ] = useState("");
+  const [calQ, setCalQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MRec | null>(null);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistRecord, setChecklistRecord] = useState<{ id: string; plate?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const intervalKey = `maint_interval_km:${currentCompanyId ?? "_"}`;
-  const [intervalKm, setIntervalKm] = useState<number>(10000);
+  const [intervalKm, setIntervalKm] = useState<number>(DEFAULT_INTERVAL_KM);
 
   useEffect(() => {
     if (!currentCompanyId) return;
     const saved = localStorage.getItem(intervalKey);
-    setIntervalKm(saved ? Number(saved) || 10000 : 10000);
+    setIntervalKm(saved ? Number(saved) || DEFAULT_INTERVAL_KM : DEFAULT_INTERVAL_KM);
   }, [currentCompanyId]);
 
   const saveInterval = (n: number) => {
@@ -128,21 +133,29 @@ export default function Maintenance() {
         .sort((a, b) => new Date(b.service_at).getTime() - new Date(a.service_at).getTime())[0];
       const fuel = lastFuelKm[id];
       const currentKm = Math.max(v.current_km ?? 0, fuel?.km ?? 0);
-      const baseKm = lastPrev?.km_at_service ?? 0;
+      // Se nunca houve preventiva, usa o KM cadastrado no veículo como base inicial.
+      const baseKm = lastPrev?.km_at_service ?? (v.current_km ?? 0);
       const nextKm = baseKm + intervalKm;
       const remaining = nextKm - currentKm;
       let tone = "bg-success/20 text-success border-success/30";
       let label = "Em dia";
       if (remaining < 0) { tone = "bg-destructive/20 text-destructive border-destructive/30"; label = "Vencida"; }
-      else if (remaining <= 1000) { tone = "bg-warning/20 text-warning border-warning/30"; label = "Próxima"; }
+      else if (remaining <= ALERT_THRESHOLD_KM) { tone = "bg-warning/20 text-warning border-warning/30"; label = "Fazer agora"; }
       return {
         id, plate: v.plate, currentKm, fuelKm: fuel?.km ?? null, fuelAt: fuel?.at ?? null,
         lastPrevKm: lastPrev?.km_at_service ?? null,
         lastPrevAt: lastPrev?.service_at ?? null,
+        baseKm,
         nextKm, remaining, tone, label,
       };
     }).sort((a, b) => a.remaining - b.remaining);
   }, [vehicles, records, lastFuelKm, intervalKm]);
+
+  const filteredCalendar = useMemo(
+    () => calendar.filter((c) => c.plate.toLowerCase().includes(calQ.toLowerCase())),
+    [calendar, calQ],
+  );
+  const toDoNow = filteredCalendar.filter((c) => c.label === "Fazer agora" || c.label === "Vencida");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -159,8 +172,8 @@ export default function Maintenance() {
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard label="Gasto total" value={fmtBRL(totalSpent)} icon={DollarSign} tone="primary" />
         <KpiCard label="Últimos 30 dias" value={fmtBRL(last30)} icon={Activity} tone="success" />
-        <KpiCard label="Próximas" value={String(upcoming)} icon={CalendarClock} tone="warning" />
-        <KpiCard label="Vencidas" value={String(overdue)} icon={AlertTriangle} tone="destructive" />
+        <KpiCard label="Fazer preventivo" value={String(toDoNow.length)} icon={BellRing} tone="warning" hint={`a ≤ ${ALERT_THRESHOLD_KM.toLocaleString("pt-BR")} km`} />
+        <KpiCard label="Vencidas" value={String(calendar.filter((c)=>c.label==="Vencida").length)} icon={AlertTriangle} tone="destructive" />
       </div>
 
       <Tabs defaultValue="records">
@@ -216,6 +229,12 @@ export default function Maintenance() {
                       <TableCell><Badge className={`capitalize border ${STATUS_TONE[r.status] ?? ""}`}>{r.status.replace("_", " ")}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1 justify-end">
+                          {r.type === "preventiva" && (
+                            <Button size="icon" variant="ghost" title="Checklist preventivo"
+                              onClick={() => { setChecklistRecord({ id: r.id, plate: vehicles[r.vehicle_id]?.plate }); setChecklistOpen(true); }}>
+                              <ListChecks className="h-3.5 w-3.5 text-primary" />
+                            </Button>
+                          )}
                           <Button size="icon" variant="ghost" onClick={() => { setEditing(r); setOpen(true); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -312,15 +331,45 @@ export default function Maintenance() {
                 />
               </div>
             </div>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-xs">Buscar veículo</Label>
+              <div className="relative mt-1">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input className="pl-9" placeholder="Placa..." value={calQ} onChange={(e) => setCalQ(e.target.value)} />
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground max-w-md">
-              O cálculo usa a última manutenção preventiva registrada + intervalo, comparando com o KM atual do veículo cruzado com o último abastecimento.
+              KM base: última preventiva registrada OU o KM cadastrado no veículo. Cruzamos com o último abastecimento e alertamos a {ALERT_THRESHOLD_KM.toLocaleString("pt-BR")} km da próxima.
             </p>
           </div>
 
-          {calendar.length === 0 ? (
+          {toDoNow.length > 0 && (
+            <div className="surface-card rounded-xl p-4 border border-warning/30 bg-warning/5">
+              <h3 className="font-display font-semibold text-sm flex items-center gap-2 text-warning">
+                <BellRing className="h-4 w-4" /> Fazer preventivo agora ({toDoNow.length})
+              </h3>
+              <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                {toDoNow.map((c) => (
+                  <div key={c.id} className="surface-card rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <div className="font-mono text-primary font-semibold">{c.plate}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {c.remaining < 0
+                          ? `${Math.abs(c.remaining).toLocaleString("pt-BR")} km vencidos`
+                          : `Faltam ${c.remaining.toLocaleString("pt-BR")} km`}
+                      </div>
+                    </div>
+                    <Badge className={`border ${c.tone}`}>{c.label}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredCalendar.length === 0 ? (
             <div className="surface-card rounded-xl p-12 text-center">
               <CalendarDays className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <h3 className="font-display font-semibold">Nenhum veículo cadastrado</h3>
+              <h3 className="font-display font-semibold">Nenhum veículo encontrado</h3>
             </div>
           ) : (
             <div className="surface-card rounded-xl overflow-hidden">
@@ -330,14 +379,14 @@ export default function Maintenance() {
                     <TableHead>Veículo</TableHead>
                     <TableHead className="text-right">KM atual</TableHead>
                     <TableHead className="text-right">Último abast. (KM)</TableHead>
-                    <TableHead className="text-right">Última preventiva</TableHead>
+                    <TableHead className="text-right">Base (última prev. ou cadastro)</TableHead>
                     <TableHead className="text-right">Próxima em (KM)</TableHead>
                     <TableHead className="text-right">Restante</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {calendar.map((c) => (
+                  {filteredCalendar.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-mono text-primary">{c.plate}</TableCell>
                       <TableCell className="text-right font-mono text-xs">{c.currentKm.toLocaleString("pt-BR")}</TableCell>
@@ -355,7 +404,12 @@ export default function Maintenance() {
                             {c.lastPrevKm.toLocaleString("pt-BR")}
                             <div className="text-[10px] text-muted-foreground">{c.lastPrevAt ? new Date(c.lastPrevAt).toLocaleDateString("pt-BR") : ""}</div>
                           </>
-                        ) : <span className="text-muted-foreground">nunca</span>}
+                        ) : (
+                          <>
+                            {c.baseKm.toLocaleString("pt-BR")}
+                            <div className="text-[10px] text-muted-foreground">do cadastro</div>
+                          </>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">{c.nextKm.toLocaleString("pt-BR")}</TableCell>
                       <TableCell className="text-right font-mono text-xs font-semibold">
@@ -372,6 +426,12 @@ export default function Maintenance() {
       </Tabs>
 
       <MaintenanceDialog open={open} onOpenChange={setOpen} record={editing} onSaved={load} />
+      <ChecklistDialog
+        open={checklistOpen}
+        onOpenChange={setChecklistOpen}
+        maintenanceRecordId={checklistRecord?.id ?? null}
+        vehiclePlate={checklistRecord?.plate}
+      />
     </div>
   );
 }

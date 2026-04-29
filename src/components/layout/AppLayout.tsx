@@ -2,7 +2,7 @@ import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,7 @@ const nav = [
 ];
 
 export default function AppLayout() {
-  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut } = useAuth();
+  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly } = useAuth();
   const loc = useLocation();
 
   if (loading) return (
@@ -33,7 +33,15 @@ export default function AppLayout() {
   );
   if (!user) return <Navigate to="/login" replace state={{ from: loc }} />;
 
+  // Motorista (sem cargo de gestão) só acessa /app/colaborador
+  if (isDriverOnly && loc.pathname !== "/app/colaborador") {
+    return <Navigate to="/app/colaborador" replace />;
+  }
+
   const currentCompany = companies.find((c) => c.id === currentCompanyId);
+  const visibleNav = isDriverOnly
+    ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
+    : nav;
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -49,7 +57,7 @@ export default function AppLayout() {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-          {nav.map((it) => (
+          {visibleNav.map((it: any) => (
             <NavLink
               key={it.to}
               to={it.to}

@@ -10,6 +10,9 @@ interface AuthCtx {
   loading: boolean;
   companies: CompanyMembership[];
   currentCompanyId: string | null;
+  roles: string[];
+  isManager: boolean;
+  isDriverOnly: boolean;
   setCurrentCompany: (id: string) => Promise<void>;
   refreshCompanies: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -23,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<CompanyMembership[]>([]);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
 
   const loadCompanies = async (uid: string) => {
     const { data: members } = await supabase
@@ -42,6 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.from("profiles").update({ current_company_id: current }).eq("id", uid);
     }
     setCurrentCompanyId(current);
+
+    if (current) {
+      const { data: rs } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid)
+        .eq("company_id", current);
+      setRoles((rs ?? []).map((r: any) => r.role));
+    } else {
+      setRoles([]);
+    }
   };
 
   useEffect(() => {
@@ -67,14 +82,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     await supabase.from("profiles").update({ current_company_id: id }).eq("id", user.id);
     setCurrentCompanyId(id);
+    const { data: rs } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("company_id", id);
+    setRoles((rs ?? []).map((r: any) => r.role));
   };
 
   const refreshCompanies = async () => { if (user) await loadCompanies(user.id); };
 
   const signOut = async () => { await supabase.auth.signOut(); };
 
+  const isManager = roles.includes("admin") || roles.includes("gestor_frota");
+  const isDriverOnly = roles.length > 0 && !isManager && roles.includes("motorista");
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, companies, currentCompanyId, setCurrentCompany, refreshCompanies, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, companies, currentCompanyId, roles, isManager, isDriverOnly, setCurrentCompany, refreshCompanies, signOut }}>
       {children}
     </AuthContext.Provider>
   );
