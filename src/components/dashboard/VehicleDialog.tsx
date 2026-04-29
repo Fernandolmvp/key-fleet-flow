@@ -42,6 +42,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
     responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
     fipe_value: "", photos: [] as string[],
+    licensing_year: "", owner_name: "", crlv_issue_date: "", crlv_city: "",
   });
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
+      licensing_year: "", owner_name: "", crlv_issue_date: "", crlv_city: "",
     });
     setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +92,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
         color: data.color ?? f.color,
         fuel_type: data.fuel_type ?? f.fuel_type,
         vehicle_type: data.vehicle_type ?? f.vehicle_type,
+        owner_name: data.owner_name ?? f.owner_name,
+        crlv_city: data.crlv_city ?? f.crlv_city,
+        crlv_issue_date: data.crlv_issue_date ?? f.crlv_issue_date,
+        licensing_year: data.licensing_year ?? f.licensing_year,
         documents: archivedUrl ? [...(f.documents ?? []), archivedUrl] : (f.documents ?? []),
       }));
       setArchivedDoc(archivedUrl);
@@ -115,6 +121,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       current_km: Number(form.current_km) || 0,
       fipe_value: form.fipe_value ? Number(form.fipe_value) : null,
       insurance_expires_at: form.insurance_expires_at || null,
+      licensing_year: form.licensing_year ? Number(form.licensing_year) : null,
+      crlv_issue_date: form.crlv_issue_date || null,
+      owner_name: form.owner_name || null,
+      crlv_city: form.crlv_city || null,
     };
     delete payload.id;
     const op = isEdit
