@@ -7,7 +7,7 @@ const corsHeaders = {
 // Extrai dados estruturados de imagens/PDFs (CRLV de veículos, CNH de motoristas)
 // usando Lovable AI Gateway com tool calling.
 
-type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice" | "tire_invoice";
+type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice" | "tire_invoice" | "document";
 
 const TOOL_VEHICLE = {
   type: "function",
@@ -177,6 +177,40 @@ const TOOL_TIRE = {
   },
 };
 
+const TOOL_DOCUMENT = {
+  type: "function",
+  function: {
+    name: "extract_document_generic",
+    description:
+      "Extrai dados de qualquer documento de frota (CRLV, IPVA, Licenciamento, Apólice de Seguro, CNH, Exame Médico, Toxicológico, MOPP, Certificados). Identifique o tipo do documento, número, emissor, datas de emissão e validade, e o titular (CPF do motorista ou placa do veículo).",
+    parameters: {
+      type: "object",
+      properties: {
+        doc_type: {
+          type: ["string", "null"],
+          enum: [
+            "crlv","ipva","licenciamento","seguro","rastreador","laudo_veiculo","outro_veiculo",
+            "cnh","exame_medico","exame_toxicologico","curso_mopp","curso_transporte_passageiros","outro_motorista",
+            null,
+          ],
+        },
+        title: { type: ["string", "null"], description: "Título/descrição curta do documento" },
+        document_number: { type: ["string", "null"], description: "Número/registro do documento (sem pontuação)" },
+        issuer: { type: ["string", "null"], description: "Órgão emissor (DETRAN, seguradora, clínica, etc)" },
+        issue_date: { type: ["string", "null"], description: "Data de emissão YYYY-MM-DD" },
+        expires_at: { type: ["string", "null"], description: "Data de vencimento/validade YYYY-MM-DD. Se sem validade, null" },
+        plate: { type: ["string", "null"], description: "Placa do veículo, se for documento veicular" },
+        cpf: { type: ["string", "null"], description: "CPF do titular (apenas dígitos), se for documento de motorista" },
+        full_name: { type: ["string", "null"], description: "Nome completo do titular, se aplicável" },
+        cnh_category: { type: ["string", "null"] },
+        notes: { type: ["string", "null"], description: "Observações relevantes" },
+      },
+      required: ["doc_type"],
+      additionalProperties: false,
+    },
+  },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -213,6 +247,9 @@ Deno.serve(async (req) => {
     } else if (type === "tire_invoice") {
       tool = TOOL_TIRE; fnName = "extract_tire_invoice";
       sys = "Você lê notas fiscais de pneus (compra ou recapagem). Cada item é um pneu individual: marca, modelo, medida (ex.: 295/80 R22.5), DOT, preço unitário. Datas em ISO YYYY-MM-DD.";
+    } else if (type === "document") {
+      tool = TOOL_DOCUMENT; fnName = "extract_document_generic";
+      sys = "Você é um especialista em documentos de frota brasileiros: CRLV, IPVA, Licenciamento, Apólice de Seguro, CNH, Exame Médico, Toxicológico, MOPP. Identifique o tipo do documento e extraia número, emissor, datas e titular (placa ou CPF). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF apenas dígitos.";
     } else {
       tool = TOOL_MAINT; fnName = "extract_maintenance_invoice";
       sys = "Você é um especialista em notas fiscais e ordens de serviço de oficinas mecânicas brasileiras. Extraia dados de oficina, valores (mão de obra, peças, total), data, e itens individuais. Datas em ISO YYYY-MM-DD.";
