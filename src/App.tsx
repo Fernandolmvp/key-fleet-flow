@@ -11,6 +11,7 @@ import Dashboard from "./pages/app/Dashboard";
 import Vehicles from "./pages/app/Vehicles";
 import Drivers from "./pages/app/Drivers";
 import Fuel from "./pages/app/Fuel";
+import FuelStations from "./pages/app/FuelStations";
 import Maintenance from "./pages/app/Maintenance";
 import Tires from "./pages/app/Tires";
 import Colaborador from "./pages/app/Colaborador";
@@ -34,6 +35,7 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="vehicles" element={<Vehicles />} />
               <Route path="drivers" element={<Drivers />} />
+              <Route path="fuel-stations" element={<FuelStations />} />
               <Route path="fuel" element={<Fuel />} />
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="tires" element={<Tires />} />
