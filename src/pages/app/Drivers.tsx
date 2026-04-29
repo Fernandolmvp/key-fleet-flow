@@ -4,8 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle, Sparkles, FileText } from "lucide-react";
+import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle, Sparkles, FileText, CheckCircle2, XCircle } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
+import { daysUntil } from "@/lib/documents";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,11 +20,14 @@ interface Driver {
   user_id: string | null; auto_fuel_authorized: boolean | null; manager_user_id: string | null;
 }
 
+interface DriverDoc { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; }
+
 const STATUSES = ["ativo","inativo","ferias","afastado"];
 
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
   const [items, setItems] = useState<Driver[]>([]);
+  const [docsByDriver, setDocsByDriver] = useState<Record<string, DriverDoc[]>>({});
   const [managers, setManagers] = useState<{ user_id: string; name: string }[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -31,7 +35,7 @@ export default function Drivers() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [archivedDoc, setArchivedDoc] = useState<string | null>(null);
+  const [archivedDoc, setArchivedDoc] = useState<{ url: string; name: string; mime: string } | null>(null);
   const [form, setForm] = useState<any>(blank());
 
   function blank() {
@@ -45,6 +49,17 @@ export default function Drivers() {
       .order("full_name");
     if (error) toast.error(error.message);
     setItems((data ?? []) as Driver[]);
+
+    const { data: docs } = await supabase.from("documents")
+      .select("id,entity_id,doc_type,file_url,expires_at")
+      .eq("company_id", currentCompanyId)
+      .eq("entity_type", "driver");
+    const map: Record<string, DriverDoc[]> = {};
+    (docs ?? []).forEach((d: any) => {
+      if (!map[d.entity_id]) map[d.entity_id] = [];
+      map[d.entity_id].push(d);
+    });
+    setDocsByDriver(map);
 
     // Carrega gestores da empresa (admin/gestor_frota)
     const { data: roles } = await supabase
@@ -98,7 +113,7 @@ export default function Drivers() {
     setAiBusy(true);
     try {
       const { data, archivedUrl } = await extractDocument({
-        type: "driver", file, bucket: "driver-photos", companyId,
+        type: "driver", file, bucket: "documents", companyId,
       });
       setForm((f: any) => ({
         ...f,
@@ -110,7 +125,7 @@ export default function Drivers() {
         medical_exam_expires_at: data.medical_exam_expires_at ?? f.medical_exam_expires_at,
         address: data.address ?? f.address,
       }));
-      setArchivedDoc(archivedUrl);
+      setArchivedDoc(archivedUrl ? { url: archivedUrl, name: file.name, mime: file.type } : null);
       toast.success("Dados preenchidos pela IA. Revise antes de salvar.");
     } catch (e: any) {
       toast.error(e?.message || "Falha ao processar documento");
@@ -134,10 +149,30 @@ export default function Drivers() {
     delete payload.id; delete payload.created_at; delete payload.updated_at;
     const op = editing
       ? supabase.from("drivers").update(payload).eq("id", editing.id)
-      : supabase.from("drivers").insert(payload);
-    const { error } = await op;
+      : supabase.from("drivers").insert(payload).select("id").single();
+    const { data: saved, error } = await op as any;
+    if (error) { setBusy(false); return toast.error(error.message); }
+
+    // Arquivar CNH na tabela de documentos (se enviada via IA neste fluxo)
+    const driverId = editing ? editing.id : saved?.id;
+    if (archivedDoc && driverId) {
+      const { error: docErr } = await supabase.from("documents").insert({
+        company_id: currentCompanyId,
+        entity_type: "driver",
+        entity_id: driverId,
+        doc_type: "cnh",
+        title: "CNH",
+        document_number: form.cnh_number || null,
+        expires_at: form.cnh_expires_at || null,
+        file_url: archivedDoc.url,
+        file_name: archivedDoc.name,
+        mime_type: archivedDoc.mime,
+        ai_extracted: { source: "driver_form", cnh_number: form.cnh_number, cnh_category: form.cnh_category },
+      });
+      if (docErr) console.warn("doc archive failed", docErr.message);
+    }
+
     setBusy(false);
-    if (error) return toast.error(error.message);
     toast.success(editing ? "Motorista atualizado" : "Motorista cadastrado");
     setOpen(false); load();
   };
@@ -149,8 +184,22 @@ export default function Drivers() {
     toast.success("Motorista removido"); load();
   };
 
-  const filtered = items.filter((d) => d.full_name.toLowerCase().includes(q.toLowerCase()));
-  const isExpiringSoon = (date: string | null) => date && new Date(date) <= new Date(Date.now() + 30 * 86400000);
+  const filtered = items.filter((d) =>
+    [d.full_name, d.cpf, d.cnh_number].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase())
+  );
+
+  type CnhStatus = { kind: "vencida" | "vencendo" | "valida" | "sem_data"; days: number | null; label: string };
+  const cnhStatus = (date: string | null): CnhStatus => {
+    if (!date) return { kind: "sem_data", days: null, label: "Sem validade" };
+    const dl = daysUntil(date);
+    if (dl === null) return { kind: "sem_data", days: null, label: "Sem validade" };
+    if (dl < 0) return { kind: "vencida", days: dl, label: `Vencida há ${Math.abs(dl)} dias` };
+    if (dl <= 30) return { kind: "vencendo", days: dl, label: `Vence em ${dl} dias` };
+    return { kind: "valida", days: dl, label: `Válida (${dl} dias)` };
+  };
+
+  const findCnhDoc = (driverId: string) =>
+    (docsByDriver[driverId] ?? []).find((d) => d.doc_type === "cnh" && d.file_url);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -179,7 +228,8 @@ export default function Drivers() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((d) => {
-            const cnhAlert = isExpiringSoon(d.cnh_expires_at);
+            const cs = cnhStatus(d.cnh_expires_at);
+            const cnhDoc = findCnhDoc(d.id);
             return (
               <div key={d.id} className="surface-card rounded-xl p-5 hover:border-primary/40 transition-colors">
                 <div className="flex items-start gap-4">
@@ -195,12 +245,39 @@ export default function Drivers() {
                     </div>
                   </div>
                 </div>
-                {cnhAlert && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-warning bg-warning/10 border border-warning/30 rounded-lg px-3 py-2">
-                    <AlertTriangle className="h-3.5 w-3.5" /> CNH vence em breve
-                  </div>
-                )}
+                <div className="mt-3 flex items-center gap-2 text-xs rounded-lg px-3 py-2 border"
+                  style={undefined}
+                >
+                  {cs.kind === "vencida" && (
+                    <span className="flex items-center gap-1.5 text-destructive bg-destructive/10 border-destructive/30 rounded-lg px-2 py-1 border w-full">
+                      <XCircle className="h-3.5 w-3.5" /> CNH {cs.label.toLowerCase()}
+                    </span>
+                  )}
+                  {cs.kind === "vencendo" && (
+                    <span className="flex items-center gap-1.5 text-warning bg-warning/10 border-warning/30 rounded-lg px-2 py-1 border w-full">
+                      <AlertTriangle className="h-3.5 w-3.5" /> CNH {cs.label.toLowerCase()}
+                    </span>
+                  )}
+                  {cs.kind === "valida" && (
+                    <span className="flex items-center gap-1.5 text-success bg-success/10 border-success/30 rounded-lg px-2 py-1 border w-full">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> CNH {cs.label}
+                    </span>
+                  )}
+                  {cs.kind === "sem_data" && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground bg-muted/30 border-border rounded-lg px-2 py-1 border w-full">
+                      <AlertTriangle className="h-3.5 w-3.5" /> CNH sem validade informada
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2 pt-3 mt-3 border-t border-border">
+                  <Button
+                    size="sm" variant="outline" className="flex-1"
+                    disabled={!cnhDoc?.file_url}
+                    onClick={() => cnhDoc?.file_url && window.open(cnhDoc.file_url, "_blank")}
+                    title={cnhDoc ? "Abrir CNH arquivada" : "Nenhuma CNH anexada"}
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1" /> {cnhDoc ? "Ver CNH" : "Sem CNH"}
+                  </Button>
                   <Button size="sm" variant="ghost" className="flex-1" onClick={() => openEdit(d)}>
                     <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                   </Button>
@@ -241,8 +318,8 @@ export default function Drivers() {
             </label>
           </div>
           {archivedDoc && (
-            <a href={archivedDoc} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
-              <FileText className="h-3 w-3" /> Documento arquivado
+            <a href={archivedDoc.url} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
+              <FileText className="h-3 w-3" /> CNH arquivada — será vinculada ao salvar
             </a>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
