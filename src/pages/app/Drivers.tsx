@@ -276,6 +276,36 @@ export default function Drivers() {
             <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
             <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+
+            <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Autorização automática de abastecimento</p>
+                  <p className="text-xs text-muted-foreground">Quando ligado, as solicitações deste colaborador são aprovadas na hora, sem passar pelo gestor.</p>
+                </div>
+                <Switch
+                  checked={!!form.auto_fuel_authorized}
+                  onCheckedChange={(v) => setForm({ ...form, auto_fuel_authorized: v })}
+                />
+              </div>
+
+              {!form.auto_fuel_authorized && (
+                <div className="space-y-2">
+                  <Label>Gestor responsável pela aprovação</Label>
+                  <Select value={form.manager_user_id || ""} onValueChange={(v) => setForm({ ...form, manager_user_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar gestor..." /></SelectTrigger>
+                    <SelectContent>
+                      {managers.length === 0 ? (
+                        <div className="p-2 text-xs text-muted-foreground">Nenhum gestor cadastrado na empresa</div>
+                      ) : managers.map((m) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">O nome aparece para o colaborador no app, indicando quem precisa autorizar.</p>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
