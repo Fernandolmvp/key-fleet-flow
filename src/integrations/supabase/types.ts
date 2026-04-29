@@ -1002,6 +1002,8 @@ export type Database = {
           company_id: string
           cost_center_id: string | null
           created_at: string
+          crlv_city: string | null
+          crlv_issue_date: string | null
           current_km: number
           documents: string[]
           fipe_value: number | null
@@ -1011,8 +1013,10 @@ export type Database = {
           insurance_expires_at: string | null
           insurance_policy: string | null
           insurer: string | null
+          licensing_year: number | null
           model: string
           notes: string | null
+          owner_name: string | null
           photos: string[]
           plate: string
           renavam: string | null
@@ -1032,6 +1036,8 @@ export type Database = {
           company_id: string
           cost_center_id?: string | null
           created_at?: string
+          crlv_city?: string | null
+          crlv_issue_date?: string | null
           current_km?: number
           documents?: string[]
           fipe_value?: number | null
@@ -1041,8 +1047,10 @@ export type Database = {
           insurance_expires_at?: string | null
           insurance_policy?: string | null
           insurer?: string | null
+          licensing_year?: number | null
           model: string
           notes?: string | null
+          owner_name?: string | null
           photos?: string[]
           plate: string
           renavam?: string | null
@@ -1062,6 +1070,8 @@ export type Database = {
           company_id?: string
           cost_center_id?: string | null
           created_at?: string
+          crlv_city?: string | null
+          crlv_issue_date?: string | null
           current_km?: number
           documents?: string[]
           fipe_value?: number | null
@@ -1071,8 +1081,10 @@ export type Database = {
           insurance_expires_at?: string | null
           insurance_policy?: string | null
           insurer?: string | null
+          licensing_year?: number | null
           model?: string
           notes?: string | null
+          owner_name?: string | null
           photos?: string[]
           plate?: string
           renavam?: string | null
