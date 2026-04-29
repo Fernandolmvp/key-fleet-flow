@@ -49,6 +49,118 @@ export function daysUntil(dateISO: string | null | undefined): number | null {
 }
 
 /**
+ * Calendário brasileiro de Licenciamento Anual (Denatran — base nacional).
+ * Cada final de placa tem um mês-limite para o licenciamento do ano corrente.
+ * Observação: alguns estados usam calendários próprios; este é o calendário-padrão
+ * de referência. O dia-limite considerado é o último dia útil do mês (usamos dia 30/31).
+ */
+export const LICENSING_MONTH_BY_PLATE_END: Record<string, number> = {
+  "1": 4,   // Abril
+  "2": 5,   // Maio
+  "3": 6,   // Junho
+  "4": 7,   // Julho
+  "5": 8,   // Agosto
+  "6": 9,   // Setembro
+  "7": 10,  // Outubro
+  "8": 11,  // Novembro
+  "9": 11,  // Novembro
+  "0": 12,  // Dezembro
+};
+
+export const MONTH_LABEL_PT = [
+  "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+/** Extrai o último dígito numérico da placa (suporta Mercosul). */
+export function plateLastDigit(plate?: string | null): string | null {
+  if (!plate) return null;
+  const digits = plate.replace(/\D/g, "");
+  return digits.length ? digits[digits.length - 1] : null;
+}
+
+/**
+ * Avalia o status de licenciamento do veículo no ano corrente
+ * com base no final da placa e no calendário brasileiro.
+ * Se houver `crlvExpiresAt` (vencimento real informado no documento),
+ * ele tem prioridade.
+ */
+export type LicensingInfo = {
+  status: "licenciado" | "vence_em_breve" | "atrasado" | "indefinido";
+  dueDate: Date | null;
+  monthLabel: string | null;
+  daysLeft: number | null;
+  message: string;
+};
+
+export function evaluateLicensing(opts: {
+  plate?: string | null;
+  crlvExpiresAt?: string | null;
+}): LicensingInfo {
+  const { plate, crlvExpiresAt } = opts;
+
+  // Se há data real do CRLV, usa-a
+  if (crlvExpiresAt) {
+    const due = new Date(crlvExpiresAt + "T00:00:00");
+    const dl = daysUntil(crlvExpiresAt)!;
+    if (dl < 0) return {
+      status: "atrasado", dueDate: due, monthLabel: MONTH_LABEL_PT[due.getMonth() + 1],
+      daysLeft: dl, message: `Licenciamento vencido há ${Math.abs(dl)} dias.`,
+    };
+    if (dl <= 30) return {
+      status: "vence_em_breve", dueDate: due, monthLabel: MONTH_LABEL_PT[due.getMonth() + 1],
+      daysLeft: dl, message: `Licenciamento vence em ${dl} dias.`,
+    };
+    return {
+      status: "licenciado", dueDate: due, monthLabel: MONTH_LABEL_PT[due.getMonth() + 1],
+      daysLeft: dl, message: `Licenciado até ${due.toLocaleDateString("pt-BR")}.`,
+    };
+  }
+
+  const last = plateLastDigit(plate);
+  if (!last) return { status: "indefinido", dueDate: null, monthLabel: null, daysLeft: null, message: "Placa inválida — calendário não pôde ser aplicado." };
+
+  const month = LICENSING_MONTH_BY_PLATE_END[last];
+  const year = new Date().getFullYear();
+  // último dia do mês
+  const due = new Date(year, month, 0);
+  const dueISO = due.toISOString().slice(0, 10);
+  const dl = daysUntil(dueISO)!;
+  const monthLabel = MONTH_LABEL_PT[month];
+
+  if (dl < 0) {
+    return {
+      status: "atrasado", dueDate: due, monthLabel, daysLeft: dl,
+      message: `Pelo final ${last}, o licenciamento ${year} venceu em ${monthLabel} (sem CRLV anexado).`,
+    };
+  }
+  if (dl <= 30) {
+    return {
+      status: "vence_em_breve", dueDate: due, monthLabel, daysLeft: dl,
+      message: `Pelo final ${last}, o prazo é ${monthLabel}/${year} (em ${dl} dias).`,
+    };
+  }
+  return {
+    status: "licenciado", dueDate: due, monthLabel, daysLeft: dl,
+    message: `Pelo calendário, prazo ${monthLabel}/${year} (em ${dl} dias).`,
+  };
+}
+
+export const LICENSING_LABEL: Record<LicensingInfo["status"], string> = {
+  licenciado: "Licenciado",
+  vence_em_breve: "Vence em breve",
+  atrasado: "Atrasado",
+  indefinido: "Indefinido",
+};
+
+export const LICENSING_COLOR: Record<LicensingInfo["status"], string> = {
+  licenciado: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  vence_em_breve: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  atrasado: "bg-destructive/15 text-destructive border-destructive/30",
+  indefinido: "bg-muted/30 text-muted-foreground border-border",
+};
+
+/**
  * Validação cruzada: confere se os dados extraídos batem com a entidade vinculada.
  */
 export function crossValidate(opts: {
