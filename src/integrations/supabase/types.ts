@@ -1016,6 +1016,7 @@ export type Database = {
           licensing_year: number | null
           model: string
           notes: string | null
+          owner_doc: string | null
           owner_name: string | null
           photos: string[]
           plate: string
@@ -1050,6 +1051,7 @@ export type Database = {
           licensing_year?: number | null
           model: string
           notes?: string | null
+          owner_doc?: string | null
           owner_name?: string | null
           photos?: string[]
           plate: string
@@ -1084,6 +1086,7 @@ export type Database = {
           licensing_year?: number | null
           model?: string
           notes?: string | null
+          owner_doc?: string | null
           owner_name?: string | null
           photos?: string[]
           plate?: string
