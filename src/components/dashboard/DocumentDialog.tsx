@@ -70,11 +70,12 @@ export default function DocumentDialog({
 
   useEffect(() => {
     if (open) {
-      setForm(doc ? { ...doc } : {
+      const base: DocFormDoc = {
         entity_type: "vehicle", entity_id: "", doc_type: "crlv",
         title: "", document_number: "", issuer: "", issue_date: "", expires_at: "", notes: "",
         file_url: null, file_name: null, mime_type: null, ai_extracted: {},
-      });
+      };
+      setForm(doc ? { ...base, ...doc } : base);
       setFile(null);
     }
   }, [open, doc]);
