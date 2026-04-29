@@ -10,6 +10,8 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import { Badge } from "@/components/ui/badge";
 import { ANOMALY_LABEL, SEVERITY_TONE, fmtMoney, fmtNum } from "@/lib/fuel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, X, ShieldCheck, Clock } from "lucide-react";
 
 interface Row {
   id: string; fueled_at: string; station_name: string | null; city: string | null;
@@ -21,12 +23,14 @@ interface Row {
 }
 
 export default function Fuel() {
-  const { currentCompanyId } = useAuth();
+  const { currentCompanyId, user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [auths, setAuths] = useState<any[]>([]);
+  const [authBusy, setAuthBusy] = useState<string | null>(null);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -43,6 +47,31 @@ export default function Fuel() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+
+  const loadAuths = async () => {
+    if (!currentCompanyId) return;
+    const { data } = await supabase
+      .from("fuel_authorizations")
+      .select("*, vehicles:vehicle_id(plate,brand,model)")
+      .eq("company_id", currentCompanyId)
+      .order("requested_at", { ascending: false })
+      .limit(100);
+    setAuths(data ?? []);
+  };
+  useEffect(() => { loadAuths(); }, [currentCompanyId]);
+
+  const updateAuth = async (id: string, status: "aprovada" | "recusada" | "cancelada") => {
+    setAuthBusy(id);
+    const { error } = await supabase.from("fuel_authorizations").update({
+      status, approved_by: user?.id ?? null,
+    }).eq("id", id);
+    setAuthBusy(null);
+    if (error) return toast.error(error.message);
+    toast.success(status === "aprovada" ? "Autorização aprovada com código gerado" : "Solicitação atualizada");
+    loadAuths();
+  };
+
+  const pendingAuths = useMemo(() => auths.filter((a) => a.status === "pendente"), [auths]);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este abastecimento?")) return;
@@ -134,6 +163,16 @@ export default function Fuel() {
         <KpiCard label="Anomalias detectadas" value={stats.anomalies} icon={AlertTriangle} tone={stats.anomalies > 0 ? "warning" : "success"} hint="lançamentos com alerta" />
       </div>
 
+      <Tabs defaultValue="records">
+        <TabsList>
+          <TabsTrigger value="records">Histórico</TabsTrigger>
+          <TabsTrigger value="auths">
+            Autorizações
+            {pendingAuths.length > 0 && <Badge className="ml-2 bg-warning/30 text-warning">{pendingAuths.length}</Badge>}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="records" className="space-y-6 mt-4">
       {monthly.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="surface-card rounded-xl p-6 lg:col-span-2">
