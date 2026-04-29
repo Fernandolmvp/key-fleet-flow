@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle, Sparkles, FileText, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle, Sparkles, FileText, CheckCircle2, XCircle, LayoutGrid, List } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 import { daysUntil } from "@/lib/documents";
 import { toast } from "sonner";
@@ -37,6 +37,9 @@ export default function Drivers() {
   const [aiBusy, setAiBusy] = useState(false);
   const [archivedDoc, setArchivedDoc] = useState<{ url: string; name: string; mime: string } | null>(null);
   const [form, setForm] = useState<any>(blank());
+  const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("drivers:view") as "grid" | "list") || "grid");
+
+  useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
     return { full_name: "", cpf: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "" };
@@ -214,9 +217,21 @@ export default function Drivers() {
       </div>
 
       <div className="surface-card rounded-xl p-4">
-        <div className="relative max-w-sm">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar por nome..." value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Buscar por nome..." value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="ml-auto inline-flex rounded-lg border border-border overflow-hidden">
+            <Button type="button" size="sm" variant={view === "grid" ? "default" : "ghost"}
+              className="rounded-none px-3" onClick={() => setView("grid")} title="Visualização em quadrante">
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="sm" variant={view === "list" ? "default" : "ghost"}
+              className="rounded-none px-3" onClick={() => setView("list")} title="Visualização em lista">
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -225,7 +240,7 @@ export default function Drivers() {
           <Users className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <h3 className="font-display font-semibold">Nenhum motorista</h3>
         </div>
-      ) : (
+      ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((d) => {
             const cs = cnhStatus(d.cnh_expires_at);
@@ -288,6 +303,76 @@ export default function Drivers() {
               </div>
             );
           })}
+        </div>
+      ) : (
+        <div className="surface-card rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3">Motorista</th>
+                  <th className="text-left px-4 py-3">CPF</th>
+                  <th className="text-left px-4 py-3">CNH</th>
+                  <th className="text-left px-4 py-3">Status CNH</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((d) => {
+                  const cs = cnhStatus(d.cnh_expires_at);
+                  const cnhDoc = findCnhDoc(d.id);
+                  const tone =
+                    cs.kind === "vencida" ? "border-destructive/40 text-destructive bg-destructive/10"
+                    : cs.kind === "vencendo" ? "border-warning/40 text-warning bg-warning/10"
+                    : cs.kind === "valida" ? "border-success/40 text-success bg-success/10"
+                    : "border-border text-muted-foreground bg-muted/30";
+                  return (
+                    <tr key={d.id} className="border-t border-border hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-full bg-gradient-primary grid place-items-center text-primary-foreground text-xs font-bold shrink-0 overflow-hidden">
+                            {d.photo_url ? <img src={d.photo_url} alt="" className="h-full w-full object-cover" /> : d.full_name[0]?.toUpperCase()}
+                          </div>
+                          <span className="font-medium truncate">{d.full_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{d.cpf ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs font-mono">
+                        {d.cnh_number ?? "—"}
+                        {d.cnh_category && <span className="ml-1 text-muted-foreground">({d.cnh_category})</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={`gap-1 ${tone}`}>
+                          {cs.kind === "vencida" && <XCircle className="h-3 w-3" />}
+                          {cs.kind === "vencendo" && <AlertTriangle className="h-3 w-3" />}
+                          {cs.kind === "valida" && <CheckCircle2 className="h-3 w-3" />}
+                          {cs.label}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="secondary" className="capitalize text-xs">{d.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex gap-1">
+                          <Button size="sm" variant="ghost" disabled={!cnhDoc?.file_url}
+                            onClick={() => cnhDoc?.file_url && window.open(cnhDoc.file_url, "_blank")} title="Ver CNH">
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(d)} title="Editar">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(d.id)} title="Excluir">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
