@@ -7,7 +7,7 @@ const corsHeaders = {
 // Extrai dados estruturados de imagens/PDFs (CRLV de veículos, CNH de motoristas)
 // usando Lovable AI Gateway com tool calling.
 
-type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice" | "tire_invoice" | "document";
+type DocType = "vehicle" | "driver" | "plate" | "odometer" | "maintenance_invoice" | "tire_invoice" | "document" | "fuel_receipt";
 
 const TOOL_VEHICLE = {
   type: "function",
