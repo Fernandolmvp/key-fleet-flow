@@ -15,7 +15,7 @@ import { extractDocument } from "@/lib/ai-extract";
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
 const blank = () => ({
-  vehicle_id: "", driver_id: "", fueled_at: new Date().toISOString().slice(0, 16),
+  vehicle_id: "", driver_id: "", fuel_station_id: "", fueled_at: new Date().toISOString().slice(0, 16),
   station_name: "", station_cnpj: "", city: "", state: "",
   fuel_type: "flex", liters: "", price_per_liter: "", total_value: "", full_tank: false,
   km_at_fueling: "", payment_method: "cartao_frota", card_number: "",
@@ -27,6 +27,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const [busy, setBusy] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
   const [form, setForm] = useState<any>(blank());
   const [uploading, setUploading] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState<"plate" | "odometer" | null>(null);
@@ -36,17 +37,19 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     if (!open || !currentCompanyId) return;
     setPlateCheck(null);
     (async () => {
-      const [{ data: v }, { data: d }] = await Promise.all([
+      const [{ data: v }, { data: d }, { data: s }] = await Promise.all([
         supabase.from("vehicles").select("id,plate,brand,model,current_km,fuel_type,tank_capacity").eq("company_id", currentCompanyId).order("plate"),
         supabase.from("drivers").select("id,full_name").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
+        supabase.from("fuel_stations").select("id,name,cnpj,city,state,brand").eq("company_id", currentCompanyId).eq("active", true).order("name"),
       ]);
-      setVehicles(v ?? []); setDrivers(d ?? []);
+      setVehicles(v ?? []); setDrivers(d ?? []); setStations(s ?? []);
     })();
     if (record) {
       setForm({
         ...blank(), ...record,
         fueled_at: record.fueled_at ? new Date(record.fueled_at).toISOString().slice(0, 16) : "",
         driver_id: record.driver_id ?? "",
+        fuel_station_id: record.fuel_station_id ?? "",
       });
     } else setForm(blank());
   }, [open, record, currentCompanyId]);
@@ -67,6 +70,17 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       ...f, vehicle_id: id,
       fuel_type: v?.fuel_type ?? f.fuel_type,
       km_at_fueling: v?.current_km ? String(v.current_km) : f.km_at_fueling,
+    }));
+  };
+
+  const onStationChange = (id: string) => {
+    const s = stations.find((x) => x.id === id);
+    setForm((f: any) => ({
+      ...f, fuel_station_id: id,
+      station_name: s?.name ?? f.station_name,
+      station_cnpj: s?.cnpj ?? f.station_cnpj,
+      city: s?.city ?? f.city,
+      state: s?.state ?? f.state,
     }));
   };
 
@@ -139,6 +153,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       company_id: currentCompanyId,
       created_by: user?.id,
       driver_id: form.driver_id || null,
+      fuel_station_id: form.fuel_station_id || null,
       liters: Number(form.liters),
       price_per_liter: Number(form.price_per_liter),
       total_value: Number(form.total_value),
@@ -245,7 +260,21 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
             <Input type="datetime-local" value={form.fueled_at} onChange={(e) => setForm({ ...form, fueled_at: e.target.value })} />
           </div>
 
-          <div className="space-y-2"><Label>Posto</Label><Input value={form.station_name} onChange={(e) => setForm({ ...form, station_name: e.target.value })} /></div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Posto cadastrado</Label>
+            <Select value={form.fuel_station_id} onValueChange={onStationChange}>
+              <SelectTrigger><SelectValue placeholder="Selecione um posto cadastrado (opcional)" /></SelectTrigger>
+              <SelectContent>
+                {stations.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}{s.city ? ` · ${s.city}/${s.state ?? ""}` : ""}
+                  </SelectItem>
+                ))}
+                {stations.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum posto ativo cadastrado</div>}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Posto (nome)</Label><Input value={form.station_name} onChange={(e) => setForm({ ...form, station_name: e.target.value })} /></div>
           <div className="space-y-2"><Label>CNPJ posto</Label><Input value={form.station_cnpj} onChange={(e) => setForm({ ...form, station_cnpj: e.target.value })} /></div>
           <div className="space-y-2"><Label>Cidade</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
           <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} /></div>

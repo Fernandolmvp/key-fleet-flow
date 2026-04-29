@@ -429,6 +429,7 @@ export type Database = {
           created_by: string | null
           dashboard_photo_url: string | null
           driver_id: string | null
+          fuel_station_id: string | null
           fuel_type: Database["public"]["Enums"]["fuel_type"]
           fueled_at: string
           full_tank: boolean
@@ -465,6 +466,7 @@ export type Database = {
           created_by?: string | null
           dashboard_photo_url?: string | null
           driver_id?: string | null
+          fuel_station_id?: string | null
           fuel_type: Database["public"]["Enums"]["fuel_type"]
           fueled_at?: string
           full_tank?: boolean
@@ -501,6 +503,7 @@ export type Database = {
           created_by?: string | null
           dashboard_photo_url?: string | null
           driver_id?: string | null
+          fuel_station_id?: string | null
           fuel_type?: Database["public"]["Enums"]["fuel_type"]
           fueled_at?: string
           full_tank?: boolean
@@ -554,6 +557,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fuel_stations: {
+        Row: {
+          active: boolean
+          address: string | null
+          brand: string | null
+          city: string | null
+          cnpj: string | null
+          company_id: string
+          contact_name: string | null
+          created_at: string
+          created_by: string | null
+          fuel_types: string[]
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          brand?: string | null
+          city?: string | null
+          cnpj?: string | null
+          company_id: string
+          contact_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          fuel_types?: string[]
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          brand?: string | null
+          city?: string | null
+          cnpj?: string | null
+          company_id?: string
+          contact_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          fuel_types?: string[]
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       maintenance_checklist_items: {
         Row: {
