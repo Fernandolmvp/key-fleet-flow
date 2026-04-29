@@ -204,6 +204,14 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           <div className="space-y-2"><Label>Apólice</Label><Input value={form.insurance_policy} onChange={(e) => setForm({ ...form, insurance_policy: e.target.value })} /></div>
           <div className="space-y-2"><Label>Vencimento seguro</Label><Input type="date" value={form.insurance_expires_at} onChange={(e) => setForm({ ...form, insurance_expires_at: e.target.value })} /></div>
           <div className="space-y-2"><Label>Valor FIPE (R$)</Label><Input type="number" step="0.01" value={form.fipe_value} onChange={(e) => setForm({ ...form, fipe_value: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Proprietário (CRLV)</Label><Input value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} placeholder="Nome conforme CRLV" /></div>
+          <div className="space-y-2"><Label>Município de emplacamento</Label><Input value={form.crlv_city} onChange={(e) => setForm({ ...form, crlv_city: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Data de emissão CRLV</Label><Input type="date" value={form.crlv_issue_date} onChange={(e) => setForm({ ...form, crlv_issue_date: e.target.value })} /></div>
+          <div className="space-y-2">
+            <Label>Exercício de licenciamento</Label>
+            <Input type="number" min="2000" max="2100" value={form.licensing_year} onChange={(e) => setForm({ ...form, licensing_year: e.target.value })} placeholder={String(new Date().getFullYear())} />
+            <p className="text-[11px] text-muted-foreground">Se igual ao ano atual, o veículo é considerado licenciado.</p>
+          </div>
         </div>
 
         <div className="space-y-2">
