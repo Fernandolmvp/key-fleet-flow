@@ -131,10 +131,37 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     delete payload.id;
     const op = isEdit
       ? supabase.from("vehicles").update(payload).eq("id", vehicle.id)
-      : supabase.from("vehicles").insert(payload);
-    const { error } = await op;
+      : supabase.from("vehicles").insert(payload).select("id").single();
+    const { data: saved, error } = await (op as any);
     setBusy(false);
     if (error) return toast.error(error.message);
+
+    // Vincula CRLV anexado pela IA na tabela `documents`
+    const vehicleId = isEdit ? vehicle.id : saved?.id;
+    if (archivedDoc && vehicleId) {
+      const { error: docErr } = await supabase.from("documents").insert({
+        company_id: currentCompanyId,
+        entity_type: "vehicle",
+        entity_id: vehicleId,
+        doc_type: "crlv",
+        title: "CRLV",
+        issue_date: form.crlv_issue_date || null,
+        file_url: archivedDoc,
+        file_name: archivedDoc.split("/").pop() || null,
+        mime_type: archivedDoc.toLowerCase().endsWith(".pdf") ? "application/pdf" : null,
+        ai_extracted: {
+          source: "vehicle_form",
+          plate: payload.plate,
+          owner_name: form.owner_name,
+          owner_doc: form.owner_doc,
+          crlv_city: form.crlv_city,
+          licensing_year: payload.licensing_year,
+          crlv_issue_date: form.crlv_issue_date,
+        },
+      });
+      if (docErr) console.warn("vehicle CRLV archive failed:", docErr.message);
+    }
+
     toast.success(isEdit ? "Veículo atualizado" : "Veículo cadastrado");
     onOpenChange(false); onSaved();
   };
