@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
@@ -55,8 +57,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
     fipe_value: "", photos: [] as string[],
     licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
-    inactivated_at: "", inactive_reason: "",
+    inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
     sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
+    buyer_phone: "", buyer_email: "", buyer_address: "",
+    sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
   });
 
   useEffect(() => {
@@ -68,8 +72,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
       licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
-      inactivated_at: "", inactive_reason: "",
+      inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
       sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
+      buyer_phone: "", buyer_email: "", buyer_address: "",
+      sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
     });
     setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,6 +155,17 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       sale_value: form.sale_value ? Number(form.sale_value) : null,
       buyer_name: form.buyer_name || null,
       buyer_doc: form.buyer_doc || null,
+      buyer_phone: form.buyer_phone || null,
+      buyer_email: form.buyer_email || null,
+      buyer_address: form.buyer_address || null,
+      sale_notary: form.sale_notary || null,
+      sale_city: form.sale_city || null,
+      sale_state: form.sale_state || null,
+      sale_payment_method: form.sale_payment_method || null,
+      sale_notes: form.sale_notes || null,
+      sale_contract_url: form.sale_contract_url || null,
+      inactive_notes: form.inactive_notes || null,
+      notes: form.notes || null,
     };
     delete payload.id;
     const op = isEdit
