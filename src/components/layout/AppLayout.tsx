@@ -206,7 +206,7 @@ export default function AppLayout() {
                 </button>
                 {open && (
                   <div className="space-y-0.5 pt-0.5">
-                    {entry.items.map((it) => renderItem(it, true))}
+                    {entry.items.map((it) => renderItem(it, { indent: true }))}
                   </div>
                 )}
               </div>
