@@ -14,10 +14,15 @@ const TOOL_VEHICLE = {
   function: {
     name: "extract_vehicle",
     description:
-      "Extrai dados do CRLV/DUT/CRV brasileiro. Use null para campos ilegíveis ou ausentes.",
+      "Extrai dados do CRLV/DUT/CRV brasileiro. Antes de extrair, IDENTIFIQUE o tipo do documento. Se NÃO for um documento veicular (CRLV/CRV/DUT), preencha detected_doc_kind com o tipo real e deixe os demais campos null.",
     parameters: {
       type: "object",
       properties: {
+        detected_doc_kind: {
+          type: "string",
+          enum: ["crlv","crv","dut","cnh","ipva","licenciamento","seguro","rg","cpf","nota_fiscal","comprovante","outro","ilegivel"],
+          description: "Tipo real identificado no documento. Use 'crlv'/'crv'/'dut' apenas se for de fato um documento veicular.",
+        },
         plate: { type: ["string", "null"], description: "Placa, formato Mercosul ou antigo, somente letras/números" },
         renavam: { type: ["string", "null"] },
         chassis: { type: ["string", "null"] },
@@ -37,7 +42,7 @@ const TOOL_VEHICLE = {
         crlv_issue_date: { type: ["string", "null"], description: "Data de emissão do CRLV YYYY-MM-DD" },
         licensing_year: { type: ["integer", "null"], description: "Ano do exercício de licenciamento (ex.: 2026)" },
       },
-      required: ["plate", "brand", "model"],
+      required: ["detected_doc_kind"],
       additionalProperties: false,
     },
   },
@@ -47,10 +52,15 @@ const TOOL_DRIVER = {
   type: "function",
   function: {
     name: "extract_driver",
-    description: "Extrai dados da CNH brasileira. Use null para campos ilegíveis ou ausentes.",
+    description: "Extrai dados da CNH brasileira. Antes de extrair, IDENTIFIQUE o tipo do documento (deve ser CNH). Se for outro documento (CRLV, IPVA, RG, CPF, comprovante, nota fiscal, apólice, etc.), preencha detected_doc_kind com o tipo real e deixe os demais campos null.",
     parameters: {
       type: "object",
       properties: {
+        detected_doc_kind: {
+          type: "string",
+          enum: ["cnh","crlv","ipva","licenciamento","seguro","rg","cpf","exame_medico","exame_toxicologico","mopp","nota_fiscal","comprovante","outro","ilegivel"],
+          description: "Tipo real identificado no documento. Use 'cnh' apenas se for de fato uma Carteira Nacional de Habilitação.",
+        },
         full_name: { type: ["string", "null"] },
         cpf: { type: ["string", "null"], description: "Apenas dígitos, sem pontuação" },
         cnh_number: { type: ["string", "null"], description: "Número de registro da CNH" },
@@ -60,7 +70,7 @@ const TOOL_DRIVER = {
         birth_date: { type: ["string", "null"], description: "Data de nascimento no formato YYYY-MM-DD" },
         address: { type: ["string", "null"] },
       },
-      required: ["full_name"],
+      required: ["detected_doc_kind"],
       additionalProperties: false,
     },
   },
@@ -287,10 +297,10 @@ Deno.serve(async (req) => {
     let tool: any, fnName: string, sys: string;
     if (type === "vehicle") {
       tool = TOOL_VEHICLE; fnName = "extract_vehicle";
-      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). Extraia TODOS os dados visíveis com precisão, incluindo: PROPRIETÁRIO (nome completo), CPF/CNPJ do proprietário (apenas dígitos), MUNICÍPIO de emplacamento (geralmente próximo ao UF, na seção do proprietário), DATA DE EMISSÃO do CRLV (campo 'Local e Data' ou 'Data Emissão' — fica próximo ao código de barras/autenticação), e EXERCÍCIO (ano do licenciamento, geralmente em destaque no topo, ex.: 'EXERCÍCIO 2026'). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
+      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). PRIMEIRO identifique o tipo do documento e preencha detected_doc_kind. Se NÃO for um documento veicular (CRLV/CRV/DUT) — por exemplo CNH, RG, comprovante, nota fiscal —, preencha detected_doc_kind com o tipo real e deixe os demais campos como null. Quando for documento veicular, extraia TODOS os dados visíveis: PROPRIETÁRIO, CPF/CNPJ, MUNICÍPIO de emplacamento, DATA DE EMISSÃO do CRLV e EXERCÍCIO (ano do licenciamento). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
     } else if (type === "driver") {
       tool = TOOL_DRIVER; fnName = "extract_driver";
-      sys = "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. Extraia os dados com precisão. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
+      sys = "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. PRIMEIRO identifique o tipo do documento e preencha detected_doc_kind. Se NÃO for uma CNH (ex.: CRLV, IPVA, RG, comprovante, nota fiscal), preencha detected_doc_kind com o tipo real e deixe os demais campos como null — NÃO invente dados de motorista a partir de outros documentos. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
     } else if (type === "plate") {
       tool = TOOL_PLATE; fnName = "extract_plate";
       sys = "Você lê placas veiculares brasileiras em fotos. Retorne apenas a placa do veículo principal, em letras maiúsculas, sem hífen ou espaços. Formatos válidos: ABC1234 (antigo) ou ABC1D23 (Mercosul).";
@@ -371,6 +381,32 @@ Deno.serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Validação de tipo de documento: garante que o arquivo enviado corresponde
+    // ao que o usuário está cadastrando (ex.: motorista exige CNH, veículo exige CRLV).
+    const kindLabels: Record<string, string> = {
+      crlv: "CRLV", crv: "CRV", dut: "DUT", cnh: "CNH",
+      ipva: "IPVA", licenciamento: "Licenciamento", seguro: "Apólice de Seguro",
+      rg: "RG", cpf: "CPF", exame_medico: "Exame Médico",
+      exame_toxicologico: "Exame Toxicológico", mopp: "Curso MOPP",
+      nota_fiscal: "Nota Fiscal", comprovante: "Comprovante",
+      outro: "outro tipo de documento", ilegivel: "documento ilegível",
+    };
+    const detected = (parsed as any).detected_doc_kind as string | undefined;
+    if (type === "driver" && detected && detected !== "cnh") {
+      const label = kindLabels[detected] ?? detected;
+      return new Response(JSON.stringify({
+        error: `O arquivo enviado parece ser ${label}, não uma CNH. Envie a Carteira Nacional de Habilitação do motorista.`,
+        detectedKind: detected,
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (type === "vehicle" && detected && !["crlv","crv","dut"].includes(detected)) {
+      const label = kindLabels[detected] ?? detected;
+      return new Response(JSON.stringify({
+        error: `O arquivo enviado parece ser ${label}, não um CRLV/CRV/DUT. Envie o documento do veículo.`,
+        detectedKind: detected,
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ data: parsed }), {
