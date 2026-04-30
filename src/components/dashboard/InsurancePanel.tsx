@@ -249,12 +249,21 @@ export default function InsurancePanel() {
           inclusion_type: "apolice" as const,
         }));
         await supabase.from("insurance_policy_vehicles").upsert(rows, { onConflict: "policy_id,vehicle_id", ignoreDuplicates: true });
+        await syncVehicleInsuranceFields(currentCompanyId, matches.map((m) => m.id));
         toast.success(`${matches.length} veículo(s) vinculado(s) à apólice`);
       }
       const notFound = aiPlates.filter((p) => !vehicles.some((v) => v.plate.toUpperCase() === p));
       if (notFound.length) {
         toast.warning(`${notFound.length} placa(s) da apólice não estão cadastradas: ${notFound.join(", ")}`);
       }
+    }
+    // Se a apólice já existia (edição), ressincroniza todos os veículos vinculados
+    if (form.id && policyId) {
+      const { data: existing } = await supabase
+        .from("insurance_policy_vehicles").select("vehicle_id")
+        .eq("policy_id", policyId);
+      const vIds = (existing ?? []).map((x: any) => x.vehicle_id);
+      if (vIds.length) await syncVehicleInsuranceFields(currentCompanyId, vIds);
     }
     toast.success("Apólice salva");
     setPolicyDialog(false);
@@ -264,8 +273,13 @@ export default function InsurancePanel() {
 
   async function removePolicy(id: string) {
     if (!confirm("Excluir esta apólice e todos os vínculos?")) return;
+    // captura os veículos antes da exclusão para ressincronizar
+    const { data: existing } = await supabase
+      .from("insurance_policy_vehicles").select("vehicle_id").eq("policy_id", id);
+    const vIds = (existing ?? []).map((x: any) => x.vehicle_id);
     const r = await supabase.from("insurance_policies").delete().eq("id", id);
     if (r.error) { toast.error(r.error.message); return; }
+    if (currentCompanyId && vIds.length) await syncVehicleInsuranceFields(currentCompanyId, vIds);
     toast.success("Excluída");
     if (selectedPolicyId === id) setSelectedPolicyId(null);
     load();
@@ -280,13 +294,19 @@ export default function InsurancePanel() {
       inclusion_type: type,
     });
     if (r.error) { toast.error(r.error.message); return; }
+    await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
     toast.success(type === "adendo" ? "Adendo registrado" : "Veículo incluído");
     load();
   }
 
   async function unlinkVehicle(linkId: string) {
+    // capturar vehicle_id antes
+    const { data: link } = await supabase
+      .from("insurance_policy_vehicles").select("vehicle_id").eq("id", linkId).maybeSingle();
+    const vehicleId = (link as any)?.vehicle_id;
     const r = await supabase.from("insurance_policy_vehicles").delete().eq("id", linkId);
     if (r.error) { toast.error(r.error.message); return; }
+    if (currentCompanyId && vehicleId) await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
     toast.success("Vínculo removido");
     load();
   }
