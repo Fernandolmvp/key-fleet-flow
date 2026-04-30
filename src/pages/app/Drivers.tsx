@@ -221,6 +221,46 @@ export default function Drivers() {
       if (docErr) console.warn("doc archive failed", docErr.message);
     }
 
+    // Registrar movimentação de vínculo de veículo (em vehicle_movements)
+    try {
+      const prevVehicleId = editing?.assigned_vehicle_id || null;
+      const newVehicleId = payload.assigned_vehicle_id || null;
+      if (prevVehicleId !== newVehicleId && driverId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const driverName = form.full_name;
+        const today = new Date().toISOString().slice(0, 10);
+        const movs: any[] = [];
+        if (prevVehicleId) {
+          const v = vehicles.find((x) => x.id === prevVehicleId);
+          movs.push({
+            company_id: currentCompanyId, vehicle_id: prevVehicleId,
+            movement_type: "desvinculo_motorista",
+            reason: `Desvínculo de motorista: ${driverName}`,
+            notes: newVehicleId ? `Motorista passou a ser vinculado a outro veículo` : `Motorista deixou de ter vínculo exclusivo`,
+            occurred_at: today, created_by: user?.id ?? null,
+            metadata: { driver_id: driverId, driver_name: driverName, vehicle_plate: (v as any)?.plate },
+          });
+        }
+        if (newVehicleId) {
+          const v = vehicles.find((x) => x.id === newVehicleId);
+          movs.push({
+            company_id: currentCompanyId, vehicle_id: newVehicleId,
+            movement_type: "vinculo_motorista",
+            reason: `Vínculo de motorista: ${driverName}`,
+            notes: `Motorista vinculado para uso exclusivo deste veículo`,
+            occurred_at: today, created_by: user?.id ?? null,
+            metadata: { driver_id: driverId, driver_name: driverName, vehicle_plate: (v as any)?.plate },
+          });
+        }
+        if (movs.length) {
+          const { error: mErr } = await supabase.from("vehicle_movements").insert(movs);
+          if (mErr) console.warn("vehicle_movement insert failed:", mErr.message);
+        }
+      }
+    } catch (e: any) {
+      console.warn("link movement log failed:", e?.message);
+    }
+
     setBusy(false);
     toast.success(editing ? "Motorista atualizado" : "Motorista cadastrado");
     setOpen(false); load();
