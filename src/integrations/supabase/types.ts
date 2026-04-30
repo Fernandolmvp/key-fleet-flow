@@ -341,6 +341,8 @@ export type Database = {
           email_verified_at: string | null
           full_name: string
           id: string
+          inactivated_at: string | null
+          inactive_reason: string | null
           manager_user_id: string | null
           medical_exam_expires_at: string | null
           notes: string | null
@@ -349,6 +351,7 @@ export type Database = {
           phone_verified_at: string | null
           photo_url: string | null
           status: Database["public"]["Enums"]["driver_status"]
+          termination_date: string | null
           updated_at: string
           user_id: string | null
         }
@@ -367,6 +370,8 @@ export type Database = {
           email_verified_at?: string | null
           full_name: string
           id?: string
+          inactivated_at?: string | null
+          inactive_reason?: string | null
           manager_user_id?: string | null
           medical_exam_expires_at?: string | null
           notes?: string | null
@@ -375,6 +380,7 @@ export type Database = {
           phone_verified_at?: string | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
+          termination_date?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -393,6 +399,8 @@ export type Database = {
           email_verified_at?: string | null
           full_name?: string
           id?: string
+          inactivated_at?: string | null
+          inactive_reason?: string | null
           manager_user_id?: string | null
           medical_exam_expires_at?: string | null
           notes?: string | null
@@ -401,6 +409,7 @@ export type Database = {
           phone_verified_at?: string | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
+          termination_date?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -726,6 +735,8 @@ export type Database = {
           created_by: string | null
           fuel_types: string[]
           id: string
+          inactivated_at: string | null
+          inactive_reason: string | null
           name: string
           notes: string | null
           phone: string | null
@@ -744,6 +755,8 @@ export type Database = {
           created_by?: string | null
           fuel_types?: string[]
           id?: string
+          inactivated_at?: string | null
+          inactive_reason?: string | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -762,6 +775,8 @@ export type Database = {
           created_by?: string | null
           fuel_types?: string[]
           id?: string
+          inactivated_at?: string | null
+          inactive_reason?: string | null
           name?: string
           notes?: string | null
           phone?: string | null
@@ -1212,6 +1227,8 @@ export type Database = {
         Row: {
           branch_id: string | null
           brand: string
+          buyer_doc: string | null
+          buyer_name: string | null
           chassis: string | null
           color: string | null
           company_id: string
@@ -1225,6 +1242,8 @@ export type Database = {
           fuel_type: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker: boolean
           id: string
+          inactivated_at: string | null
+          inactive_reason: string | null
           insurance_expires_at: string | null
           insurance_policy: string | null
           insurer: string | null
@@ -1237,6 +1256,8 @@ export type Database = {
           plate: string
           renavam: string | null
           responsible: string | null
+          sale_date: string | null
+          sale_value: number | null
           status: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity: number | null
           updated_at: string
@@ -1247,6 +1268,8 @@ export type Database = {
         Insert: {
           branch_id?: string | null
           brand: string
+          buyer_doc?: string | null
+          buyer_name?: string | null
           chassis?: string | null
           color?: string | null
           company_id: string
@@ -1260,6 +1283,8 @@ export type Database = {
           fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker?: boolean
           id?: string
+          inactivated_at?: string | null
+          inactive_reason?: string | null
           insurance_expires_at?: string | null
           insurance_policy?: string | null
           insurer?: string | null
@@ -1272,6 +1297,8 @@ export type Database = {
           plate: string
           renavam?: string | null
           responsible?: string | null
+          sale_date?: string | null
+          sale_value?: number | null
           status?: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity?: number | null
           updated_at?: string
@@ -1282,6 +1309,8 @@ export type Database = {
         Update: {
           branch_id?: string | null
           brand?: string
+          buyer_doc?: string | null
+          buyer_name?: string | null
           chassis?: string | null
           color?: string | null
           company_id?: string
@@ -1295,6 +1324,8 @@ export type Database = {
           fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker?: boolean
           id?: string
+          inactivated_at?: string | null
+          inactive_reason?: string | null
           insurance_expires_at?: string | null
           insurance_policy?: string | null
           insurer?: string | null
@@ -1307,6 +1338,8 @@ export type Database = {
           plate?: string
           renavam?: string | null
           responsible?: string | null
+          sale_date?: string | null
+          sale_value?: number | null
           status?: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity?: number | null
           updated_at?: string
@@ -1396,7 +1429,14 @@ export type Database = {
         | "curso_mopp"
         | "curso_transporte_passageiros"
         | "outro_motorista"
-      driver_status: "ativo" | "inativo" | "ferias" | "afastado"
+      driver_status:
+        | "ativo"
+        | "inativo"
+        | "ferias"
+        | "afastado"
+        | "desligado"
+        | "licenca_medica"
+        | "suspenso"
       fuel_anomaly:
         | "km_regressivo"
         | "consumo_alto"
@@ -1454,6 +1494,10 @@ export type Database = {
         | "vendido"
         | "parado"
         | "sinistrado"
+        | "inativo"
+        | "transferido"
+        | "roubado_furtado"
+        | "leiloado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1614,7 +1658,15 @@ export const Constants = {
         "curso_transporte_passageiros",
         "outro_motorista",
       ],
-      driver_status: ["ativo", "inativo", "ferias", "afastado"],
+      driver_status: [
+        "ativo",
+        "inativo",
+        "ferias",
+        "afastado",
+        "desligado",
+        "licenca_medica",
+        "suspenso",
+      ],
       fuel_anomaly: [
         "km_regressivo",
         "consumo_alto",
@@ -1678,6 +1730,10 @@ export const Constants = {
         "vendido",
         "parado",
         "sinistrado",
+        "inativo",
+        "transferido",
+        "roubado_furtado",
+        "leiloado",
       ],
     },
   },
