@@ -113,34 +113,49 @@ export default function AppLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loc.pathname]);
 
-  const renderItem = (it: NavItem, indent = false) => (
-    <NavLink
-      key={it.to}
-      to={it.to}
-      end={it.end}
-      className={({ isActive }) => cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-        indent && "ml-4 pl-3 border-l border-sidebar-border/60",
-        isActive
-          ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
-          : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-      )}
-    >
-      <it.icon className="h-4 w-4" />
-      <span className="flex-1">{it.label}</span>
-      {it.badgeKey === "documents" && docPending > 0 && (
-        <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
-          {docPending}
+  const renderItem = (it: NavItem, opts: { indent?: boolean; primary?: boolean } = {}) => {
+    const { indent = false, primary = false } = opts;
+    return (
+      <NavLink
+        key={it.to}
+        to={it.to}
+        end={it.end}
+        className={({ isActive }) => cn(
+          "group flex items-center gap-3 rounded-lg transition-all",
+          primary
+            ? "px-2.5 py-2.5 text-[13px] font-semibold tracking-wide uppercase"
+            : "px-3 py-2 text-sm",
+          indent && "ml-4 pl-3 border-l border-sidebar-border/60",
+          isActive
+            ? primary
+              ? "bg-gradient-to-r from-primary/15 to-transparent text-sidebar-accent-foreground border border-primary/40 shadow-glow"
+              : "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
+            : primary
+              ? "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+        )}
+      >
+        <span className={cn(
+          "grid place-items-center rounded-md transition-colors shrink-0",
+          primary ? "h-7 w-7 bg-primary/10 text-primary group-hover:bg-primary/20" : ""
+        )}>
+          <it.icon className={cn(primary ? "h-4 w-4" : "h-4 w-4")} />
         </span>
-      )}
-      {it.badgeKey === "approvals" && approvalPending > 0 && (
-        <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
-          {approvalPending}
-        </span>
-      )}
-      {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
-    </NavLink>
-  );
+        <span className="flex-1">{it.label}</span>
+        {it.badgeKey === "documents" && docPending > 0 && (
+          <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
+            {docPending}
+          </span>
+        )}
+        {it.badgeKey === "approvals" && approvalPending > 0 && (
+          <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
+            {approvalPending}
+          </span>
+        )}
+        {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
+      </NavLink>
+    );
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -155,26 +170,31 @@ export default function AppLayout() {
             <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Fleet Intelligence</div>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {visibleNav.map((entry) => {
-            if (!isGroup(entry)) return renderItem(entry);
+            if (!isGroup(entry)) return renderItem(entry, { primary: true });
             const open = !!openGroups[entry.key];
             const Icon = entry.icon;
             const pendingCount =
               (entry.items.some((i) => i.badgeKey === "approvals") ? approvalPending : 0) +
               (entry.items.some((i) => i.badgeKey === "documents") ? docPending : 0);
+            const groupActive = entry.items.some((it) => loc.pathname.startsWith(it.to));
             return (
               <div key={entry.key} className="space-y-0.5">
                 <button
                   type="button"
                   onClick={() => setOpenGroups((p) => ({ ...p, [entry.key]: !open }))}
                   className={cn(
-                    "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                    "text-sidebar-foreground/90 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                    "w-full flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-all",
+                    groupActive
+                      ? "bg-gradient-to-r from-primary/15 to-transparent text-sidebar-accent-foreground border border-primary/40 shadow-glow"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent"
                   )}
                 >
-                  <Icon className="h-4 w-4 text-primary" />
-                  <span className="flex-1 text-left font-medium tracking-wide uppercase text-[11px]">{entry.label}</span>
+                  <span className="grid place-items-center rounded-md h-7 w-7 bg-primary/10 text-primary shrink-0">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-left font-semibold tracking-wide uppercase text-[13px]">{entry.label}</span>
                   {!open && pendingCount > 0 && (
                     <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
                       {pendingCount}
@@ -185,8 +205,8 @@ export default function AppLayout() {
                     : <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
                 </button>
                 {open && (
-                  <div className="space-y-0.5">
-                    {entry.items.map((it) => renderItem(it, true))}
+                  <div className="space-y-0.5 pt-0.5">
+                    {entry.items.map((it) => renderItem(it, { indent: true }))}
                   </div>
                 )}
               </div>
