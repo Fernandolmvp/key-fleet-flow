@@ -297,10 +297,10 @@ Deno.serve(async (req) => {
     let tool: any, fnName: string, sys: string;
     if (type === "vehicle") {
       tool = TOOL_VEHICLE; fnName = "extract_vehicle";
-      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). Extraia TODOS os dados visíveis com precisão, incluindo: PROPRIETÁRIO (nome completo), CPF/CNPJ do proprietário (apenas dígitos), MUNICÍPIO de emplacamento (geralmente próximo ao UF, na seção do proprietário), DATA DE EMISSÃO do CRLV (campo 'Local e Data' ou 'Data Emissão' — fica próximo ao código de barras/autenticação), e EXERCÍCIO (ano do licenciamento, geralmente em destaque no topo, ex.: 'EXERCÍCIO 2026'). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
+      sys = "Você é um especialista em documentos veiculares brasileiros (CRLV, CRV, DUT). PRIMEIRO identifique o tipo do documento e preencha detected_doc_kind. Se NÃO for um documento veicular (CRLV/CRV/DUT) — por exemplo CNH, RG, comprovante, nota fiscal —, preencha detected_doc_kind com o tipo real e deixe os demais campos como null. Quando for documento veicular, extraia TODOS os dados visíveis: PROPRIETÁRIO, CPF/CNPJ, MUNICÍPIO de emplacamento, DATA DE EMISSÃO do CRLV e EXERCÍCIO (ano do licenciamento). Datas em ISO YYYY-MM-DD. Placas em maiúsculas sem hífen. CPF/CNPJ apenas dígitos.";
     } else if (type === "driver") {
       tool = TOOL_DRIVER; fnName = "extract_driver";
-      sys = "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. Extraia os dados com precisão. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
+      sys = "Você é um especialista em CNH (Carteira Nacional de Habilitação) brasileira. PRIMEIRO identifique o tipo do documento e preencha detected_doc_kind. Se NÃO for uma CNH (ex.: CRLV, IPVA, RG, comprovante, nota fiscal), preencha detected_doc_kind com o tipo real e deixe os demais campos como null — NÃO invente dados de motorista a partir de outros documentos. Datas em ISO YYYY-MM-DD. CPF apenas dígitos.";
     } else if (type === "plate") {
       tool = TOOL_PLATE; fnName = "extract_plate";
       sys = "Você lê placas veiculares brasileiras em fotos. Retorne apenas a placa do veículo principal, em letras maiúsculas, sem hífen ou espaços. Formatos válidos: ABC1234 (antigo) ou ABC1D23 (Mercosul).";
