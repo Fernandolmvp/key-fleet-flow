@@ -262,10 +262,74 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_onboarding_attempts: {
+        Row: {
+          attempted_at: string
+          cpf: string
+          id: string
+          ip: string | null
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          cpf: string
+          id?: string
+          ip?: string | null
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          cpf?: string
+          id?: string
+          ip?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
+      driver_otp_codes: {
+        Row: {
+          attempts: number
+          code: string
+          company_id: string
+          consumed_at: string | null
+          created_at: string
+          created_ip: string | null
+          driver_id: string
+          expires_at: string
+          id: string
+          phone: string
+        }
+        Insert: {
+          attempts?: number
+          code: string
+          company_id: string
+          consumed_at?: string | null
+          created_at?: string
+          created_ip?: string | null
+          driver_id: string
+          expires_at: string
+          id?: string
+          phone: string
+        }
+        Update: {
+          attempts?: number
+          code?: string
+          company_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          created_ip?: string | null
+          driver_id?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+        }
+        Relationships: []
+      }
       drivers: {
         Row: {
           address: string | null
           auto_fuel_authorized: boolean
+          birth_date: string | null
           branch_id: string | null
           cnh_category: string | null
           cnh_expires_at: string | null
@@ -274,12 +338,15 @@ export type Database = {
           cpf: string | null
           created_at: string
           email: string | null
+          email_verified_at: string | null
           full_name: string
           id: string
           manager_user_id: string | null
           medical_exam_expires_at: string | null
           notes: string | null
+          onboarded_at: string | null
           phone: string | null
+          phone_verified_at: string | null
           photo_url: string | null
           status: Database["public"]["Enums"]["driver_status"]
           updated_at: string
@@ -288,6 +355,7 @@ export type Database = {
         Insert: {
           address?: string | null
           auto_fuel_authorized?: boolean
+          birth_date?: string | null
           branch_id?: string | null
           cnh_category?: string | null
           cnh_expires_at?: string | null
@@ -296,12 +364,15 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string | null
+          email_verified_at?: string | null
           full_name: string
           id?: string
           manager_user_id?: string | null
           medical_exam_expires_at?: string | null
           notes?: string | null
+          onboarded_at?: string | null
           phone?: string | null
+          phone_verified_at?: string | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
           updated_at?: string
@@ -310,6 +381,7 @@ export type Database = {
         Update: {
           address?: string | null
           auto_fuel_authorized?: boolean
+          birth_date?: string | null
           branch_id?: string | null
           cnh_category?: string | null
           cnh_expires_at?: string | null
@@ -318,12 +390,15 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string | null
+          email_verified_at?: string | null
           full_name?: string
           id?: string
           manager_user_id?: string | null
           medical_exam_expires_at?: string | null
           notes?: string | null
+          onboarded_at?: string | null
           phone?: string | null
+          phone_verified_at?: string | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
           updated_at?: string
