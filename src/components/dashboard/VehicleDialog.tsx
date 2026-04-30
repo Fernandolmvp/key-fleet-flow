@@ -221,6 +221,13 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       notes: form.notes || null,
     };
     delete payload.id;
+    // Normaliza strings vazias para null em todos os demais campos (evita perder dados ou quebrar tipos)
+    for (const k of Object.keys(payload)) {
+      if (payload[k] === "") payload[k] = null;
+    }
+    // Remove campos calculados/relacionais que não pertencem à tabela vehicles
+    delete payload.created_at;
+    delete payload.updated_at;
     const op = isEdit
       ? supabase.from("vehicles").update(payload).eq("id", vehicle.id)
       : supabase.from("vehicles").insert(payload).select("id").single();
