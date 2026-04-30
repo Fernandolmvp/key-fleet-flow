@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -22,7 +23,17 @@ interface Driver {
 
 interface DriverDoc { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; }
 
-const STATUSES = ["ativo","inativo","ferias","afastado"];
+const STATUSES = [
+  { value: "ativo", label: "Ativo" },
+  { value: "ferias", label: "Férias" },
+  { value: "afastado", label: "Afastado" },
+  { value: "licenca_medica", label: "Licença médica" },
+  { value: "suspenso", label: "Suspenso" },
+  { value: "desligado", label: "Desligado" },
+  { value: "inativo", label: "Inativo (outros)" },
+];
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(STATUSES.map(s => [s.value, s.label]));
+const INACTIVE_STATUSES = ["desligado","inativo","suspenso","licenca_medica","afastado"];
 
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
