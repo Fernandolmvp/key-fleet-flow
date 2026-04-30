@@ -413,6 +413,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       insurer: form.insurer || null,
       insurance_policy: form.insurance_policy || null,
       insurance_expires_at: form.insurance_expires_at || null,
+      insurance_responsible: form.insurance_responsible || null,
       fipe_value: form.fipe_value ? Number(form.fipe_value) : null,
       photos: form.photos ?? [],
       documents: form.documents ?? [],
