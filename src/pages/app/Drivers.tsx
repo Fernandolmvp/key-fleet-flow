@@ -42,7 +42,7 @@ export default function Drivers() {
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
-    return { full_name: "", cpf: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "" };
+    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "" };
   }
 
   const load = async () => {
@@ -126,6 +126,7 @@ export default function Drivers() {
         cnh_category: data.cnh_category ?? f.cnh_category,
         cnh_expires_at: data.cnh_expires_at ?? f.cnh_expires_at,
         medical_exam_expires_at: data.medical_exam_expires_at ?? f.medical_exam_expires_at,
+        birth_date: data.birth_date ?? f.birth_date,
         address: data.address ?? f.address,
       }));
       setArchivedDoc(archivedUrl ? { url: archivedUrl, name: file.name, mime: file.type } : null);
@@ -145,6 +146,7 @@ export default function Drivers() {
       ...form, company_id: currentCompanyId,
       cnh_expires_at: form.cnh_expires_at || null,
       medical_exam_expires_at: form.medical_exam_expires_at || null,
+      birth_date: form.birth_date || null,
       user_id: form.user_id || null,
       manager_user_id: form.manager_user_id || null,
       auto_fuel_authorized: !!form.auto_fuel_authorized,
@@ -437,6 +439,7 @@ export default function Drivers() {
             <div className="space-y-2"><Label>Categoria</Label><Input value={form.cnh_category} onChange={(e) => setForm({ ...form, cnh_category: e.target.value })} placeholder="A, B, D, E..." /></div>
             <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
             <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
 
             <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">

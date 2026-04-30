@@ -88,6 +88,9 @@ export default function Login() {
           <p className="text-sm text-center text-muted-foreground">
             Primeiro acesso? <Link to="/signup" className="text-primary hover:underline">Criar conta</Link>
           </p>
+          <p className="text-xs text-center text-muted-foreground">
+            É motorista? <Link to="/motorista/primeiro-acesso" className="text-primary hover:underline">Ativar acesso</Link>
+          </p>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import Tires from "./pages/app/Tires";
 import Colaborador from "./pages/app/Colaborador";
 import Documents from "./pages/app/Documents";
 import Approvals from "./pages/app/Approvals";
+import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/app" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="vehicles" element={<Vehicles />} />

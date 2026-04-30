@@ -57,6 +57,7 @@ const TOOL_DRIVER = {
         cnh_category: { type: ["string", "null"], description: "Ex.: A, B, AB, D, E" },
         cnh_expires_at: { type: ["string", "null"], description: "Validade no formato YYYY-MM-DD" },
         medical_exam_expires_at: { type: ["string", "null"], description: "Validade do exame médico YYYY-MM-DD" },
+        birth_date: { type: ["string", "null"], description: "Data de nascimento no formato YYYY-MM-DD" },
         address: { type: ["string", "null"] },
       },
       required: ["full_name"],
