@@ -56,7 +56,7 @@ const EMPTY_FORM = {
   plate: "", renavam: "", chassis: "", brand: "", model: "",
   year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
   tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
-  responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
+  responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "", insurance_responsible: "",
   fipe_value: "", photos: [] as string[], documents: [] as string[],
   licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
   inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
