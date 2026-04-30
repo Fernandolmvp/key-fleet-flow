@@ -1725,6 +1725,7 @@ export type Database = {
         Args: { _company_name: string; _full_name: string }
         Returns: string
       }
+      bootstrap_super_admin: { Args: { _email: string }; Returns: string }
       can_manage_fleet: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
