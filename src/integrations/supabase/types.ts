@@ -2055,6 +2055,7 @@ export type Database = {
           inactive_reason: string | null
           insurance_expires_at: string | null
           insurance_policy: string | null
+          insurance_responsible: string | null
           insurer: string | null
           licensing_year: number | null
           model: string
@@ -2106,6 +2107,7 @@ export type Database = {
           inactive_reason?: string | null
           insurance_expires_at?: string | null
           insurance_policy?: string | null
+          insurance_responsible?: string | null
           insurer?: string | null
           licensing_year?: number | null
           model: string
@@ -2157,6 +2159,7 @@ export type Database = {
           inactive_reason?: string | null
           insurance_expires_at?: string | null
           insurance_policy?: string | null
+          insurance_responsible?: string | null
           insurer?: string | null
           licensing_year?: number | null
           model?: string
