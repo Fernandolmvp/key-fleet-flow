@@ -14,10 +14,15 @@ const TOOL_VEHICLE = {
   function: {
     name: "extract_vehicle",
     description:
-      "Extrai dados do CRLV/DUT/CRV brasileiro. Use null para campos ilegíveis ou ausentes.",
+      "Extrai dados do CRLV/DUT/CRV brasileiro. Antes de extrair, IDENTIFIQUE o tipo do documento. Se NÃO for um documento veicular (CRLV/CRV/DUT), preencha detected_doc_kind com o tipo real e deixe os demais campos null.",
     parameters: {
       type: "object",
       properties: {
+        detected_doc_kind: {
+          type: "string",
+          enum: ["crlv","crv","dut","cnh","ipva","licenciamento","seguro","rg","cpf","nota_fiscal","comprovante","outro","ilegivel"],
+          description: "Tipo real identificado no documento. Use 'crlv'/'crv'/'dut' apenas se for de fato um documento veicular.",
+        },
         plate: { type: ["string", "null"], description: "Placa, formato Mercosul ou antigo, somente letras/números" },
         renavam: { type: ["string", "null"] },
         chassis: { type: ["string", "null"] },
@@ -37,7 +42,7 @@ const TOOL_VEHICLE = {
         crlv_issue_date: { type: ["string", "null"], description: "Data de emissão do CRLV YYYY-MM-DD" },
         licensing_year: { type: ["integer", "null"], description: "Ano do exercício de licenciamento (ex.: 2026)" },
       },
-      required: ["plate", "brand", "model"],
+      required: ["detected_doc_kind"],
       additionalProperties: false,
     },
   },
@@ -47,10 +52,15 @@ const TOOL_DRIVER = {
   type: "function",
   function: {
     name: "extract_driver",
-    description: "Extrai dados da CNH brasileira. Use null para campos ilegíveis ou ausentes.",
+    description: "Extrai dados da CNH brasileira. Antes de extrair, IDENTIFIQUE o tipo do documento (deve ser CNH). Se for outro documento (CRLV, IPVA, RG, CPF, comprovante, nota fiscal, apólice, etc.), preencha detected_doc_kind com o tipo real e deixe os demais campos null.",
     parameters: {
       type: "object",
       properties: {
+        detected_doc_kind: {
+          type: "string",
+          enum: ["cnh","crlv","ipva","licenciamento","seguro","rg","cpf","exame_medico","exame_toxicologico","mopp","nota_fiscal","comprovante","outro","ilegivel"],
+          description: "Tipo real identificado no documento. Use 'cnh' apenas se for de fato uma Carteira Nacional de Habilitação.",
+        },
         full_name: { type: ["string", "null"] },
         cpf: { type: ["string", "null"], description: "Apenas dígitos, sem pontuação" },
         cnh_number: { type: ["string", "null"], description: "Número de registro da CNH" },
@@ -60,7 +70,7 @@ const TOOL_DRIVER = {
         birth_date: { type: ["string", "null"], description: "Data de nascimento no formato YYYY-MM-DD" },
         address: { type: ["string", "null"] },
       },
-      required: ["full_name"],
+      required: ["detected_doc_kind"],
       additionalProperties: false,
     },
   },
