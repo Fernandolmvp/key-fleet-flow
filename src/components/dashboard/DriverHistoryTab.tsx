@@ -3,9 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Fuel, Wrench, FileText, UserCog, Undo2, Clock } from "lucide-react";
+import { Loader2, UserCog, Undo2, Clock, KeyRound, LogIn } from "lucide-react";
 
-type EventKind = "status" | "fuel" | "maintenance" | "document";
+type EventKind = "status" | "access";
 
 interface TimelineEvent {
   id: string;
@@ -25,23 +25,17 @@ interface Props {
 
 const KIND_LABEL: Record<EventKind, string> = {
   status: "Status",
-  fuel: "Abastecimento",
-  maintenance: "Manutenção",
-  document: "Documento",
+  access: "Acesso",
 };
 
 const KIND_ICON: Record<EventKind, any> = {
   status: UserCog,
-  fuel: Fuel,
-  maintenance: Wrench,
-  document: FileText,
+  access: KeyRound,
 };
 
 const KIND_TONE: Record<EventKind, string> = {
   status: "bg-primary/15 text-primary border-primary/30",
-  fuel: "bg-warning/15 text-warning border-warning/30",
-  maintenance: "bg-success/15 text-success border-success/30",
-  document: "bg-muted/40 text-foreground border-border",
+  access: "bg-success/15 text-success border-success/30",
 };
 
 export default function DriverHistoryTab({ driverId, companyId, driverStatus }: Props) {
@@ -51,18 +45,12 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
 
   const load = async () => {
     setLoading(true);
-    const [{ data: hist }, { data: fuel }, { data: maint }, { data: docs }] = await Promise.all([
+    const [{ data: hist }, { data: drv }] = await Promise.all([
       supabase.from("driver_status_history" as any)
         .select("*").eq("driver_id", driverId).order("created_at", { ascending: false }),
-      supabase.from("fuel_records")
-        .select("id,fueled_at,liters,total_value,fuel_type,station_name,created_at")
-        .eq("driver_id", driverId).order("created_at", { ascending: false }),
-      supabase.from("maintenance_records")
-        .select("id,service_at,type,category,workshop_name,total_value,created_at")
-        .eq("driver_id", driverId).order("created_at", { ascending: false }),
-      supabase.from("documents")
-        .select("id,doc_type,title,document_number,expires_at,created_at")
-        .eq("entity_type", "driver").eq("entity_id", driverId).order("created_at", { ascending: false }),
+      supabase.from("drivers")
+        .select("onboarded_at,phone_verified_at,email_verified_at,user_id")
+        .eq("id", driverId).maybeSingle(),
     ]);
 
     const all: TimelineEvent[] = [];
@@ -79,27 +67,31 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
         raw: h,
       });
     });
-    (fuel ?? []).forEach((f: any) => all.push({
-      id: `fuel:${f.id}`, kind: "fuel", created_at: f.created_at,
-      title: `Abastecimento — ${f.fuel_type ?? ""} ${Number(f.liters).toFixed(2)} L`,
-      subtitle: f.station_name || undefined,
-      meta: `R$ ${Number(f.total_value || 0).toFixed(2)} · realizado ${new Date(f.fueled_at).toLocaleString("pt-BR")}`,
-      raw: f,
-    }));
-    (maint ?? []).forEach((m: any) => all.push({
-      id: `maintenance:${m.id}`, kind: "maintenance", created_at: m.created_at,
-      title: `Manutenção ${m.type}${m.category ? ` · ${m.category}` : ""}`,
-      subtitle: m.workshop_name || undefined,
-      meta: `R$ ${Number(m.total_value || 0).toFixed(2)} · serviço ${new Date(m.service_at).toLocaleString("pt-BR")}`,
-      raw: m,
-    }));
-    (docs ?? []).forEach((d: any) => all.push({
-      id: `document:${d.id}`, kind: "document", created_at: d.created_at,
-      title: d.title || d.doc_type,
-      subtitle: d.document_number || undefined,
-      meta: d.expires_at ? `Vence em ${new Date(d.expires_at).toLocaleDateString("pt-BR")}` : undefined,
-      raw: d,
-    }));
+
+    // Eventos de acesso ao sistema
+    if (drv?.onboarded_at) {
+      all.push({
+        id: `access:onboarded`, kind: "access", created_at: drv.onboarded_at,
+        title: "Primeiro acesso concluído",
+        subtitle: "Identidade confirmada e contato validado",
+        meta: drv.user_id ? "Conta de acesso vinculada" : undefined,
+        raw: { kind: "onboarded" },
+      });
+    }
+    if (drv?.phone_verified_at) {
+      all.push({
+        id: `access:phone`, kind: "access", created_at: drv.phone_verified_at,
+        title: "Telefone verificado (SMS)",
+        raw: { kind: "phone_verified" },
+      });
+    }
+    if (drv?.email_verified_at) {
+      all.push({
+        id: `access:email`, kind: "access", created_at: drv.email_verified_at,
+        title: "Email verificado",
+        raw: { kind: "email_verified" },
+      });
+    }
 
     // ordena pela data/hora real do lançamento (created_at) — desc
     all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -113,15 +105,10 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
     if (!confirm(`Desfazer este lançamento?\n\n${ev.title}`)) return;
     setBusyId(ev.id);
     try {
-      if (ev.kind === "fuel") {
-        const { error } = await supabase.from("fuel_records").delete().eq("id", ev.raw.id);
-        if (error) throw error;
-      } else if (ev.kind === "maintenance") {
-        const { error } = await supabase.from("maintenance_records").delete().eq("id", ev.raw.id);
-        if (error) throw error;
-      } else if (ev.kind === "document") {
-        const { error } = await supabase.from("documents").delete().eq("id", ev.raw.id);
-        if (error) throw error;
+      if (ev.kind === "access") {
+        toast.info("Eventos de acesso não podem ser desfeitos por aqui.");
+        setBusyId(null);
+        return;
       } else if (ev.kind === "status") {
         // Reverte o motorista para o status anterior desta entrada
         const prev = ev.raw.previous_status;
@@ -173,7 +160,8 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        {events.length} lançamento(s) — ordenados pela data e hora do lançamento no sistema (mais recentes primeiro).
+        {events.length} evento(s) — cadastro do motorista e acessos ao sistema, ordenados pela data/hora do lançamento.
+        Abastecimentos, manutenções e documentos têm registro próprio em seus módulos.
       </p>
       <div className="relative pl-6 border-l-2 border-border space-y-3">
         {events.map((ev) => {
@@ -197,7 +185,7 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
                     {ev.subtitle && <p className="text-xs text-muted-foreground">{ev.subtitle}</p>}
                     {ev.meta && <p className="text-[11px] text-muted-foreground mt-1 font-mono">{ev.meta}</p>}
                   </div>
-                  <Button
+                  {ev.kind !== "access" && <Button
                     size="sm" variant="ghost"
                     className="text-destructive hover:text-destructive shrink-0"
                     onClick={() => undo(ev)}
@@ -205,7 +193,7 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
                     title="Desfazer este lançamento"
                   >
                     {busyId === ev.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
-                  </Button>
+                  </Button>}
                 </div>
               </div>
             </div>
