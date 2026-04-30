@@ -57,6 +57,7 @@ export default function AppLayout() {
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ cadastros: true, movimentacao: true });
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -78,6 +79,18 @@ export default function AppLayout() {
     })();
   }, [currentCompanyId, loc.pathname]);
 
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      for (const e of nav) {
+        if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
+          next[e.key] = true;
+        }
+      }
+      return next;
+    });
+  }, [loc.pathname]);
+
   if (loading) return (
     <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
   );
@@ -92,26 +105,6 @@ export default function AppLayout() {
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
     : nav;
-
-  const initialOpen: Record<string, boolean> = {};
-  for (const e of visibleNav) {
-    if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
-      initialOpen[e.key] = true;
-    }
-  }
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ cadastros: true, movimentacao: true, ...initialOpen });
-  useEffect(() => {
-    setOpenGroups((prev) => {
-      const next = { ...prev };
-      for (const e of visibleNav) {
-        if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
-          next[e.key] = true;
-        }
-      }
-      return next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loc.pathname]);
 
   const renderItem = (it: NavItem, opts: { indent?: boolean; primary?: boolean } = {}) => {
     const { indent = false, primary = false } = opts;
