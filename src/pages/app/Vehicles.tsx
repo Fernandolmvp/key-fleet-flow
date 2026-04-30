@@ -53,8 +53,10 @@ export default function Vehicles() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("vehicles:view") as "grid" | "list") || "grid");
+  const [tab, setTab] = useState<string>(() => localStorage.getItem("vehicles:tab") || "ativos");
 
   useEffect(() => { localStorage.setItem("vehicles:view", view); }, [view]);
+  useEffect(() => { localStorage.setItem("vehicles:tab", tab); }, [tab]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -89,12 +91,27 @@ export default function Vehicles() {
     load();
   };
 
-  const filtered = items.filter((v) => {
+  const byTab = items.filter((v) => {
+    if (tab === "todos") return true;
+    if (tab === "ativos") return v.status === "ativo" || v.status === "manutencao";
+    if (tab === "vendidos") return v.status === "vendido";
+    if (tab === "inativos") return INACTIVE_STATUSES.includes(v.status);
+    return true;
+  });
+
+  const filtered = byTab.filter((v) => {
     const needle = q.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!needle) return true;
     const hay = [v.plate, v.brand, v.model, v.owner_name].filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9 ]/g, "");
     return hay.includes(needle) || hay.replace(/\s+/g, "").includes(needle);
   });
+
+  const counts = {
+    ativos: items.filter(v => v.status === "ativo" || v.status === "manutencao").length,
+    vendidos: items.filter(v => v.status === "vendido").length,
+    inativos: items.filter(v => INACTIVE_STATUSES.includes(v.status)).length,
+    todos: items.length,
+  };
 
   const currentYear = new Date().getFullYear();
   const findCrlv = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "crlv" && d.file_url);
