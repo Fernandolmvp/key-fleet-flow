@@ -47,10 +47,17 @@ const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado
 
 interface DocRow { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; status: string; }
 
+interface PolicyLink {
+  vehicle_id: string;
+  removed_at: string | null;
+  policy: { id: string; status: string; end_date: string | null; file_url: string | null; policy_number: string | null; insurer_name: string | null } | null;
+}
+
 export default function Vehicles() {
   const { currentCompanyId } = useAuth();
   const [items, setItems] = useState<Vehicle[]>([]);
   const [docsByVehicle, setDocsByVehicle] = useState<Record<string, DocRow[]>>({});
+  const [policiesByVehicle, setPoliciesByVehicle] = useState<Record<string, PolicyLink[]>>({});
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -81,6 +88,16 @@ export default function Vehicles() {
       map[d.entity_id].push(d);
     });
     setDocsByVehicle(map);
+
+    const { data: links } = await supabase.from("insurance_policy_vehicles")
+      .select("vehicle_id,removed_at,policy:insurance_policies(id,status,end_date,file_url,policy_number,insurer_name)")
+      .eq("company_id", currentCompanyId);
+    const pmap: Record<string, PolicyLink[]> = {};
+    (links ?? []).forEach((l: any) => {
+      if (!pmap[l.vehicle_id]) pmap[l.vehicle_id] = [];
+      pmap[l.vehicle_id].push(l);
+    });
+    setPoliciesByVehicle(pmap);
     setLoading(false);
   };
 
@@ -120,8 +137,22 @@ export default function Vehicles() {
   const findCrlv = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "crlv" && d.file_url);
   const findInsurance = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "seguro" && d.file_url);
 
+  const findActivePolicy = (vid: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const list = policiesByVehicle[vid] ?? [];
+    return list.find((l) => {
+      if (l.removed_at && l.removed_at <= today) return false;
+      const p = l.policy;
+      if (!p) return false;
+      if (p.status && p.status !== "ativa") return false;
+      if (p.end_date && p.end_date < today) return false;
+      return true;
+    }) || null;
+  };
+
   const isInsured = (v: Vehicle) => {
     const today = new Date().toISOString().slice(0, 10);
+    if (findActivePolicy(v.id)) return true;
     const ins = findInsurance(v.id);
     if (ins?.expires_at) return ins.expires_at >= today;
     if (v.insurance_expires_at) return v.insurance_expires_at >= today;
@@ -187,7 +218,8 @@ export default function Vehicles() {
             const licensed = v.licensing_year === currentYear;
             const insured = isInsured(v);
             const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
-            const insuranceUrl = insurance?.file_url || null;
+            const policyLink = findActivePolicy(v.id);
+            const insuranceUrl = policyLink?.policy?.file_url || insurance?.file_url || null;
             const isSold = tab === "vendidos" || v.status === "vendido";
             return (
             <div key={v.id} className="surface-card rounded-xl overflow-hidden hover:border-primary/40 transition-colors group">
@@ -310,7 +342,8 @@ export default function Vehicles() {
                   const licensed = v.licensing_year === currentYear;
                   const insured = isInsured(v);
                   const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
-                  const insuranceUrl = insurance?.file_url || null;
+                  const policyLink = findActivePolicy(v.id);
+                  const insuranceUrl = policyLink?.policy?.file_url || insurance?.file_url || null;
                   const isSold = tab === "vendidos" || v.status === "vendido";
                   return (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/20">
