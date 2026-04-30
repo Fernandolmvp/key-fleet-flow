@@ -353,6 +353,45 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_status_history: {
+        Row: {
+          changed_by: string | null
+          company_id: string
+          created_at: string
+          driver_id: string
+          id: string
+          inactivated_at: string | null
+          new_status: string
+          previous_status: string | null
+          reason: string | null
+          termination_date: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          company_id: string
+          created_at?: string
+          driver_id: string
+          id?: string
+          inactivated_at?: string | null
+          new_status: string
+          previous_status?: string | null
+          reason?: string | null
+          termination_date?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          company_id?: string
+          created_at?: string
+          driver_id?: string
+          id?: string
+          inactivated_at?: string | null
+          new_status?: string
+          previous_status?: string | null
+          reason?: string | null
+          termination_date?: string | null
+        }
+        Relationships: []
+      }
       drivers: {
         Row: {
           address: string | null

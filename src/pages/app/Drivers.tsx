@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import DriverHistoryTab from "@/components/dashboard/DriverHistoryTab";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -465,12 +466,13 @@ export default function Drivers() {
             </a>
           )}
           <Tabs defaultValue="dados" className="w-full">
-            <TabsList className="grid grid-cols-3 w-full">
+            <TabsList className={`grid w-full ${editing ? "grid-cols-4" : "grid-cols-3"}`}>
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="autorizacao">Autorizações</TabsTrigger>
               <TabsTrigger value="inativacao" className={INACTIVE_STATUSES.includes(form.status) ? "text-warning data-[state=active]:text-warning" : ""}>
                 Inativação{INACTIVE_STATUSES.includes(form.status) ? " ●" : ""}
               </TabsTrigger>
+              {editing && <TabsTrigger value="historico">Histórico</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="dados" className="mt-4">
@@ -625,6 +627,12 @@ export default function Drivers() {
                 )}
               </div>
             </TabsContent>
+
+            {editing && currentCompanyId && (
+              <TabsContent value="historico" className="mt-4">
+                <DriverHistoryTab driverId={editing.id} companyId={currentCompanyId} driverStatus={editing.status} />
+              </TabsContent>
+            )}
           </Tabs>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
