@@ -439,6 +439,7 @@ export default function Drivers() {
             <div className="space-y-2"><Label>Categoria</Label><Input value={form.cnh_category} onChange={(e) => setForm({ ...form, cnh_category: e.target.value })} placeholder="A, B, D, E..." /></div>
             <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
             <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
 
             <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">
