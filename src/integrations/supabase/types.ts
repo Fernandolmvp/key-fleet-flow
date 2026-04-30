@@ -107,6 +107,280 @@ export type Database = {
           },
         ]
       }
+      checklist_answers: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          company_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          photo_urls: string[]
+          question_category: string | null
+          question_id: string
+          question_label: string
+          question_type: Database["public"]["Enums"]["checklist_question_type"]
+          run_id: string
+          signature_url: string | null
+          status: Database["public"]["Enums"]["checklist_answer_status"]
+          updated_at: string
+          value_bool: boolean | null
+          value_choice: string | null
+          value_number: number | null
+          value_text: string | null
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          photo_urls?: string[]
+          question_category?: string | null
+          question_id: string
+          question_label: string
+          question_type: Database["public"]["Enums"]["checklist_question_type"]
+          run_id: string
+          signature_url?: string | null
+          status?: Database["public"]["Enums"]["checklist_answer_status"]
+          updated_at?: string
+          value_bool?: boolean | null
+          value_choice?: string | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          photo_urls?: string[]
+          question_category?: string | null
+          question_id?: string
+          question_label?: string
+          question_type?: Database["public"]["Enums"]["checklist_question_type"]
+          run_id?: string
+          signature_url?: string | null
+          status?: Database["public"]["Enums"]["checklist_answer_status"]
+          updated_at?: string
+          value_bool?: boolean | null
+          value_choice?: string | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_answers_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_questions: {
+        Row: {
+          category: string | null
+          company_id: string
+          created_at: string
+          help_text: string | null
+          id: string
+          label: string
+          max_value: number | null
+          min_value: number | null
+          options: Json
+          question_type: Database["public"]["Enums"]["checklist_question_type"]
+          require_note_when_fail: boolean
+          require_photo_when_fail: boolean
+          required: boolean
+          sort_order: number
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          company_id: string
+          created_at?: string
+          help_text?: string | null
+          id?: string
+          label: string
+          max_value?: number | null
+          min_value?: number | null
+          options?: Json
+          question_type?: Database["public"]["Enums"]["checklist_question_type"]
+          require_note_when_fail?: boolean
+          require_photo_when_fail?: boolean
+          required?: boolean
+          sort_order?: number
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          company_id?: string
+          created_at?: string
+          help_text?: string | null
+          id?: string
+          label?: string
+          max_value?: number | null
+          min_value?: number | null
+          options?: Json
+          question_type?: Database["public"]["Enums"]["checklist_question_type"]
+          require_note_when_fail?: boolean
+          require_photo_when_fail?: boolean
+          required?: boolean
+          sort_order?: number
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_runs: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          conform_items: number
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          due_date: string | null
+          generated_maintenance_id: string | null
+          id: string
+          km_at_check: number | null
+          na_items: number
+          non_conform_items: number
+          notes: string | null
+          reference_month: string | null
+          score: number | null
+          signature_url: string | null
+          signed_by_name: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["checklist_run_status"]
+          template_id: string
+          total_items: number
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          conform_items?: number
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          due_date?: string | null
+          generated_maintenance_id?: string | null
+          id?: string
+          km_at_check?: number | null
+          na_items?: number
+          non_conform_items?: number
+          notes?: string | null
+          reference_month?: string | null
+          score?: number | null
+          signature_url?: string | null
+          signed_by_name?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["checklist_run_status"]
+          template_id: string
+          total_items?: number
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          conform_items?: number
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          due_date?: string | null
+          generated_maintenance_id?: string | null
+          id?: string
+          km_at_check?: number | null
+          na_items?: number
+          non_conform_items?: number
+          notes?: string | null
+          reference_month?: string | null
+          score?: number | null
+          signature_url?: string | null
+          signed_by_name?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["checklist_run_status"]
+          template_id?: string
+          total_items?: number
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_runs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          active: boolean
+          auto_open_os: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          frequency: Database["public"]["Enums"]["checklist_frequency"]
+          id: string
+          name: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          auto_open_os?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          frequency?: Database["public"]["Enums"]["checklist_frequency"]
+          id?: string
+          name: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          auto_open_os?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          frequency?: Database["public"]["Enums"]["checklist_frequency"]
+          id?: string
+          name?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           cnpj: string | null
@@ -2029,6 +2303,32 @@ export type Database = {
         | "truck_10"
         | "carreta_18"
         | "custom"
+      checklist_answer_status:
+        | "conforme"
+        | "nao_conforme"
+        | "nao_aplicavel"
+        | "pendente"
+      checklist_frequency:
+        | "unico"
+        | "diario"
+        | "semanal"
+        | "mensal"
+        | "trimestral"
+        | "semestral"
+        | "anual"
+      checklist_question_type:
+        | "sim_nao"
+        | "multipla_escolha"
+        | "numero"
+        | "texto"
+        | "foto"
+        | "assinatura"
+      checklist_run_status:
+        | "pendente"
+        | "em_andamento"
+        | "concluido"
+        | "reprovado"
+        | "cancelado"
       document_entity: "vehicle" | "driver"
       document_status: "valido" | "vencendo" | "vencido" | "sem_validade"
       document_type:
@@ -2269,6 +2569,36 @@ export const Constants = {
         "truck_10",
         "carreta_18",
         "custom",
+      ],
+      checklist_answer_status: [
+        "conforme",
+        "nao_conforme",
+        "nao_aplicavel",
+        "pendente",
+      ],
+      checklist_frequency: [
+        "unico",
+        "diario",
+        "semanal",
+        "mensal",
+        "trimestral",
+        "semestral",
+        "anual",
+      ],
+      checklist_question_type: [
+        "sim_nao",
+        "multipla_escolha",
+        "numero",
+        "texto",
+        "foto",
+        "assinatura",
+      ],
+      checklist_run_status: [
+        "pendente",
+        "em_andamento",
+        "concluido",
+        "reprovado",
+        "cancelado",
       ],
       document_entity: ["vehicle", "driver"],
       document_status: ["valido", "vencendo", "vencido", "sem_validade"],
