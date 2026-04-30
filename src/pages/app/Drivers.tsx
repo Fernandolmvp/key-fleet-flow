@@ -249,6 +249,14 @@ export default function Drivers() {
       </div>
 
       <div className="surface-card rounded-xl p-4">
+        <Tabs value={tab} onValueChange={setTab} className="mb-4">
+          <TabsList className="grid grid-cols-4 w-full sm:w-auto sm:inline-grid">
+            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
+            <TabsTrigger value="desligados">Desligados · {counts.desligados}</TabsTrigger>
+            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
+            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
