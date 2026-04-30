@@ -678,9 +678,23 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
                   <div key={m.id} className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold capitalize">{m.movement_type}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {m.occurred_at ? new Date(m.occurred_at).toLocaleDateString("pt-BR") : new Date(m.created_at).toLocaleDateString("pt-BR")}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {m.occurred_at ? new Date(m.occurred_at).toLocaleDateString("pt-BR") : new Date(m.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                        {(m.movement_type === "venda" || m.movement_type === "inativacao") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                            disabled={busy}
+                            onClick={() => undoMovement(m)}
+                            title="Desfazer este movimento"
+                          >
+                            <Undo2 className="h-3.5 w-3.5 mr-1" /> Desfazer
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     {m.reason && <div className="text-xs text-muted-foreground mt-1">Motivo: {m.reason}</div>}
                     {m.notes && <div className="text-xs mt-1">{m.notes}</div>}
