@@ -383,6 +383,32 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validação de tipo de documento: garante que o arquivo enviado corresponde
+    // ao que o usuário está cadastrando (ex.: motorista exige CNH, veículo exige CRLV).
+    const kindLabels: Record<string, string> = {
+      crlv: "CRLV", crv: "CRV", dut: "DUT", cnh: "CNH",
+      ipva: "IPVA", licenciamento: "Licenciamento", seguro: "Apólice de Seguro",
+      rg: "RG", cpf: "CPF", exame_medico: "Exame Médico",
+      exame_toxicologico: "Exame Toxicológico", mopp: "Curso MOPP",
+      nota_fiscal: "Nota Fiscal", comprovante: "Comprovante",
+      outro: "outro tipo de documento", ilegivel: "documento ilegível",
+    };
+    const detected = (parsed as any).detected_doc_kind as string | undefined;
+    if (type === "driver" && detected && detected !== "cnh") {
+      const label = kindLabels[detected] ?? detected;
+      return new Response(JSON.stringify({
+        error: `O arquivo enviado parece ser ${label}, não uma CNH. Envie a Carteira Nacional de Habilitação do motorista.`,
+        detectedKind: detected,
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (type === "vehicle" && detected && !["crlv","crv","dut"].includes(detected)) {
+      const label = kindLabels[detected] ?? detected;
+      return new Response(JSON.stringify({
+        error: `O arquivo enviado parece ser ${label}, não um CRLV/CRV/DUT. Envie o documento do veículo.`,
+        detectedKind: detected,
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
