@@ -143,6 +143,12 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       owner_name: form.owner_name || null,
       owner_doc: form.owner_doc || null,
       crlv_city: form.crlv_city || null,
+      inactivated_at: form.inactivated_at || null,
+      inactive_reason: form.inactive_reason || null,
+      sale_date: form.sale_date || null,
+      sale_value: form.sale_value ? Number(form.sale_value) : null,
+      buyer_name: form.buyer_name || null,
+      buyer_doc: form.buyer_doc || null,
     };
     delete payload.id;
     const op = isEdit
