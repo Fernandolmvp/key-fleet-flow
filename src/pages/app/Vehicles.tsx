@@ -20,6 +20,9 @@ interface Vehicle {
   owner_name?: string | null;
   crlv_city?: string | null;
   crlv_issue_date?: string | null;
+  buyer_name?: string | null;
+  sale_value?: number | null;
+  sale_date?: string | null;
 }
 
 const statusTone: Record<string, string> = {
@@ -62,7 +65,7 @@ export default function Vehicles() {
     if (!currentCompanyId) return;
     setLoading(true);
     const { data, error } = await supabase.from("vehicles")
-      .select("id,plate,brand,model,year_model,status,current_km,fuel_type,photos,documents,licensing_year,insurer,insurance_policy,insurance_expires_at,owner_name,crlv_city,crlv_issue_date")
+      .select("id,plate,brand,model,year_model,status,current_km,fuel_type,photos,documents,licensing_year,insurer,insurance_policy,insurance_expires_at,owner_name,crlv_city,crlv_issue_date,buyer_name,sale_value,sale_date")
       .eq("company_id", currentCompanyId)
       .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
