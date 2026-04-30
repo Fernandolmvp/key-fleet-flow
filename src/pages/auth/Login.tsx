@@ -5,8 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Truck, Loader2 } from "lucide-react";
+import { Truck, Loader2, Building2, IdCard } from "lucide-react";
 
 export default function Login() {
   const { user, loading } = useAuth();
@@ -72,25 +73,63 @@ export default function Login() {
             <h2 className="font-display text-3xl font-bold">Acesse seu painel</h2>
             <p className="text-muted-foreground mt-2">Entre com suas credenciais corporativas</p>
           </div>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email corporativo</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@empresa.com" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pwd">Senha</Label>
-              <Input id="pwd" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
-            </Button>
-          </form>
-          <p className="text-sm text-center text-muted-foreground">
-            Primeiro acesso? <Link to="/signup" className="text-primary hover:underline">Criar conta</Link>
-          </p>
-          <p className="text-xs text-center text-muted-foreground">
-            É motorista? <Link to="/motorista/primeiro-acesso" className="text-primary hover:underline">Ativar acesso</Link>
-          </p>
+          <Tabs defaultValue="empresa" className="w-full">
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="empresa" className="gap-2">
+                <Building2 className="h-4 w-4" /> Empresa
+              </TabsTrigger>
+              <TabsTrigger value="motorista" className="gap-2">
+                <IdCard className="h-4 w-4" /> Motorista
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="empresa" className="space-y-4 mt-6">
+              <form onSubmit={submit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email corporativo</Label>
+                  <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@empresa.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pwd">Senha</Label>
+                  <Input id="pwd" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                </div>
+                <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
+                </Button>
+              </form>
+              <p className="text-sm text-center text-muted-foreground">
+                Primeiro acesso? <Link to="/signup" className="text-primary hover:underline">Criar conta da empresa</Link>
+              </p>
+            </TabsContent>
+
+            <TabsContent value="motorista" className="space-y-4 mt-6">
+              <form onSubmit={submit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email-mot">Email do motorista</Label>
+                  <Input id="email-mot" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="motorista@empresa.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pwd-mot">Senha</Label>
+                  <Input id="pwd-mot" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                </div>
+                <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar como motorista"}
+                </Button>
+              </form>
+              <div className="surface-card rounded-lg p-4 text-center space-y-2">
+                <p className="text-sm font-medium">É seu primeiro acesso?</p>
+                <p className="text-xs text-muted-foreground">
+                  Ative seu cadastro com o CPF informado pela sua empresa.
+                </p>
+                <Link
+                  to="/motorista/primeiro-acesso"
+                  className="inline-flex items-center justify-center w-full h-10 rounded-md border border-primary/40 text-primary hover:bg-primary/10 text-sm font-medium transition-colors"
+                >
+                  Ativar acesso de motorista
+                </Link>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
