@@ -227,7 +227,6 @@ export default function Drivers() {
   const byTab = items.filter((d) => {
     if (tab === "todos") return true;
     if (tab === "ativos") return d.status === "ativo" || d.status === "ferias";
-    if (tab === "desligados") return d.status === "desligado";
     if (tab === "inativos") return INACTIVE_STATUSES.includes(d.status);
     return true;
   });
@@ -236,7 +235,6 @@ export default function Drivers() {
   );
   const counts = {
     ativos: items.filter(d => d.status === "ativo" || d.status === "ferias").length,
-    desligados: items.filter(d => d.status === "desligado").length,
     inativos: items.filter(d => INACTIVE_STATUSES.includes(d.status)).length,
     todos: items.length,
   };
@@ -268,9 +266,8 @@ export default function Drivers() {
 
       <div className="surface-card rounded-xl p-4">
         <Tabs value={tab} onValueChange={setTab} className="mb-4">
-          <TabsList className="grid grid-cols-4 w-full sm:w-auto sm:inline-grid">
+          <TabsList className="grid grid-cols-3 w-full sm:w-auto sm:inline-grid">
             <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
-            <TabsTrigger value="desligados">Desligados · {counts.desligados}</TabsTrigger>
             <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
             <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
           </TabsList>
