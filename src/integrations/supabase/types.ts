@@ -827,6 +827,190 @@ export type Database = {
         }
         Relationships: []
       }
+      insurance_brokers: {
+        Row: {
+          active: boolean
+          address: string | null
+          company_id: string
+          contact_name: string | null
+          created_at: string
+          created_by: string | null
+          document: string | null
+          email: string | null
+          id: string
+          legal_name: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          susep: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          company_id: string
+          contact_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          document?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          susep?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          company_id?: string
+          contact_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          document?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          susep?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      insurance_policies: {
+        Row: {
+          ai_extracted: Json
+          broker_id: string | null
+          company_id: string
+          coverage_summary: string | null
+          created_at: string
+          created_by: string | null
+          deductible: number | null
+          end_date: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string
+          insurer_email: string | null
+          insurer_name: string
+          insurer_phone: string | null
+          notes: string | null
+          policy_number: string
+          start_date: string | null
+          status: string
+          total_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          ai_extracted?: Json
+          broker_id?: string | null
+          company_id: string
+          coverage_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          deductible?: number | null
+          end_date?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          insurer_email?: string | null
+          insurer_name: string
+          insurer_phone?: string | null
+          notes?: string | null
+          policy_number: string
+          start_date?: string | null
+          status?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ai_extracted?: Json
+          broker_id?: string | null
+          company_id?: string
+          coverage_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          deductible?: number | null
+          end_date?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          insurer_email?: string | null
+          insurer_name?: string
+          insurer_phone?: string | null
+          notes?: string | null
+          policy_number?: string
+          start_date?: string | null
+          status?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_policies_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_brokers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_policy_vehicles: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          endorsement_number: string | null
+          id: string
+          included_at: string
+          inclusion_type: string
+          notes: string | null
+          policy_id: string
+          removed_at: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          endorsement_number?: string | null
+          id?: string
+          included_at?: string
+          inclusion_type?: string
+          notes?: string | null
+          policy_id: string
+          removed_at?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          endorsement_number?: string | null
+          id?: string
+          included_at?: string
+          inclusion_type?: string
+          notes?: string | null
+          policy_id?: string
+          removed_at?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_policy_vehicles_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_checklist_items: {
         Row: {
           category: string | null

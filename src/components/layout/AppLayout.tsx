@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ const nav = [
   { to: "/app/vehicles", label: "Veículos", icon: Truck },
   { to: "/app/drivers", label: "Motoristas", icon: Users },
   { to: "/app/fuel-stations", label: "Postos", icon: Store },
+  { to: "/app/brokers", label: "Corretores", icon: Briefcase },
   { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
   { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals" },
   { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
