@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -34,6 +35,22 @@ const STATUSES = [
 ];
 const STATUS_LABEL: Record<string, string> = Object.fromEntries(STATUSES.map(s => [s.value, s.label]));
 const INACTIVE_STATUSES = ["desligado","inativo","suspenso","licenca_medica","afastado"];
+const INACTIVATION_REASONS = [
+  "Pedido de demissão",
+  "Demissão sem justa causa",
+  "Demissão por justa causa",
+  "Aposentadoria",
+  "Fim de contrato",
+  "Acordo entre partes",
+  "Atestado médico prolongado",
+  "Suspensão da CNH",
+  "Acidente de trabalho",
+  "Licença maternidade/paternidade",
+  "Férias prolongadas",
+  "Transferência para outra empresa",
+  "Falecimento",
+  "Outro motivo",
+];
 
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
@@ -447,8 +464,18 @@ export default function Drivers() {
               <FileText className="h-3 w-3" /> CNH arquivada — será vinculada ao salvar
             </a>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2 space-y-2">
+          <Tabs defaultValue="dados" className="w-full">
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="dados">Dados</TabsTrigger>
+              <TabsTrigger value="autorizacao">Autorizações</TabsTrigger>
+              <TabsTrigger value="inativacao" className={INACTIVE_STATUSES.includes(form.status) ? "text-warning data-[state=active]:text-warning" : ""}>
+                Inativação{INACTIVE_STATUSES.includes(form.status) ? " ●" : ""}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dados" className="mt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2 space-y-2">
               <Label>Foto</Label>
               <div className="flex items-center gap-3">
                 <div className="h-16 w-16 rounded-full bg-muted overflow-hidden grid place-items-center">
@@ -462,38 +489,28 @@ export default function Drivers() {
                 </label>
               </div>
             </div>
-            <div className="space-y-2 sm:col-span-2"><Label>Nome completo *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
-            <div className="space-y-2"><Label>CPF</Label><Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2"><Label>CNH número</Label><Input value={form.cnh_number} onChange={(e) => setForm({ ...form, cnh_number: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Categoria</Label><Input value={form.cnh_category} onChange={(e) => setForm({ ...form, cnh_category: e.target.value })} placeholder="A, B, D, E..." /></div>
-            <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
-            <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-
-            {INACTIVE_STATUSES.includes(form.status) && (
-              <div className="sm:col-span-2 rounded-xl border border-border p-4 space-y-3 bg-muted/20">
-                <p className="text-sm font-semibold">Dados da inativação</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {form.status === "desligado" && (
-                    <div className="space-y-2"><Label>Data de desligamento</Label><Input type="date" value={form.termination_date} onChange={(e) => setForm({ ...form, termination_date: e.target.value })} /></div>
-                  )}
-                  <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
-                  <div className="space-y-2 sm:col-span-2"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex.: pedido de demissão, atestado de 90 dias, suspensão CNH..." /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Nome completo *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
+                <div className="space-y-2"><Label>CPF</Label><Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
+                <div className="space-y-2"><Label>CNH número</Label><Input value={form.cnh_number} onChange={(e) => setForm({ ...form, cnh_number: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Categoria</Label><Input value={form.cnh_category} onChange={(e) => setForm({ ...form, cnh_category: e.target.value })} placeholder="A, B, D, E..." /></div>
+                <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
               </div>
-            )}
+            </TabsContent>
 
-            <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">
+            <TabsContent value="autorizacao" className="mt-4">
+              <div className="rounded-xl border border-border p-4 space-y-4 bg-muted/20">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">Autorização automática de abastecimento</p>
@@ -522,7 +539,93 @@ export default function Drivers() {
                 </div>
               )}
             </div>
-          </div>
+            </TabsContent>
+
+            <TabsContent value="inativacao" className="mt-4">
+              <div className="rounded-xl border border-border p-4 space-y-4 bg-muted/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Inativação do colaborador</p>
+                    <p className="text-xs text-muted-foreground">Registre o motivo e a data quando o motorista for desligado, suspenso ou afastado. O status muda automaticamente.</p>
+                  </div>
+                  {INACTIVE_STATUSES.includes(form.status) && (
+                    <Badge variant="outline" className="border-warning/40 text-warning bg-warning/10 shrink-0">
+                      <AlertTriangle className="h-3 w-3 mr-1" /> Inativo
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Tipo de inativação</Label>
+                    <Select
+                      value={INACTIVE_STATUSES.includes(form.status) ? form.status : ""}
+                      onValueChange={(v) => setForm({
+                        ...form,
+                        status: v,
+                        inactivated_at: form.inactivated_at || new Date().toISOString().slice(0, 10),
+                      })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o tipo..." /></SelectTrigger>
+                      <SelectContent>
+                        {STATUSES.filter((s) => INACTIVE_STATUSES.includes(s.value)).map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Motivo</Label>
+                    <Select
+                      value={INACTIVATION_REASONS.includes(form.inactive_reason) ? form.inactive_reason : (form.inactive_reason ? "Outro motivo" : "")}
+                      onValueChange={(v) => setForm({ ...form, inactive_reason: v === "Outro motivo" ? "" : v })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione um motivo..." /></SelectTrigger>
+                      <SelectContent>
+                        {INACTIVATION_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Data da inativação</Label>
+                    <Input type="date" value={form.inactivated_at || ""} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} />
+                  </div>
+
+                  {form.status === "desligado" && (
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Data oficial de desligamento</Label>
+                      <Input type="date" value={form.termination_date || ""} onChange={(e) => setForm({ ...form, termination_date: e.target.value })} />
+                    </div>
+                  )}
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Detalhes / observações</Label>
+                    <Textarea
+                      rows={3}
+                      value={form.inactive_reason || ""}
+                      onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })}
+                      placeholder="Descreva o motivo com mais detalhes (ex.: pedido formal em 15/04, processo trabalhista, suspensão de 90 dias da CNH...)"
+                    />
+                  </div>
+                </div>
+
+                {INACTIVE_STATUSES.includes(form.status) && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setForm({ ...form, status: "ativo", inactivated_at: "", inactive_reason: "", termination_date: "" })}
+                    >
+                      Reativar motorista
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={save} disabled={busy} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
