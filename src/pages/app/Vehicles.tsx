@@ -337,27 +337,40 @@ export default function Vehicles() {
         </div>
       ) : (
         <div className="surface-card rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+          <div className="w-full">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[15%]" />
+                <col className="w-[18%]" />
+                <col className="w-[10%]" />
+                {tab === "vendidos" ? (
+                  <>
+                    <col className="w-[15%]" />
+                    <col className="w-[10%]" />
+                  </>
+                ) : (
+                  <col className="w-[15%]" />
+                )}
+                <col className="w-[8%]" />
+                <col className="w-[12%]" />
+              </colgroup>
+              <thead className="bg-muted/30 text-[11px] uppercase text-muted-foreground">
                 <tr>
-                  <th className="text-left px-4 py-3">Veículo</th>
-                  <th className="text-left px-4 py-3">Proprietário</th>
-                  <th className="text-left px-4 py-3">Motorista</th>
-                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-2 py-2">Veículo</th>
+                  <th className="text-left px-2 py-2">Proprietário</th>
+                  <th className="text-left px-2 py-2">Motorista</th>
+                  <th className="text-left px-2 py-2">Status</th>
                   {tab === "vendidos" ? (
                     <>
-                      <th className="text-left px-4 py-3">Comprador</th>
-                      <th className="text-left px-4 py-3">Valor venda</th>
+                      <th className="text-left px-2 py-2">Comprador</th>
+                      <th className="text-left px-2 py-2">Valor</th>
                     </>
                   ) : (
-                    <>
-                      <th className="text-left px-4 py-3">Licenciamento</th>
-                      <th className="text-left px-4 py-3">Seguro</th>
-                    </>
+                    <th className="text-left px-2 py-2">Lic. / Seguro</th>
                   )}
-                  <th className="text-left px-4 py-3">KM</th>
-                  <th className="text-right px-4 py-3">Ações</th>
+                  <th className="text-left px-2 py-2">KM</th>
+                  <th className="text-right px-2 py-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -372,70 +385,70 @@ export default function Vehicles() {
                   const isSold = tab === "vendidos" || v.status === "vendido";
                   return (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/20">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-14 rounded bg-muted/30 overflow-hidden grid place-items-center shrink-0">
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="h-9 w-12 rounded bg-muted/30 overflow-hidden grid place-items-center shrink-0">
                             {v.photos?.[0]
                               ? <img src={v.photos[0]} alt="" className="h-full w-full object-cover" />
                               : <Truck className="h-4 w-4 text-muted-foreground" />}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-mono font-bold text-primary">{v.plate}</div>
+                            <div className="font-mono font-bold text-primary text-sm">{v.plate}</div>
                             <div className="text-xs text-muted-foreground truncate">{v.brand} {v.model} {v.year_model ?? ""}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-foreground truncate">{v.owner_name || "—"}</span>
+                      <td className="px-2 py-2">
+                        <div className="text-xs text-foreground truncate">{v.owner_name || "—"}</div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-2">
                         {driverByVehicle[v.id] ? (
-                          <span className="text-xs text-foreground truncate">{driverByVehicle[v.id]}</span>
+                          <div className="text-xs text-foreground truncate">{driverByVehicle[v.id]}</div>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">não possui esse vínculo</span>
+                          <div className="text-xs text-muted-foreground italic truncate">sem vínculo</div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <Badge className={`border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
+                      <td className="px-2 py-2">
+                        <Badge className={`border text-[10px] px-1.5 py-0 ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
                       </td>
                       {isSold ? (
                         <>
-                          <td className="px-4 py-3 text-xs">{v.buyer_name || "—"}</td>
-                          <td className="px-4 py-3 font-mono text-xs">
+                          <td className="px-2 py-2 text-xs truncate">{v.buyer_name || "—"}</td>
+                          <td className="px-2 py-2 font-mono text-xs truncate">
                             {v.sale_value != null ? v.sale_value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
                           </td>
                         </>
                       ) : (
-                        <>
-                          <td className="px-4 py-3">
-                            <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
+                        <td className="px-2 py-2">
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" title={licensed ? `Licenciado ${currentYear}` : v.licensing_year ? `Exercício ${v.licensing_year}` : "Sem exercício"}
+                              className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
                               {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                              {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exerc."}
+                              {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `${v.licensing_year}` : "Sem"}
                             </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
+                            <Badge variant="outline" title={insured ? "Segurado" : "Sem seguro"}
+                              className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
                               {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
-                              {insured ? "Segurado" : "Sem seguro"}
+                              {insured ? "Seguro" : "Sem seg."}
                             </Badge>
-                          </td>
-                        </>
+                          </div>
+                        </td>
                       )}
-                      <td className="px-4 py-3 font-mono text-xs">{v.current_km.toLocaleString("pt-BR")}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex gap-1">
-                          <Button size="sm" variant="ghost" disabled={!crlvUrl}
+                      <td className="px-2 py-2 font-mono text-xs truncate">{v.current_km.toLocaleString("pt-BR")}</td>
+                      <td className="px-2 py-2 text-right">
+                        <div className="inline-flex gap-0.5">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!crlvUrl}
                             onClick={() => crlvUrl && window.open(crlvUrl, "_blank")} title="Ver CRLV">
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" disabled={!insuranceUrl}
+                          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!insuranceUrl}
                             onClick={() => insuranceUrl && window.open(insuranceUrl, "_blank")} title="Ver apólice">
                             <ShieldCheck className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditing(v as any); setOpen(true); }} title="Editar">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(v as any); setOpen(true); }} title="Editar">
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(v.id)} title="Excluir">
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove(v.id)} title="Excluir">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
