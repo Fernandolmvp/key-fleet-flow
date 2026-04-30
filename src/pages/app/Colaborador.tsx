@@ -69,7 +69,7 @@ export default function Colaborador() {
     if (!currentCompanyId || !user) return;
     setLoading(true);
     const [{ data: v }, { data: a }, { data: drv }, { data: st }] = await Promise.all([
-      supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("company_id", currentCompanyId).order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("company_id", currentCompanyId).in("status", ["ativo","manutencao"]).order("plate"),
       supabase.from("fuel_authorizations").select("*").eq("company_id", currentCompanyId).eq("requested_by", user.id).order("requested_at", { ascending: false }).limit(20),
       supabase.from("drivers").select("id,full_name,auto_fuel_authorized,manager_user_id").eq("company_id", currentCompanyId).eq("user_id", user.id).maybeSingle(),
       supabase.from("fuel_stations").select("id,name,cnpj,brand,city,state").eq("company_id", currentCompanyId).eq("active", true).order("name"),

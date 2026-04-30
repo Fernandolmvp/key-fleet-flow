@@ -38,7 +38,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     setPlateCheck(null);
     (async () => {
       const [{ data: v }, { data: d }, { data: s }] = await Promise.all([
-        supabase.from("vehicles").select("id,plate,brand,model,current_km,fuel_type,tank_capacity").eq("company_id", currentCompanyId).order("plate"),
+        supabase.from("vehicles").select("id,plate,brand,model,current_km,fuel_type,tank_capacity").eq("company_id", currentCompanyId).in("status", ["ativo","manutencao"]).order("plate"),
         supabase.from("drivers").select("id,full_name").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
         supabase.from("fuel_stations").select("id,name,cnpj,city,state,brand").eq("company_id", currentCompanyId).eq("active", true).order("name"),
       ]);
