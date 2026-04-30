@@ -480,6 +480,19 @@ export default function Drivers() {
             <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
 
+            {INACTIVE_STATUSES.includes(form.status) && (
+              <div className="sm:col-span-2 rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+                <p className="text-sm font-semibold">Dados da inativação</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {form.status === "desligado" && (
+                    <div className="space-y-2"><Label>Data de desligamento</Label><Input type="date" value={form.termination_date} onChange={(e) => setForm({ ...form, termination_date: e.target.value })} /></div>
+                  )}
+                  <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex.: pedido de demissão, atestado de 90 dias, suspensão CNH..." /></div>
+                </div>
+              </div>
+            )}
+
             <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">
               <div className="flex items-center justify-between">
                 <div>
