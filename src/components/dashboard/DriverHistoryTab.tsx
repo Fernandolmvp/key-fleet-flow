@@ -3,9 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserCog, Undo2, Clock, KeyRound, LogIn } from "lucide-react";
+import { Loader2, UserCog, Undo2, Clock, KeyRound, LogIn, Truck } from "lucide-react";
 
-type EventKind = "status" | "access";
+type EventKind = "status" | "access" | "vehicle";
 
 interface TimelineEvent {
   id: string;
@@ -26,16 +26,19 @@ interface Props {
 const KIND_LABEL: Record<EventKind, string> = {
   status: "Status",
   access: "Acesso",
+  vehicle: "Veículo",
 };
 
 const KIND_ICON: Record<EventKind, any> = {
   status: UserCog,
   access: KeyRound,
+  vehicle: Truck,
 };
 
 const KIND_TONE: Record<EventKind, string> = {
   status: "bg-primary/15 text-primary border-primary/30",
   access: "bg-success/15 text-success border-success/30",
+  vehicle: "bg-warning/15 text-warning border-warning/30",
 };
 
 export default function DriverHistoryTab({ driverId, companyId, driverStatus }: Props) {
@@ -45,12 +48,18 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
 
   const load = async () => {
     setLoading(true);
-    const [{ data: hist }, { data: drv }] = await Promise.all([
+    const [{ data: hist }, { data: drv }, { data: vmoves }] = await Promise.all([
       supabase.from("driver_status_history" as any)
         .select("*").eq("driver_id", driverId).order("created_at", { ascending: false }),
       supabase.from("drivers")
         .select("onboarded_at,phone_verified_at,email_verified_at,user_id")
         .eq("id", driverId).maybeSingle(),
+      supabase.from("vehicle_movements")
+        .select("id,movement_type,reason,notes,occurred_at,created_at,metadata,vehicle_id")
+        .eq("company_id", companyId)
+        .in("movement_type", ["vinculo_motorista", "desvinculo_motorista"])
+        .filter("metadata->>driver_id", "eq", driverId)
+        .order("created_at", { ascending: false }),
     ]);
 
     const all: TimelineEvent[] = [];
@@ -92,6 +101,19 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
         raw: { kind: "email_verified" },
       });
     }
+
+    // Eventos de vínculo / desvínculo de veículo
+    (vmoves ?? []).forEach((m: any) => {
+      const isLink = m.movement_type === "vinculo_motorista";
+      const plate = m?.metadata?.vehicle_plate || "veículo";
+      all.push({
+        id: `vehicle:${m.id}`, kind: "vehicle", created_at: m.created_at,
+        title: isLink ? `Vinculado ao veículo ${plate}` : `Desvinculado do veículo ${plate}`,
+        subtitle: m.notes || m.reason || undefined,
+        meta: m.occurred_at ? `Em ${new Date(m.occurred_at).toLocaleDateString("pt-BR")}` : undefined,
+        raw: m,
+      });
+    });
 
     // ordena pela data/hora real do lançamento (created_at) — desc
     all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
