@@ -20,6 +20,7 @@ import Approvals from "./pages/app/Approvals";
 import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
 import Subscription from "./pages/app/Subscription";
 import Brokers from "./pages/app/Brokers";
+import Checklists from "./pages/app/Checklists";
 import SuperAdmin from "./pages/admin/SuperAdmin";
 import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import NotFound from "./pages/NotFound";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="fuel" element={<Fuel />} />
               <Route path="approvals" element={<Approvals />} />
               <Route path="maintenance" element={<Maintenance />} />
+              <Route path="checklists" element={<Checklists />} />
               <Route path="tires" element={<Tires />} />
               <Route path="documents" element={<Documents />} />
               <Route path="brokers" element={<Brokers />} />
