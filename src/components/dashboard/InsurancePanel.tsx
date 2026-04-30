@@ -44,6 +44,53 @@ type Link = {
 
 const emptyPolicy: Partial<Policy> = { status: "ativa" };
 
+/**
+ * Sincroniza os campos de seguro no cadastro do veículo a partir das apólices
+ * vinculadas a ele (insurer, insurance_policy, insurance_expires_at, insurance_responsible).
+ * Escolhe a apólice ATIVA com a maior data de fim. Se não houver apólice ativa,
+ * limpa os campos do veículo.
+ */
+async function syncVehicleInsuranceFields(companyId: string, vehicleIds: string[]) {
+  if (!companyId || !vehicleIds.length) return;
+  const ids = Array.from(new Set(vehicleIds.filter(Boolean)));
+
+  const { data: links } = await supabase
+    .from("insurance_policy_vehicles")
+    .select("vehicle_id, removed_at, policy:insurance_policies(id,policy_number,insurer_name,end_date,status,broker_id)")
+    .eq("company_id", companyId)
+    .in("vehicle_id", ids);
+
+  // brokers cache
+  const brokerIds = Array.from(new Set(((links ?? []) as any[])
+    .map((l) => l.policy?.broker_id).filter(Boolean)));
+  let brokersById: Record<string, string> = {};
+  if (brokerIds.length) {
+    const { data: bs } = await supabase
+      .from("insurance_brokers").select("id,name").in("id", brokerIds);
+    brokersById = Object.fromEntries((bs ?? []).map((b: any) => [b.id, b.name]));
+  }
+
+  for (const vid of ids) {
+    const pols = ((links ?? []) as any[])
+      .filter((l) => l.vehicle_id === vid && !l.removed_at && l.policy && l.policy.status === "ativa")
+      .map((l) => l.policy)
+      .sort((a, b) => (b?.end_date || "").localeCompare(a?.end_date || ""));
+    const best = pols[0];
+    const update: any = best ? {
+      insurer: best.insurer_name || null,
+      insurance_policy: best.policy_number || null,
+      insurance_expires_at: best.end_date || null,
+      insurance_responsible: best.broker_id ? (brokersById[best.broker_id] || null) : null,
+    } : {
+      insurer: null,
+      insurance_policy: null,
+      insurance_expires_at: null,
+      insurance_responsible: null,
+    };
+    await supabase.from("vehicles").update(update).eq("id", vid);
+  }
+}
+
 export default function InsurancePanel() {
   const { currentCompanyId } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
