@@ -10,7 +10,19 @@ import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
-const STATUSES = ["ativo","manutencao","vendido","parado","sinistrado"];
+const STATUSES = [
+  { value: "ativo", label: "Ativo" },
+  { value: "manutencao", label: "Em manutenção" },
+  { value: "parado", label: "Parado" },
+  { value: "vendido", label: "Vendido" },
+  { value: "sinistrado", label: "Sinistrado" },
+  { value: "inativo", label: "Inativo (outros)" },
+  { value: "transferido", label: "Transferido" },
+  { value: "roubado_furtado", label: "Roubado / Furtado" },
+  { value: "leiloado", label: "Leiloado" },
+];
+const SOLD_STATUS = "vendido";
+const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
 
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
@@ -43,6 +55,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
     fipe_value: "", photos: [] as string[],
     licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
+    inactivated_at: "", inactive_reason: "",
+    sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
   });
 
   useEffect(() => {
@@ -54,6 +68,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
       licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
+      inactivated_at: "", inactive_reason: "",
+      sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
     });
     setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
