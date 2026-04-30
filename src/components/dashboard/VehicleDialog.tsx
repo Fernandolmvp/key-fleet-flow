@@ -266,6 +266,29 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           </div>
         </div>
 
+        {form.status === SOLD_STATUS && (
+          <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+            <p className="text-sm font-semibold">Dados da venda</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Data da venda</Label><Input type="date" value={form.sale_date} onChange={(e) => setForm({ ...form, sale_date: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Valor da venda (R$)</Label><Input type="number" step="0.01" value={form.sale_value} onChange={(e) => setForm({ ...form, sale_value: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Comprador</Label><Input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} /></div>
+              <div className="space-y-2"><Label>CPF/CNPJ comprador</Label><Input value={form.buyer_doc} onChange={(e) => setForm({ ...form, buyer_doc: e.target.value.replace(/\D/g, "") })} placeholder="Somente números" /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Observações</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Notas sobre a venda" /></div>
+            </div>
+          </div>
+        )}
+
+        {INACTIVE_STATUSES.includes(form.status) && (
+          <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+            <p className="text-sm font-semibold">Dados da inativação</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
+              <div className="space-y-2 sm:col-span-1"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex: BO de furto, transferência para filial X..." /></div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label>Fotos do veículo</Label>
           <div className="flex flex-wrap gap-3">
