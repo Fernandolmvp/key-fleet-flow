@@ -203,9 +203,25 @@ export default function Drivers() {
     toast.success("Motorista removido"); load();
   };
 
-  const filtered = items.filter((d) =>
+  const [tab, setTab] = useState<string>(() => localStorage.getItem("drivers:tab") || "ativos");
+  useEffect(() => { localStorage.setItem("drivers:tab", tab); }, [tab]);
+
+  const byTab = items.filter((d) => {
+    if (tab === "todos") return true;
+    if (tab === "ativos") return d.status === "ativo" || d.status === "ferias";
+    if (tab === "desligados") return d.status === "desligado";
+    if (tab === "inativos") return INACTIVE_STATUSES.includes(d.status);
+    return true;
+  });
+  const filtered = byTab.filter((d) =>
     [d.full_name, d.cpf, d.cnh_number].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase())
   );
+  const counts = {
+    ativos: items.filter(d => d.status === "ativo" || d.status === "ferias").length,
+    desligados: items.filter(d => d.status === "desligado").length,
+    inativos: items.filter(d => INACTIVE_STATUSES.includes(d.status)).length,
+    todos: items.length,
+  };
 
   type CnhStatus = { kind: "vencida" | "vencendo" | "valida" | "sem_data"; days: number | null; label: string };
   const cnhStatus = (date: string | null): CnhStatus => {
