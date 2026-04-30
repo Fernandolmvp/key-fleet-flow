@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,24 +14,43 @@ import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 
-const nav = [
+type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean };
+type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
+type NavEntry = NavItem | NavGroup;
+
+const nav: NavEntry[] = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/app/vehicles", label: "Veículos", icon: Truck },
-  { to: "/app/drivers", label: "Motoristas", icon: Users },
-  { to: "/app/fuel-stations", label: "Postos", icon: Store },
-  { to: "/app/brokers", label: "Corretores", icon: Briefcase },
-  { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
-  { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals" },
-  { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
-  { to: "/app/checklists", label: "Checklists", icon: ClipboardList },
-  { to: "/app/tires", label: "Pneus", icon: CircleDot },
-  { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents" },
+  {
+    type: "group", key: "cadastros", label: "Cadastros", icon: Database,
+    items: [
+      { to: "/app/vehicles", label: "Veículos", icon: Truck },
+      { to: "/app/drivers", label: "Motoristas", icon: Users },
+      { to: "/app/fuel-stations", label: "Postos", icon: Store },
+      { to: "/app/brokers", label: "Corretores", icon: Briefcase },
+    ],
+  },
+  {
+    type: "group", key: "movimentacao", label: "Movimentação", icon: Activity,
+    items: [
+      { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
+      { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals" },
+      { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
+      { to: "/app/checklists", label: "Checklists", icon: ClipboardList },
+      { to: "/app/tires", label: "Pneus", icon: CircleDot },
+      { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents" },
+      { to: "/app/insurance", label: "Seguros", icon: ShieldCheck },
+    ],
+  },
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
   { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
   { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true },
   { to: "/app/settings", label: "Configurações", icon: Settings, soon: true },
 ];
+
+function isGroup(e: NavEntry): e is NavGroup {
+  return (e as NavGroup).type === "group";
+}
 
 export default function AppLayout() {
   const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin } = useAuth();
@@ -70,9 +89,58 @@ export default function AppLayout() {
   }
 
   const currentCompany = companies.find((c) => c.id === currentCompanyId);
-  const visibleNav = isDriverOnly
+  const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
     : nav;
+
+  const initialOpen: Record<string, boolean> = {};
+  for (const e of visibleNav) {
+    if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
+      initialOpen[e.key] = true;
+    }
+  }
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ cadastros: true, movimentacao: true, ...initialOpen });
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      for (const e of visibleNav) {
+        if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
+          next[e.key] = true;
+        }
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc.pathname]);
+
+  const renderItem = (it: NavItem, indent = false) => (
+    <NavLink
+      key={it.to}
+      to={it.to}
+      end={it.end}
+      className={({ isActive }) => cn(
+        "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        indent && "ml-4 pl-3 border-l border-sidebar-border/60",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
+          : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+      )}
+    >
+      <it.icon className="h-4 w-4" />
+      <span className="flex-1">{it.label}</span>
+      {it.badgeKey === "documents" && docPending > 0 && (
+        <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
+          {docPending}
+        </span>
+      )}
+      {it.badgeKey === "approvals" && approvalPending > 0 && (
+        <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
+          {approvalPending}
+        </span>
+      )}
+      {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
+    </NavLink>
+  );
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -88,33 +156,42 @@ export default function AppLayout() {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-          {visibleNav.map((it: any) => (
-            <NavLink
-              key={it.to}
-              to={it.to}
-              end={it.end}
-              className={({ isActive }) => cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <it.icon className="h-4 w-4" />
-              <span className="flex-1">{it.label}</span>
-              {it.badgeKey === "documents" && docPending > 0 && (
-                <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
-                  {docPending}
-                </span>
-              )}
-              {it.badgeKey === "approvals" && approvalPending > 0 && (
-                <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
-                  {approvalPending}
-                </span>
-              )}
-              {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
-            </NavLink>
-          ))}
+          {visibleNav.map((entry) => {
+            if (!isGroup(entry)) return renderItem(entry);
+            const open = !!openGroups[entry.key];
+            const Icon = entry.icon;
+            const pendingCount =
+              (entry.items.some((i) => i.badgeKey === "approvals") ? approvalPending : 0) +
+              (entry.items.some((i) => i.badgeKey === "documents") ? docPending : 0);
+            return (
+              <div key={entry.key} className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => setOpenGroups((p) => ({ ...p, [entry.key]: !open }))}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "text-sidebar-foreground/90 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4 text-primary" />
+                  <span className="flex-1 text-left font-medium tracking-wide uppercase text-[11px]">{entry.label}</span>
+                  {!open && pendingCount > 0 && (
+                    <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
+                      {pendingCount}
+                    </span>
+                  )}
+                  {open
+                    ? <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    : <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
+                </button>
+                {open && (
+                  <div className="space-y-0.5">
+                    {entry.items.map((it) => renderItem(it, true))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="p-3 border-t border-sidebar-border">
           <div className="surface-card rounded-lg p-3 text-xs text-muted-foreground">
