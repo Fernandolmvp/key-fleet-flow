@@ -669,6 +669,7 @@ export type Database = {
       drivers: {
         Row: {
           address: string | null
+          assigned_vehicle_id: string | null
           auto_fuel_authorized: boolean
           birth_date: string | null
           branch_id: string | null
@@ -681,6 +682,7 @@ export type Database = {
           email: string | null
           email_verified_at: string | null
           full_name: string
+          has_assigned_vehicle: boolean
           id: string
           inactivated_at: string | null
           inactive_reason: string | null
@@ -698,6 +700,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          assigned_vehicle_id?: string | null
           auto_fuel_authorized?: boolean
           birth_date?: string | null
           branch_id?: string | null
@@ -710,6 +713,7 @@ export type Database = {
           email?: string | null
           email_verified_at?: string | null
           full_name: string
+          has_assigned_vehicle?: boolean
           id?: string
           inactivated_at?: string | null
           inactive_reason?: string | null
@@ -727,6 +731,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          assigned_vehicle_id?: string | null
           auto_fuel_authorized?: boolean
           birth_date?: string | null
           branch_id?: string | null
@@ -739,6 +744,7 @@ export type Database = {
           email?: string | null
           email_verified_at?: string | null
           full_name?: string
+          has_assigned_vehicle?: boolean
           id?: string
           inactivated_at?: string | null
           inactive_reason?: string | null
