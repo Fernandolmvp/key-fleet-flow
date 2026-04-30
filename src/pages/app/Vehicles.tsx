@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,19 @@ const statusTone: Record<string, string> = {
   vendido: "bg-muted text-muted-foreground",
   parado: "bg-destructive/20 text-destructive border-destructive/30",
   sinistrado: "bg-destructive/30 text-destructive border-destructive/40",
+  inativo: "bg-muted text-muted-foreground",
+  transferido: "bg-muted text-muted-foreground",
+  roubado_furtado: "bg-destructive/30 text-destructive border-destructive/40",
+  leiloado: "bg-muted text-muted-foreground",
 };
+
+const statusLabel: Record<string, string> = {
+  ativo: "Ativo", manutencao: "Em manutenção", vendido: "Vendido", parado: "Parado",
+  sinistrado: "Sinistrado", inativo: "Inativo", transferido: "Transferido",
+  roubado_furtado: "Roubado/Furtado", leiloado: "Leiloado",
+};
+
+const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
 
 interface DocRow { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; status: string; }
 
