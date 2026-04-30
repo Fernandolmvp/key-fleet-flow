@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CreditCard, CheckCircle2, AlertTriangle, Truck, Users, Receipt } from "lucide-react";
+import { CreditCard, CheckCircle2, AlertTriangle, Truck, Users, Receipt, Loader2, ArrowUpCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
+import { getStripeEnvironment } from "@/lib/stripe";
 
 const fmtBRL = (v: number | null | undefined) =>
   v == null ? "a combinar" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -24,28 +28,68 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function Subscription() {
-  const { currentCompanyId } = useAuth();
+  const { user, currentCompanyId } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<any>(null);
   const [plans, setPlans] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutPriceId, setCheckoutPriceId] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
-  useEffect(() => {
+  const reload = async () => {
     if (!currentCompanyId) return;
-    (async () => {
-      setLoading(true);
-      const [{ data: u, error: eu }, { data: p }, { data: pays }] = await Promise.all([
-        supabase.from("company_usage").select("*").eq("company_id", currentCompanyId).maybeSingle(),
-        supabase.from("plans").select("*").eq("active", true).order("sort_order"),
-        supabase.from("subscription_payments").select("*").eq("company_id", currentCompanyId).order("paid_at", { ascending: false }).limit(10),
-      ]);
-      if (eu) toast.error(eu.message);
-      setData(u);
-      setPlans(p ?? []);
-      setPayments(pays ?? []);
-      setLoading(false);
-    })();
-  }, [currentCompanyId]);
+    setLoading(true);
+    const [{ data: u, error: eu }, { data: p }, { data: pays }] = await Promise.all([
+      supabase.from("company_usage").select("*").eq("company_id", currentCompanyId).maybeSingle(),
+      supabase.from("plans").select("*").eq("active", true).order("sort_order"),
+      supabase.from("subscription_payments").select("*").eq("company_id", currentCompanyId).order("paid_at", { ascending: false }).limit(10),
+    ]);
+    if (eu) toast.error(eu.message);
+    setData(u);
+    setPlans(p ?? []);
+    setPayments(pays ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { reload(); }, [currentCompanyId]);
+
+  // Volta do checkout
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      toast.success("Pagamento confirmado! Sua assinatura está sendo ativada.");
+      // pequeno delay pro webhook processar
+      setTimeout(() => { reload(); }, 1500);
+      searchParams.delete("checkout");
+      searchParams.delete("session_id");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams]);
+
+  const handleUpgrade = (priceId: string) => {
+    if (!currentCompanyId) return;
+    setCheckoutPriceId(priceId);
+  };
+
+  const handleManageCard = async () => {
+    if (!currentCompanyId) return;
+    setPortalLoading(true);
+    try {
+      const { data: resp, error } = await supabase.functions.invoke("create-portal-session", {
+        body: {
+          companyId: currentCompanyId,
+          returnUrl: `${window.location.origin}/app/assinatura`,
+          environment: getStripeEnvironment(),
+        },
+      });
+      if (error || !resp?.url) throw new Error(error?.message || "Falha ao abrir portal");
+      window.open(resp.url, "_blank");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   if (loading) return <div className="text-muted-foreground">Carregando...</div>;
   if (!data) return <div className="text-muted-foreground">Sem dados de assinatura</div>;
@@ -53,6 +97,7 @@ export default function Subscription() {
   const limit = data.vehicle_limit;
   const usagePct = limit ? Math.min(100, Math.round((data.vehicles_used / limit) * 100)) : 0;
   const overdue = new Date(data.current_period_end) < new Date() && data.subscription_status !== "cancelada";
+  const hasStripeCustomer = !!data.stripe_customer_id || data.subscription_status === "ativa" || data.subscription_status === "atrasada";
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl">
@@ -71,9 +116,17 @@ export default function Subscription() {
               {fmtBRL(data.monthly_amount)} / mês
             </div>
           </div>
-          <Badge className={`border ${statusTone[data.subscription_status] ?? ""}`}>
-            {statusLabel[data.subscription_status] ?? data.subscription_status}
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge className={`border ${statusTone[data.subscription_status] ?? ""}`}>
+              {statusLabel[data.subscription_status] ?? data.subscription_status}
+            </Badge>
+            {hasStripeCustomer && (
+              <Button size="sm" variant="outline" onClick={handleManageCard} disabled={portalLoading}>
+                {portalLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <CreditCard className="h-3 w-3" />}
+                Gerenciar cartão / faturas
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3 pt-4 border-t border-border">
@@ -117,6 +170,8 @@ export default function Subscription() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((p) => {
             const current = p.id === data.plan_id;
+            const priceId = p.stripe_price_id as string | null;
+            const canCheckout = !!priceId && !current;
             return (
               <div key={p.id} className={`surface-card rounded-xl p-5 ${current ? "border-primary" : ""}`}>
                 <div className="flex items-center justify-between">
@@ -137,12 +192,27 @@ export default function Subscription() {
                     </li>
                   ))}
                 </ul>
+                <div className="mt-4">
+                  {canCheckout ? (
+                    <Button size="sm" className="w-full" onClick={() => handleUpgrade(priceId!)}>
+                      <ArrowUpCircle className="h-3 w-3" /> Assinar este plano
+                    </Button>
+                  ) : !priceId ? (
+                    <Button size="sm" variant="outline" className="w-full" asChild>
+                      <a href="mailto:contato@suporte.com?subject=Plano Enterprise">Falar com vendas</a>
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" className="w-full" disabled>
+                      Plano atual
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
         <p className="text-xs text-muted-foreground mt-3">
-          Para mudar de plano, fale com o suporte. Mudanças são aplicadas no próximo ciclo.
+          Cobrança automática mensal no cartão. Em upgrade, você paga só a diferença proporcional do mês corrente.
         </p>
       </div>
 
@@ -179,6 +249,26 @@ export default function Subscription() {
           </div>
         )}
       </div>
+
+      {/* Modal de checkout */}
+      <Dialog open={!!checkoutPriceId} onOpenChange={(o) => !o && setCheckoutPriceId(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirmar assinatura</DialogTitle>
+            <DialogDescription>
+              Cadastre seu cartão. A cobrança é mensal e renova automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          {checkoutPriceId && currentCompanyId && (
+            <StripeEmbeddedCheckout
+              priceId={checkoutPriceId}
+              companyId={currentCompanyId}
+              userId={user?.id}
+              customerEmail={user?.email ?? undefined}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
