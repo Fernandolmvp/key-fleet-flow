@@ -345,7 +345,15 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
 
     setBusy(false);
     toast.success(isEdit ? "Veículo atualizado" : "Veículo cadastrado");
-    onOpenChange(false); onSaved();
+    onSaved();
+    // Se houve inativação, mantém o diálogo aberto e mostra o histórico
+    const becameInactiveNow = INACTIVE_STATUSES.includes(finalStatus) && !INACTIVE_STATUSES.includes(prevStatus ?? "");
+    if (becameInactiveNow && vehicleId) {
+      await loadMovements();
+      setActiveTab("movimentacoes");
+    } else {
+      onOpenChange(false);
+    }
   };
 
   return (
