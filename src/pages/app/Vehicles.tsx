@@ -195,7 +195,7 @@ export default function Vehicles() {
                     <Truck className="h-12 w-12 opacity-40" />
                   </div>
                 )}
-                <Badge className={`absolute top-3 right-3 capitalize border ${statusTone[v.status] ?? ""}`}>{v.status}</Badge>
+                <Badge className={`absolute top-3 right-3 border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
               </div>
               <div className="p-4 space-y-3">
                 <div>
@@ -290,7 +290,7 @@ export default function Vehicles() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge className={`capitalize border ${statusTone[v.status] ?? ""}`}>{v.status}</Badge>
+                        <Badge className={`border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
