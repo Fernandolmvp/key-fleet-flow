@@ -254,6 +254,14 @@ export default function Vehicles() {
                   <div className="font-mono text-lg font-bold tracking-wider text-primary">{v.plate}</div>
                   <div className="text-sm text-muted-foreground">{v.brand} {v.model} {v.year_model ?? ""}</div>
                   {v.owner_name && <div className="text-xs text-muted-foreground mt-0.5 truncate">Prop.: {v.owner_name}</div>}
+                  <div className="text-xs mt-0.5 truncate">
+                    <span className="text-muted-foreground">Motorista: </span>
+                    {driverByVehicle[v.id] ? (
+                      <span className="text-foreground font-medium">{driverByVehicle[v.id]}</span>
+                    ) : (
+                      <span className="text-muted-foreground italic">não possui esse vínculo</span>
+                    )}
+                  </div>
                 </div>
 
                 {isSold ? (
@@ -335,6 +343,7 @@ export default function Vehicles() {
                 <tr>
                   <th className="text-left px-4 py-3">Veículo</th>
                   <th className="text-left px-4 py-3">Proprietário</th>
+                  <th className="text-left px-4 py-3">Motorista</th>
                   <th className="text-left px-4 py-3">Status</th>
                   {tab === "vendidos" ? (
                     <>
@@ -378,6 +387,13 @@ export default function Vehicles() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-foreground truncate">{v.owner_name || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {driverByVehicle[v.id] ? (
+                          <span className="text-xs text-foreground truncate">{driverByVehicle[v.id]}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">não possui esse vínculo</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge className={`border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
