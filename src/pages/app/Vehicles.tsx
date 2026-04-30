@@ -342,7 +342,8 @@ export default function Vehicles() {
                   const licensed = v.licensing_year === currentYear;
                   const insured = isInsured(v);
                   const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
-                  const insuranceUrl = insurance?.file_url || null;
+                  const policyLink = findActivePolicy(v.id);
+                  const insuranceUrl = policyLink?.policy?.file_url || insurance?.file_url || null;
                   const isSold = tab === "vendidos" || v.status === "vendido";
                   return (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/20">
