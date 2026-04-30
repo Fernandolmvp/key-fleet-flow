@@ -25,6 +25,7 @@ const STATUSES = [
 ];
 const SOLD_STATUS = "vendido";
 const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
+const UNDOABLE_MOVEMENT_TYPES = ["venda", "inativacao"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
 
 const INACTIVE_REASONS = [
@@ -70,6 +71,102 @@ const buildFormState = (data?: any) => ({
   photos: data?.photos ?? [],
   documents: data?.documents ?? [],
 });
+
+const getMovementTimestamp = (movement: MovementRow) => {
+  if (movement.occurred_at) {
+    return new Date(`${movement.occurred_at}T23:59:59`).getTime();
+  }
+
+  return new Date(movement.created_at).getTime();
+};
+
+const sortMovementsChronologically = (rows: MovementRow[]) => (
+  [...rows].sort((a, b) => {
+    const timeDiff = getMovementTimestamp(b) - getMovementTimestamp(a);
+    if (timeDiff !== 0) return timeDiff;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  })
+);
+
+const getRevertedMovementIds = (rows: MovementRow[]) => (
+  new Set(
+    rows
+      .filter((movement) => movement.movement_type === "reversao")
+      .map((movement) => String(movement.metadata?.reverted_movement_id ?? ""))
+      .filter(Boolean)
+  )
+);
+
+const getEffectiveMovements = (rows: MovementRow[]) => {
+  const revertedIds = getRevertedMovementIds(rows);
+
+  return sortMovementsChronologically(rows).filter(
+    (movement) => movement.movement_type !== "reversao" && !revertedIds.has(movement.id)
+  );
+};
+
+const getLatestUndoableMovement = (rows: MovementRow[]) => (
+  getEffectiveMovements(rows).find((movement) => UNDOABLE_MOVEMENT_TYPES.includes(movement.movement_type)) ?? null
+);
+
+const buildVehicleStateFromHistory = (rows: MovementRow[]) => {
+  const latestMovement = getEffectiveMovements(rows)[0] ?? null;
+  const clearedState = {
+    sale_date: null,
+    sale_value: null,
+    buyer_name: null,
+    buyer_doc: null,
+    buyer_phone: null,
+    buyer_email: null,
+    buyer_address: null,
+    sale_notary: null,
+    sale_city: null,
+    sale_state: null,
+    sale_payment_method: null,
+    sale_notes: null,
+    sale_contract_url: null,
+    inactivated_at: null,
+    inactive_reason: null,
+    inactive_notes: null,
+  };
+
+  if (!latestMovement) {
+    return { status: "ativo", notes: null, ...clearedState };
+  }
+
+  if (latestMovement.movement_type === "venda") {
+    return {
+      status: SOLD_STATUS,
+      notes: null,
+      ...clearedState,
+      sale_date: latestMovement.occurred_at ?? null,
+      sale_value: latestMovement.metadata?.sale_value ?? null,
+      buyer_name: latestMovement.metadata?.buyer_name ?? null,
+      buyer_doc: latestMovement.metadata?.buyer_doc ?? null,
+      sale_payment_method: latestMovement.metadata?.payment_method ?? null,
+      sale_notes: latestMovement.notes ?? null,
+    };
+  }
+
+  if (latestMovement.movement_type === "inativacao") {
+    const historicalStatus = latestMovement.metadata?.status;
+    return {
+      status: INACTIVE_STATUSES.includes(historicalStatus) ? historicalStatus : "inativo",
+      notes: null,
+      ...clearedState,
+    };
+  }
+
+  if (latestMovement.movement_type === "reativacao") {
+    return {
+      status: latestMovement.metadata?.to === "manutencao" ? "manutencao" : "ativo",
+      notes: null,
+      ...clearedState,
+    };
+  }
+
+  return { status: "ativo", notes: null, ...clearedState };
+};
 
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
   const { currentCompanyId, refreshCompanies } = useAuth();
