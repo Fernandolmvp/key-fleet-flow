@@ -51,6 +51,26 @@ interface MovementRow {
   metadata: any;
 }
 
+const EMPTY_FORM = {
+  plate: "", renavam: "", chassis: "", brand: "", model: "",
+  year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
+  tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
+  responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
+  fipe_value: "", photos: [] as string[], documents: [] as string[],
+  licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
+  inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
+  sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
+  buyer_phone: "", buyer_email: "", buyer_address: "",
+  sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
+};
+
+const buildFormState = (data?: any) => ({
+  ...EMPTY_FORM,
+  ...(data ?? {}),
+  photos: data?.photos ?? [],
+  documents: data?.documents ?? [],
+});
+
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
   const { currentCompanyId, refreshCompanies } = useAuth();
 
@@ -76,36 +96,40 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
   const [archivedDoc, setArchivedDoc] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("dados");
   const [movements, setMovements] = useState<MovementRow[]>([]);
-  const [form, setForm] = useState<any>({
-    plate: "", renavam: "", chassis: "", brand: "", model: "",
-    year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
-    tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
-    responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
-    fipe_value: "", photos: [] as string[],
-    licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
-    inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
-    sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
-    buyer_phone: "", buyer_email: "", buyer_address: "",
-    sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
-  });
+  const [form, setForm] = useState<any>(buildFormState());
 
   useEffect(() => {
-    if (vehicle) setForm({ ...form, ...vehicle, photos: vehicle.photos ?? [] });
-    else setForm({
-      plate: "", renavam: "", chassis: "", brand: "", model: "",
-      year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
-      tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
-      responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
-      fipe_value: "", photos: [],
-      licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
-      inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
-      sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
-      buyer_phone: "", buyer_email: "", buyer_address: "",
-      sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
-    });
-    setArchivedDoc(null);
-    setActiveTab("dados");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+
+    const hydrateForm = async () => {
+      setArchivedDoc(null);
+      setActiveTab("dados");
+
+      if (!open) return;
+      if (!vehicle?.id) {
+        setForm(buildFormState());
+        return;
+      }
+
+      setForm(buildFormState(vehicle));
+
+      const { data, error } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("id", vehicle.id)
+        .maybeSingle();
+
+      if (!alive) return;
+      if (error) {
+        console.warn("vehicle full load failed:", error.message);
+        return;
+      }
+
+      setForm(buildFormState(data ?? vehicle));
+    };
+
+    hydrateForm();
+    return () => { alive = false; };
   }, [vehicle, open]);
 
   const loadMovements = async () => {
@@ -180,30 +204,45 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
 
     // Auto-flag: se preencheu data de venda mas o status não foi alterado, marca como vendido.
     const hasSaleData = !!(form.sale_date || form.sale_value || form.buyer_name);
+    const hasInactiveLaunch = !!(form.inactivated_at || form.inactive_reason || form.inactive_notes || form.notes);
     const prevStatus = vehicle?.status ?? null;
     let finalStatus = form.status;
     if (hasSaleData && finalStatus !== SOLD_STATUS) {
       finalStatus = SOLD_STATUS;
     }
+    if (activeTab === "inativacao" && hasInactiveLaunch && !INACTIVE_STATUSES.includes(finalStatus) && finalStatus !== SOLD_STATUS) {
+      finalStatus = "inativo";
+    }
 
-    const payload: any = {
-      ...form,
-      status: finalStatus,
-      company_id: currentCompanyId,
+    const dataPayload: any = {
       plate: form.plate.toUpperCase().trim(),
+      renavam: form.renavam || null,
+      chassis: form.chassis || null,
+      brand: form.brand.trim(),
+      model: form.model.trim(),
       year_manufacture: form.year_manufacture ? Number(form.year_manufacture) : null,
       year_model: form.year_model ? Number(form.year_model) : null,
+      color: form.color || null,
+      fuel_type: form.fuel_type || null,
       tank_capacity: form.tank_capacity ? Number(form.tank_capacity) : null,
+      vehicle_type: form.vehicle_type || null,
       current_km: Number(form.current_km) || 0,
-      fipe_value: form.fipe_value ? Number(form.fipe_value) : null,
+      status: finalStatus,
+      responsible: form.responsible || null,
+      insurer: form.insurer || null,
+      insurance_policy: form.insurance_policy || null,
       insurance_expires_at: form.insurance_expires_at || null,
+      fipe_value: form.fipe_value ? Number(form.fipe_value) : null,
+      photos: form.photos ?? [],
+      documents: form.documents ?? [],
       licensing_year: form.licensing_year ? Number(form.licensing_year) : null,
-      crlv_issue_date: form.crlv_issue_date || null,
       owner_name: form.owner_name || null,
       owner_doc: form.owner_doc || null,
+      crlv_issue_date: form.crlv_issue_date || null,
       crlv_city: form.crlv_city || null,
-      inactivated_at: form.inactivated_at || null,
-      inactive_reason: form.inactive_reason || null,
+    };
+    const salePayload: any = {
+      status: finalStatus,
       sale_date: form.sale_date || null,
       sale_value: form.sale_value ? Number(form.sale_value) : null,
       buyer_name: form.buyer_name || null,
@@ -217,9 +256,28 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       sale_payment_method: form.sale_payment_method || null,
       sale_notes: form.sale_notes || null,
       sale_contract_url: form.sale_contract_url || null,
+    };
+    const inactivePayload: any = {
+      status: finalStatus,
+      inactivated_at: form.inactivated_at || null,
+      inactive_reason: form.inactive_reason || null,
       inactive_notes: form.inactive_notes || null,
       notes: form.notes || null,
     };
+    const payload: any = isEdit
+      ? {
+          ...(activeTab === "dados" ? dataPayload : {}),
+          ...(activeTab === "venda" ? salePayload : {}),
+          ...(activeTab === "inativacao" ? inactivePayload : {}),
+        }
+      : {
+          ...dataPayload,
+          ...salePayload,
+          ...inactivePayload,
+          company_id: currentCompanyId,
+        };
+
+    if (isEdit) payload.company_id = currentCompanyId;
     delete payload.id;
     // Normaliza strings vazias para null em todos os demais campos (evita perder dados ou quebrar tipos)
     for (const k of Object.keys(payload)) {
@@ -265,9 +323,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       const { data: { user } } = await supabase.auth.getUser();
       const movs: any[] = [];
 
-      // Venda: registra se houve dados de venda novos OU mudou para vendido agora
+      // Venda: registra quando a aba de venda é salva com dados preenchidos
       const becameSold = finalStatus === SOLD_STATUS && prevStatus !== SOLD_STATUS;
-      if (becameSold || (hasSaleData && !isEdit)) {
+      const shouldRegisterSale = activeTab === "venda" && hasSaleData;
+      if (shouldRegisterSale || (becameSold && !shouldRegisterSale) || (hasSaleData && !isEdit)) {
         movs.push({
           company_id: currentCompanyId,
           vehicle_id: vehicleId,
@@ -285,9 +344,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
         });
       }
 
-      // Inativação: registra se o status passou a ser inativo agora
+      // Inativação: registra sempre que houver lançamento salvo nesta aba
       const becameInactive = INACTIVE_STATUSES.includes(finalStatus) && !INACTIVE_STATUSES.includes(prevStatus ?? "");
-      if (becameInactive) {
+      const shouldRegisterInactive = activeTab === "inativacao" && hasInactiveLaunch;
+      if (becameInactive || shouldRegisterInactive) {
         movs.push({
           company_id: currentCompanyId,
           vehicle_id: vehicleId,
@@ -339,7 +399,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
 
       if (movs.length) {
         const { error: mErr } = await supabase.from("vehicle_movements").insert(movs);
-        if (mErr) console.warn("vehicle movement insert failed:", mErr.message);
+        if (mErr) {
+          console.warn("vehicle movement insert failed:", mErr.message);
+          toast.error("Veículo salvo, mas a movimentação não foi registrada.");
+        }
       }
     }
 
@@ -347,7 +410,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     toast.success(isEdit ? "Veículo atualizado" : "Veículo cadastrado");
     onSaved();
     // Se houve inativação, mantém o diálogo aberto e mostra o histórico
-    const becameInactiveNow = INACTIVE_STATUSES.includes(finalStatus) && !INACTIVE_STATUSES.includes(prevStatus ?? "");
+    const becameInactiveNow = activeTab === "inativacao" && hasInactiveLaunch;
     if (becameInactiveNow && vehicleId) {
       await loadMovements();
       setActiveTab("movimentacoes");
