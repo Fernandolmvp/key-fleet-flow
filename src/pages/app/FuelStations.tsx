@@ -229,6 +229,16 @@ export default function FuelStations() {
               <Switch id="active" checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
               <Label htmlFor="active" className="cursor-pointer">Posto ativo (disponível para seleção)</Label>
             </div>
+
+            {!form.active && (
+              <div className="sm:col-span-2 rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+                <p className="text-sm font-semibold">Dados da inativação</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex.: contrato encerrado, posto fechado..." /></div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
