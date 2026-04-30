@@ -58,6 +58,7 @@ export default function Vehicles() {
   const [items, setItems] = useState<Vehicle[]>([]);
   const [docsByVehicle, setDocsByVehicle] = useState<Record<string, DocRow[]>>({});
   const [policiesByVehicle, setPoliciesByVehicle] = useState<Record<string, PolicyLink[]>>({});
+  const [driverByVehicle, setDriverByVehicle] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -98,6 +99,21 @@ export default function Vehicles() {
       pmap[l.vehicle_id].push(l);
     });
     setPoliciesByVehicle(pmap);
+
+    // Motorista principal por veículo (motorista com vínculo exclusivo ativo)
+    const { data: assigned } = await supabase
+      .from("drivers")
+      .select("full_name, assigned_vehicle_id, has_assigned_vehicle, status")
+      .eq("company_id", currentCompanyId)
+      .eq("has_assigned_vehicle", true)
+      .not("assigned_vehicle_id", "is", null);
+    const dmap: Record<string, string> = {};
+    (assigned ?? []).forEach((d: any) => {
+      if (["ativo", "ferias"].includes(String(d.status))) {
+        dmap[d.assigned_vehicle_id] = d.full_name;
+      }
+    });
+    setDriverByVehicle(dmap);
     setLoading(false);
   };
 
