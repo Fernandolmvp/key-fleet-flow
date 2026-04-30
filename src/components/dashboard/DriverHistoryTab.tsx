@@ -182,7 +182,7 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        {events.length} evento(s) — cadastro do motorista e acessos ao sistema, ordenados pela data/hora do lançamento.
+        {events.length} evento(s) — cadastro, acessos ao sistema e vínculos de veículo, ordenados pela data/hora do lançamento.
         Abastecimentos, manutenções e documentos têm registro próprio em seus módulos.
       </p>
       <div className="relative pl-6 border-l-2 border-border space-y-3">
@@ -207,7 +207,7 @@ export default function DriverHistoryTab({ driverId, companyId, driverStatus }: 
                     {ev.subtitle && <p className="text-xs text-muted-foreground">{ev.subtitle}</p>}
                     {ev.meta && <p className="text-[11px] text-muted-foreground mt-1 font-mono">{ev.meta}</p>}
                   </div>
-                  {ev.kind !== "access" && <Button
+                  {ev.kind === "status" && <Button
                     size="sm" variant="ghost"
                     className="text-destructive hover:text-destructive shrink-0"
                     onClick={() => undo(ev)}
