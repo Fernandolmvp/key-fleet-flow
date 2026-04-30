@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
@@ -55,8 +57,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
     fipe_value: "", photos: [] as string[],
     licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
-    inactivated_at: "", inactive_reason: "",
+    inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
     sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
+    buyer_phone: "", buyer_email: "", buyer_address: "",
+    sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
   });
 
   useEffect(() => {
@@ -68,8 +72,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
       licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
-      inactivated_at: "", inactive_reason: "",
+      inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
       sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
+      buyer_phone: "", buyer_email: "", buyer_address: "",
+      sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
     });
     setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,6 +155,17 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       sale_value: form.sale_value ? Number(form.sale_value) : null,
       buyer_name: form.buyer_name || null,
       buyer_doc: form.buyer_doc || null,
+      buyer_phone: form.buyer_phone || null,
+      buyer_email: form.buyer_email || null,
+      buyer_address: form.buyer_address || null,
+      sale_notary: form.sale_notary || null,
+      sale_city: form.sale_city || null,
+      sale_state: form.sale_state || null,
+      sale_payment_method: form.sale_payment_method || null,
+      sale_notes: form.sale_notes || null,
+      sale_contract_url: form.sale_contract_url || null,
+      inactive_notes: form.inactive_notes || null,
+      notes: form.notes || null,
     };
     delete payload.id;
     const op = isEdit
@@ -224,6 +241,14 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           </a>
         )}
 
+        <Tabs defaultValue="dados" className="mt-2">
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="dados">Dados</TabsTrigger>
+            <TabsTrigger value="venda">Venda</TabsTrigger>
+            <TabsTrigger value="inativacao">Observações & Inativação</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dados" className="space-y-4 mt-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2"><Label>Placa *</Label><Input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} className="font-mono uppercase" /></div>
           <div className="space-y-2"><Label>RENAVAM</Label><Input value={form.renavam} onChange={(e) => setForm({ ...form, renavam: e.target.value })} /></div>
@@ -266,29 +291,6 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           </div>
         </div>
 
-        {form.status === SOLD_STATUS && (
-          <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
-            <p className="text-sm font-semibold">Dados da venda</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Data da venda</Label><Input type="date" value={form.sale_date} onChange={(e) => setForm({ ...form, sale_date: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Valor da venda (R$)</Label><Input type="number" step="0.01" value={form.sale_value} onChange={(e) => setForm({ ...form, sale_value: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Comprador</Label><Input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} /></div>
-              <div className="space-y-2"><Label>CPF/CNPJ comprador</Label><Input value={form.buyer_doc} onChange={(e) => setForm({ ...form, buyer_doc: e.target.value.replace(/\D/g, "") })} placeholder="Somente números" /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Observações</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Notas sobre a venda" /></div>
-            </div>
-          </div>
-        )}
-
-        {INACTIVE_STATUSES.includes(form.status) && (
-          <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
-            <p className="text-sm font-semibold">Dados da inativação</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
-              <div className="space-y-2 sm:col-span-1"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex: BO de furto, transferência para filial X..." /></div>
-            </div>
-          </div>
-        )}
-
         <div className="space-y-2">
           <Label>Fotos do veículo</Label>
           <div className="flex flex-wrap gap-3">
@@ -306,6 +308,65 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
             </label>
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="venda" className="space-y-4 mt-4">
+            {form.status !== SOLD_STATUS && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+                Para registrar a venda, defina o status do veículo como <strong>Vendido</strong> na aba Dados. Os campos abaixo serão salvos mesmo sem alterar o status.
+              </div>
+            )}
+            <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+              <p className="text-sm font-semibold">Dados da venda</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Data da venda</Label><Input type="date" value={form.sale_date} onChange={(e) => setForm({ ...form, sale_date: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Valor da venda (R$)</Label><Input type="number" step="0.01" value={form.sale_value} onChange={(e) => setForm({ ...form, sale_value: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Forma de pagamento</Label><Input value={form.sale_payment_method} onChange={(e) => setForm({ ...form, sale_payment_method: e.target.value })} placeholder="À vista, financiado, transferência..." /></div>
+                <div className="space-y-2"><Label>URL do contrato (opcional)</Label><Input value={form.sale_contract_url} onChange={(e) => setForm({ ...form, sale_contract_url: e.target.value })} placeholder="https://..." /></div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+              <p className="text-sm font-semibold">Comprador</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Nome / Razão social</Label><Input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} /></div>
+                <div className="space-y-2"><Label>CPF / CNPJ</Label><Input value={form.buyer_doc} onChange={(e) => setForm({ ...form, buyer_doc: e.target.value.replace(/\D/g, "") })} placeholder="Somente números" /></div>
+                <div className="space-y-2"><Label>Telefone</Label><Input value={form.buyer_phone} onChange={(e) => setForm({ ...form, buyer_phone: e.target.value })} /></div>
+                <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.buyer_email} onChange={(e) => setForm({ ...form, buyer_email: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.buyer_address} onChange={(e) => setForm({ ...form, buyer_address: e.target.value })} /></div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+              <p className="text-sm font-semibold">Cartório / Registro</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2 sm:col-span-2"><Label>Cartório (nome)</Label><Input value={form.sale_notary} onChange={(e) => setForm({ ...form, sale_notary: e.target.value })} placeholder="Ex: 2º Tabelião de Notas" /></div>
+                <div className="space-y-2"><Label>Cidade</Label><Input value={form.sale_city} onChange={(e) => setForm({ ...form, sale_city: e.target.value })} /></div>
+                <div className="space-y-2"><Label>UF</Label><Input value={form.sale_state} onChange={(e) => setForm({ ...form, sale_state: e.target.value.toUpperCase().slice(0,2) })} maxLength={2} /></div>
+              </div>
+              <div className="space-y-2"><Label>Observações da venda</Label><Textarea rows={3} value={form.sale_notes} onChange={(e) => setForm({ ...form, sale_notes: e.target.value })} placeholder="Detalhes do reconhecimento de firma, transferência, recibo..." /></div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="inativacao" className="space-y-4 mt-4">
+            <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+              <p className="text-sm font-semibold">Inativação</p>
+              {!INACTIVE_STATUSES.includes(form.status) && form.status !== SOLD_STATUS && (
+                <p className="text-xs text-muted-foreground">Os campos abaixo são usados quando o status é Inativo, Sinistrado, Transferido, Roubado/Furtado, Leiloado ou Parado.</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex: BO de furto, transferência..." /></div>
+              </div>
+              <div className="space-y-2"><Label>Detalhes da inativação</Label><Textarea rows={3} value={form.inactive_notes} onChange={(e) => setForm({ ...form, inactive_notes: e.target.value })} placeholder="Número do BO, processo, contraparte, anexos..." /></div>
+            </div>
+
+            <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+              <p className="text-sm font-semibold">Observações gerais</p>
+              <Textarea rows={5} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notas livres sobre o veículo, histórico, particularidades..." />
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>

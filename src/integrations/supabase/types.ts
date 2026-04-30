@@ -1227,8 +1227,11 @@ export type Database = {
         Row: {
           branch_id: string | null
           brand: string
+          buyer_address: string | null
           buyer_doc: string | null
+          buyer_email: string | null
           buyer_name: string | null
+          buyer_phone: string | null
           chassis: string | null
           color: string | null
           company_id: string
@@ -1243,6 +1246,7 @@ export type Database = {
           has_tracker: boolean
           id: string
           inactivated_at: string | null
+          inactive_notes: string | null
           inactive_reason: string | null
           insurance_expires_at: string | null
           insurance_policy: string | null
@@ -1256,7 +1260,13 @@ export type Database = {
           plate: string
           renavam: string | null
           responsible: string | null
+          sale_city: string | null
+          sale_contract_url: string | null
           sale_date: string | null
+          sale_notary: string | null
+          sale_notes: string | null
+          sale_payment_method: string | null
+          sale_state: string | null
           sale_value: number | null
           status: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity: number | null
@@ -1268,8 +1278,11 @@ export type Database = {
         Insert: {
           branch_id?: string | null
           brand: string
+          buyer_address?: string | null
           buyer_doc?: string | null
+          buyer_email?: string | null
           buyer_name?: string | null
+          buyer_phone?: string | null
           chassis?: string | null
           color?: string | null
           company_id: string
@@ -1284,6 +1297,7 @@ export type Database = {
           has_tracker?: boolean
           id?: string
           inactivated_at?: string | null
+          inactive_notes?: string | null
           inactive_reason?: string | null
           insurance_expires_at?: string | null
           insurance_policy?: string | null
@@ -1297,7 +1311,13 @@ export type Database = {
           plate: string
           renavam?: string | null
           responsible?: string | null
+          sale_city?: string | null
+          sale_contract_url?: string | null
           sale_date?: string | null
+          sale_notary?: string | null
+          sale_notes?: string | null
+          sale_payment_method?: string | null
+          sale_state?: string | null
           sale_value?: number | null
           status?: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity?: number | null
@@ -1309,8 +1329,11 @@ export type Database = {
         Update: {
           branch_id?: string | null
           brand?: string
+          buyer_address?: string | null
           buyer_doc?: string | null
+          buyer_email?: string | null
           buyer_name?: string | null
+          buyer_phone?: string | null
           chassis?: string | null
           color?: string | null
           company_id?: string
@@ -1325,6 +1348,7 @@ export type Database = {
           has_tracker?: boolean
           id?: string
           inactivated_at?: string | null
+          inactive_notes?: string | null
           inactive_reason?: string | null
           insurance_expires_at?: string | null
           insurance_policy?: string | null
@@ -1338,7 +1362,13 @@ export type Database = {
           plate?: string
           renavam?: string | null
           responsible?: string | null
+          sale_city?: string | null
+          sale_contract_url?: string | null
           sale_date?: string | null
+          sale_notary?: string | null
+          sale_notes?: string | null
+          sale_payment_method?: string | null
+          sale_state?: string | null
           sale_value?: number | null
           status?: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity?: number | null
