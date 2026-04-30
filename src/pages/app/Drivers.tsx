@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -34,6 +35,22 @@ const STATUSES = [
 ];
 const STATUS_LABEL: Record<string, string> = Object.fromEntries(STATUSES.map(s => [s.value, s.label]));
 const INACTIVE_STATUSES = ["desligado","inativo","suspenso","licenca_medica","afastado"];
+const INACTIVATION_REASONS = [
+  "Pedido de demissão",
+  "Demissão sem justa causa",
+  "Demissão por justa causa",
+  "Aposentadoria",
+  "Fim de contrato",
+  "Acordo entre partes",
+  "Atestado médico prolongado",
+  "Suspensão da CNH",
+  "Acidente de trabalho",
+  "Licença maternidade/paternidade",
+  "Férias prolongadas",
+  "Transferência para outra empresa",
+  "Falecimento",
+  "Outro motivo",
+];
 
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
