@@ -60,14 +60,14 @@ export default function Maintenance() {
     const [{ data: r }, { data: s }, { data: v }, { data: f }] = await Promise.all([
       supabase.from("maintenance_records").select("*").eq("company_id", currentCompanyId).order("service_at", { ascending: false }),
       supabase.from("maintenance_schedules").select("*").eq("company_id", currentCompanyId).neq("status", "concluida"),
-      supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId),
+      supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId).eq("status", "ativo"),
       supabase.from("fuel_records").select("vehicle_id,km_at_fueling,fueled_at").eq("company_id", currentCompanyId).order("fueled_at", { ascending: false }),
     ]);
-    setRecords((r ?? []) as MRec[]);
-    setSchedules((s ?? []) as Sched[]);
     const map: Record<string, any> = {};
     (v ?? []).forEach((x: any) => { map[x.id] = { plate: x.plate, current_km: x.current_km }; });
     setVehicles(map);
+    setRecords(((r ?? []) as MRec[]).filter((x) => map[x.vehicle_id]));
+    setSchedules(((s ?? []) as Sched[]).filter((x) => map[x.vehicle_id]));
     const fuelMap: Record<string, { km: number; at: string }> = {};
     (f ?? []).forEach((row: any) => {
       if (!fuelMap[row.vehicle_id]) fuelMap[row.vehicle_id] = { km: row.km_at_fueling, at: row.fueled_at };
