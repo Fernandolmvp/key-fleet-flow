@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Sparkles, FileText, History } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, FileText, History, Undo2 } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
 const STATUSES = [
@@ -140,6 +140,73 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       .eq("vehicle_id", vehicle.id)
       .order("created_at", { ascending: false });
     setMovements((data ?? []) as MovementRow[]);
+  };
+
+  const undoMovement = async (m: MovementRow) => {
+    if (!vehicle?.id || !currentCompanyId) return;
+    const tipo = m.movement_type === "venda" ? "venda" : m.movement_type === "inativacao" ? "inativação" : m.movement_type;
+    if (!confirm(`Desfazer este movimento de ${tipo}? O veículo voltará para Ativo e os dados desta movimentação serão removidos.`)) return;
+
+    setBusy(true);
+    try {
+      const resetPayload: any = { status: "ativo" };
+      if (m.movement_type === "venda") {
+        Object.assign(resetPayload, {
+          sale_date: null, sale_value: null,
+          buyer_name: null, buyer_doc: null, buyer_phone: null, buyer_email: null, buyer_address: null,
+          sale_notary: null, sale_city: null, sale_state: null,
+          sale_payment_method: null, sale_notes: null, sale_contract_url: null,
+        });
+      } else if (m.movement_type === "inativacao") {
+        Object.assign(resetPayload, {
+          inactivated_at: null, inactive_reason: null, inactive_notes: null,
+        });
+      } else {
+        toast.error("Somente movimentos de venda ou inativação podem ser desfeitos.");
+        setBusy(false);
+        return;
+      }
+
+      const { error: upErr } = await supabase.from("vehicles").update(resetPayload).eq("id", vehicle.id);
+      if (upErr) throw upErr;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: revErr } = await supabase.from("vehicle_movements").insert({
+        company_id: currentCompanyId,
+        vehicle_id: vehicle.id,
+        movement_type: "reversao",
+        reason: `Reversão de ${tipo}`,
+        notes: `Desfeito movimento original de ${m.occurred_at || m.created_at?.slice(0,10)}`,
+        occurred_at: new Date().toISOString().slice(0, 10),
+        created_by: user?.id ?? null,
+        metadata: { reverted_movement_id: m.id, original_type: m.movement_type, original_metadata: m.metadata ?? {} },
+      });
+      if (revErr) console.warn("reversal insert failed:", revErr.message);
+
+      const { error: delErr } = await supabase.from("vehicle_movements").delete().eq("id", m.id);
+      if (delErr) console.warn("original movement delete failed:", delErr.message);
+
+      setForm((f: any) => ({
+        ...f,
+        status: "ativo",
+        ...(m.movement_type === "venda" ? {
+          sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "", buyer_phone: "",
+          buyer_email: "", buyer_address: "", sale_notary: "", sale_city: "", sale_state: "",
+          sale_payment_method: "", sale_notes: "", sale_contract_url: "",
+        } : {}),
+        ...(m.movement_type === "inativacao" ? {
+          inactivated_at: "", inactive_reason: "", inactive_notes: "",
+        } : {}),
+      }));
+
+      await loadMovements();
+      onSaved?.();
+      toast.success(`Movimento de ${tipo} desfeito. Veículo voltou para Ativo.`);
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao desfazer movimento");
+    } finally {
+      setBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -611,9 +678,23 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
                   <div key={m.id} className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold capitalize">{m.movement_type}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {m.occurred_at ? new Date(m.occurred_at).toLocaleDateString("pt-BR") : new Date(m.created_at).toLocaleDateString("pt-BR")}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {m.occurred_at ? new Date(m.occurred_at).toLocaleDateString("pt-BR") : new Date(m.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                        {(m.movement_type === "venda" || m.movement_type === "inativacao") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                            disabled={busy}
+                            onClick={() => undoMovement(m)}
+                            title="Desfazer este movimento"
+                          >
+                            <Undo2 className="h-3.5 w-3.5 mr-1" /> Desfazer
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     {m.reason && <div className="text-xs text-muted-foreground mt-1">Motivo: {m.reason}</div>}
                     {m.notes && <div className="text-xs mt-1">{m.notes}</div>}
