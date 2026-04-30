@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,19 @@ const statusTone: Record<string, string> = {
   vendido: "bg-muted text-muted-foreground",
   parado: "bg-destructive/20 text-destructive border-destructive/30",
   sinistrado: "bg-destructive/30 text-destructive border-destructive/40",
+  inativo: "bg-muted text-muted-foreground",
+  transferido: "bg-muted text-muted-foreground",
+  roubado_furtado: "bg-destructive/30 text-destructive border-destructive/40",
+  leiloado: "bg-muted text-muted-foreground",
 };
+
+const statusLabel: Record<string, string> = {
+  ativo: "Ativo", manutencao: "Em manutenção", vendido: "Vendido", parado: "Parado",
+  sinistrado: "Sinistrado", inativo: "Inativo", transferido: "Transferido",
+  roubado_furtado: "Roubado/Furtado", leiloado: "Leiloado",
+};
+
+const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
 
 interface DocRow { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; status: string; }
 
@@ -40,8 +53,10 @@ export default function Vehicles() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("vehicles:view") as "grid" | "list") || "grid");
+  const [tab, setTab] = useState<string>(() => localStorage.getItem("vehicles:tab") || "ativos");
 
   useEffect(() => { localStorage.setItem("vehicles:view", view); }, [view]);
+  useEffect(() => { localStorage.setItem("vehicles:tab", tab); }, [tab]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -76,12 +91,27 @@ export default function Vehicles() {
     load();
   };
 
-  const filtered = items.filter((v) => {
+  const byTab = items.filter((v) => {
+    if (tab === "todos") return true;
+    if (tab === "ativos") return v.status === "ativo" || v.status === "manutencao";
+    if (tab === "vendidos") return v.status === "vendido";
+    if (tab === "inativos") return INACTIVE_STATUSES.includes(v.status);
+    return true;
+  });
+
+  const filtered = byTab.filter((v) => {
     const needle = q.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!needle) return true;
     const hay = [v.plate, v.brand, v.model, v.owner_name].filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9 ]/g, "");
     return hay.includes(needle) || hay.replace(/\s+/g, "").includes(needle);
   });
+
+  const counts = {
+    ativos: items.filter(v => v.status === "ativo" || v.status === "manutencao").length,
+    vendidos: items.filter(v => v.status === "vendido").length,
+    inativos: items.filter(v => INACTIVE_STATUSES.includes(v.status)).length,
+    todos: items.length,
+  };
 
   const currentYear = new Date().getFullYear();
   const findCrlv = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "crlv" && d.file_url);
@@ -108,6 +138,14 @@ export default function Vehicles() {
       </div>
 
       <div className="surface-card rounded-xl p-4">
+        <Tabs value={tab} onValueChange={setTab} className="mb-4">
+          <TabsList className="grid grid-cols-4 w-full sm:w-auto sm:inline-grid">
+            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
+            <TabsTrigger value="vendidos">Vendidos · {counts.vendidos}</TabsTrigger>
+            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
+            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -157,7 +195,7 @@ export default function Vehicles() {
                     <Truck className="h-12 w-12 opacity-40" />
                   </div>
                 )}
-                <Badge className={`absolute top-3 right-3 capitalize border ${statusTone[v.status] ?? ""}`}>{v.status}</Badge>
+                <Badge className={`absolute top-3 right-3 border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
               </div>
               <div className="p-4 space-y-3">
                 <div>
@@ -252,7 +290,7 @@ export default function Vehicles() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge className={`capitalize border ${statusTone[v.status] ?? ""}`}>{v.status}</Badge>
+                        <Badge className={`border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>

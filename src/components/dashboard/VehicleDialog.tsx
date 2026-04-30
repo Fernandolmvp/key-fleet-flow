@@ -10,7 +10,19 @@ import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
-const STATUSES = ["ativo","manutencao","vendido","parado","sinistrado"];
+const STATUSES = [
+  { value: "ativo", label: "Ativo" },
+  { value: "manutencao", label: "Em manutenção" },
+  { value: "parado", label: "Parado" },
+  { value: "vendido", label: "Vendido" },
+  { value: "sinistrado", label: "Sinistrado" },
+  { value: "inativo", label: "Inativo (outros)" },
+  { value: "transferido", label: "Transferido" },
+  { value: "roubado_furtado", label: "Roubado / Furtado" },
+  { value: "leiloado", label: "Leiloado" },
+];
+const SOLD_STATUS = "vendido";
+const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
 
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
@@ -43,6 +55,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
     fipe_value: "", photos: [] as string[],
     licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
+    inactivated_at: "", inactive_reason: "",
+    sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
   });
 
   useEffect(() => {
@@ -54,6 +68,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
       fipe_value: "", photos: [],
       licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
+      inactivated_at: "", inactive_reason: "",
+      sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
     });
     setArchivedDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +143,12 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       owner_name: form.owner_name || null,
       owner_doc: form.owner_doc || null,
       crlv_city: form.crlv_city || null,
+      inactivated_at: form.inactivated_at || null,
+      inactive_reason: form.inactive_reason || null,
+      sale_date: form.sale_date || null,
+      sale_value: form.sale_value ? Number(form.sale_value) : null,
+      buyer_name: form.buyer_name || null,
+      buyer_doc: form.buyer_doc || null,
     };
     delete payload.id;
     const op = isEdit
@@ -225,7 +247,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
+              <SelectContent>{STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2"><Label>Responsável</Label><Input value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} /></div>
@@ -243,6 +265,29 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
             <p className="text-[11px] text-muted-foreground">Se igual ao ano atual, o veículo é considerado licenciado.</p>
           </div>
         </div>
+
+        {form.status === SOLD_STATUS && (
+          <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+            <p className="text-sm font-semibold">Dados da venda</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Data da venda</Label><Input type="date" value={form.sale_date} onChange={(e) => setForm({ ...form, sale_date: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Valor da venda (R$)</Label><Input type="number" step="0.01" value={form.sale_value} onChange={(e) => setForm({ ...form, sale_value: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Comprador</Label><Input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} /></div>
+              <div className="space-y-2"><Label>CPF/CNPJ comprador</Label><Input value={form.buyer_doc} onChange={(e) => setForm({ ...form, buyer_doc: e.target.value.replace(/\D/g, "") })} placeholder="Somente números" /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Observações</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Notas sobre a venda" /></div>
+            </div>
+          </div>
+        )}
+
+        {INACTIVE_STATUSES.includes(form.status) && (
+          <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+            <p className="text-sm font-semibold">Dados da inativação</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
+              <div className="space-y-2 sm:col-span-1"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex: BO de furto, transferência para filial X..." /></div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>Fotos do veículo</Label>

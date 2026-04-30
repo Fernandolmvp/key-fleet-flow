@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -22,7 +23,17 @@ interface Driver {
 
 interface DriverDoc { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; }
 
-const STATUSES = ["ativo","inativo","ferias","afastado"];
+const STATUSES = [
+  { value: "ativo", label: "Ativo" },
+  { value: "ferias", label: "Férias" },
+  { value: "afastado", label: "Afastado" },
+  { value: "licenca_medica", label: "Licença médica" },
+  { value: "suspenso", label: "Suspenso" },
+  { value: "desligado", label: "Desligado" },
+  { value: "inativo", label: "Inativo (outros)" },
+];
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(STATUSES.map(s => [s.value, s.label]));
+const INACTIVE_STATUSES = ["desligado","inativo","suspenso","licenca_medica","afastado"];
 
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
@@ -42,7 +53,7 @@ export default function Drivers() {
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
-    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "" };
+    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "" };
   }
 
   const load = async () => {
@@ -147,6 +158,9 @@ export default function Drivers() {
       cnh_expires_at: form.cnh_expires_at || null,
       medical_exam_expires_at: form.medical_exam_expires_at || null,
       birth_date: form.birth_date || null,
+      inactivated_at: form.inactivated_at || null,
+      termination_date: form.termination_date || null,
+      inactive_reason: form.inactive_reason || null,
       user_id: form.user_id || null,
       manager_user_id: form.manager_user_id || null,
       auto_fuel_authorized: !!form.auto_fuel_authorized,
@@ -189,9 +203,25 @@ export default function Drivers() {
     toast.success("Motorista removido"); load();
   };
 
-  const filtered = items.filter((d) =>
+  const [tab, setTab] = useState<string>(() => localStorage.getItem("drivers:tab") || "ativos");
+  useEffect(() => { localStorage.setItem("drivers:tab", tab); }, [tab]);
+
+  const byTab = items.filter((d) => {
+    if (tab === "todos") return true;
+    if (tab === "ativos") return d.status === "ativo" || d.status === "ferias";
+    if (tab === "desligados") return d.status === "desligado";
+    if (tab === "inativos") return INACTIVE_STATUSES.includes(d.status);
+    return true;
+  });
+  const filtered = byTab.filter((d) =>
     [d.full_name, d.cpf, d.cnh_number].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase())
   );
+  const counts = {
+    ativos: items.filter(d => d.status === "ativo" || d.status === "ferias").length,
+    desligados: items.filter(d => d.status === "desligado").length,
+    inativos: items.filter(d => INACTIVE_STATUSES.includes(d.status)).length,
+    todos: items.length,
+  };
 
   type CnhStatus = { kind: "vencida" | "vencendo" | "valida" | "sem_data"; days: number | null; label: string };
   const cnhStatus = (date: string | null): CnhStatus => {
@@ -219,6 +249,14 @@ export default function Drivers() {
       </div>
 
       <div className="surface-card rounded-xl p-4">
+        <Tabs value={tab} onValueChange={setTab} className="mb-4">
+          <TabsList className="grid grid-cols-4 w-full sm:w-auto sm:inline-grid">
+            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
+            <TabsTrigger value="desligados">Desligados · {counts.desligados}</TabsTrigger>
+            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
+            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -257,7 +295,7 @@ export default function Drivers() {
                     <h3 className="font-semibold truncate">{d.full_name}</h3>
                     <p className="text-xs text-muted-foreground">CPF: {d.cpf ?? "—"}</p>
                     <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="secondary" className="capitalize text-xs">{d.status}</Badge>
+                      <Badge variant="secondary" className="text-xs">{STATUS_LABEL[d.status] ?? d.status}</Badge>
                       {d.cnh_category && <Badge variant="outline" className="text-xs font-mono">CNH {d.cnh_category}</Badge>}
                     </div>
                   </div>
@@ -353,7 +391,7 @@ export default function Drivers() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="secondary" className="capitalize text-xs">{d.status}</Badge>
+                        <Badge variant="secondary" className="text-xs">{STATUS_LABEL[d.status] ?? d.status}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
@@ -432,7 +470,7 @@ export default function Drivers() {
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>CNH número</Label><Input value={form.cnh_number} onChange={(e) => setForm({ ...form, cnh_number: e.target.value })} /></div>
@@ -441,6 +479,19 @@ export default function Drivers() {
             <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
             <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+
+            {INACTIVE_STATUSES.includes(form.status) && (
+              <div className="sm:col-span-2 rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+                <p className="text-sm font-semibold">Dados da inativação</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {form.status === "desligado" && (
+                    <div className="space-y-2"><Label>Data de desligamento</Label><Input type="date" value={form.termination_date} onChange={(e) => setForm({ ...form, termination_date: e.target.value })} /></div>
+                  )}
+                  <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex.: pedido de demissão, atestado de 90 dias, suspensão CNH..." /></div>
+                </div>
+              </div>
+            )}
 
             <div className="sm:col-span-2 mt-2 rounded-xl border border-border p-4 space-y-4 bg-muted/20">
               <div className="flex items-center justify-between">
