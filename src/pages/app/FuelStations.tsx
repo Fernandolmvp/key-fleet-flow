@@ -9,12 +9,14 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Station {
   id: string; name: string; cnpj: string | null; brand: string | null;
   address: string | null; city: string | null; state: string | null;
   phone: string | null; contact_name: string | null; fuel_types: string[];
   notes: string | null; active: boolean;
+  inactivated_at: string | null; inactive_reason: string | null;
 }
 
 const FUEL_TYPES = ["gasolina", "etanol", "diesel_s10", "diesel_s500", "gnv", "flex"];
@@ -22,6 +24,7 @@ const FUEL_TYPES = ["gasolina", "etanol", "diesel_s10", "diesel_s500", "gnv", "f
 const blank = () => ({
   name: "", cnpj: "", brand: "", address: "", city: "", state: "",
   phone: "", contact_name: "", fuel_types: [] as string[], notes: "", active: true,
+  inactivated_at: "", inactive_reason: "",
 });
 
 export default function FuelStations() {
@@ -32,6 +35,8 @@ export default function FuelStations() {
   const [editing, setEditing] = useState<Station | null>(null);
   const [form, setForm] = useState<any>(blank());
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<string>(() => localStorage.getItem("stations:tab") || "ativos");
+  useEffect(() => { localStorage.setItem("stations:tab", tab); }, [tab]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -68,6 +73,8 @@ export default function FuelStations() {
       company_id: currentCompanyId,
       cnpj: form.cnpj || null,
       state: form.state ? form.state.toUpperCase() : null,
+      inactivated_at: form.inactivated_at || null,
+      inactive_reason: form.inactive_reason || null,
     };
     if (!editing) payload.created_by = user?.id;
     delete payload.id; delete payload.created_at; delete payload.updated_at;
@@ -88,7 +95,17 @@ export default function FuelStations() {
     toast.success("Posto excluído"); load();
   };
 
-  const filtered = items.filter((s) => {
+  const byTab = items.filter((s) => {
+    if (tab === "ativos") return s.active;
+    if (tab === "inativos") return !s.active;
+    return true;
+  });
+  const counts = {
+    ativos: items.filter(s => s.active).length,
+    inativos: items.filter(s => !s.active).length,
+    todos: items.length,
+  };
+  const filtered = byTab.filter((s) => {
     if (!q) return true;
     const t = q.toLowerCase();
     return (s.name + " " + (s.cnpj ?? "") + " " + (s.city ?? "") + " " + (s.brand ?? "")).toLowerCase().includes(t);
@@ -106,9 +123,18 @@ export default function FuelStations() {
         </Button>
       </div>
 
-      <div className="surface-card rounded-xl p-4 flex items-center gap-3">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nome, CNPJ, cidade ou bandeira" value={q} onChange={(e) => setQ(e.target.value)} className="border-0 bg-transparent focus-visible:ring-0" />
+      <div className="surface-card rounded-xl p-4 space-y-4">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="grid grid-cols-3 w-full sm:w-auto sm:inline-grid">
+            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
+            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
+            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-3">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nome, CNPJ, cidade ou bandeira" value={q} onChange={(e) => setQ(e.target.value)} className="border-0 bg-transparent focus-visible:ring-0" />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
