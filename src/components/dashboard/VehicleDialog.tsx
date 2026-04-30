@@ -289,8 +289,42 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           notes: form.inactive_notes || null,
           occurred_at: form.inactivated_at || new Date().toISOString().slice(0, 10),
           created_by: user?.id ?? null,
-          metadata: { status: finalStatus },
+          metadata: {
+            status: finalStatus,
+            snapshot: {
+              current_km: payload.current_km,
+              fuel_type: payload.fuel_type,
+              tank_capacity: payload.tank_capacity,
+              vehicle_type: payload.vehicle_type,
+              color: payload.color,
+              responsible: payload.responsible,
+              insurer: payload.insurer,
+              insurance_policy: payload.insurance_policy,
+              insurance_expires_at: payload.insurance_expires_at,
+              fipe_value: payload.fipe_value,
+              licensing_year: payload.licensing_year,
+              owner_name: payload.owner_name,
+              owner_doc: payload.owner_doc,
+              crlv_city: payload.crlv_city,
+              crlv_issue_date: payload.crlv_issue_date,
+              notes: payload.notes,
+            },
+          },
         });
+
+        // Zera campos operacionais — mantém apenas identificação básica + dados de inativação
+        const resetPayload: any = {
+          responsible: null,
+          insurer: null,
+          insurance_policy: null,
+          insurance_expires_at: null,
+          fipe_value: null,
+          licensing_year: null,
+          notes: null,
+        };
+        const { error: resetErr } = await supabase
+          .from("vehicles").update(resetPayload).eq("id", vehicleId);
+        if (resetErr) console.warn("vehicle reset on inactivation failed:", resetErr.message);
       }
 
       // Reativação
