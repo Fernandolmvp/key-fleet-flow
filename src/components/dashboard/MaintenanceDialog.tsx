@@ -39,7 +39,7 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
     if (!open || !currentCompanyId) return;
     (async () => {
       const [{ data: v }, { data: d }] = await Promise.all([
-        supabase.from("vehicles").select("id,plate,brand,model,current_km").eq("company_id", currentCompanyId).order("plate"),
+        supabase.from("vehicles").select("id,plate,brand,model,current_km").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
         supabase.from("drivers").select("id,full_name").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
       ]);
       setVehicles(v ?? []); setDrivers(d ?? []);
