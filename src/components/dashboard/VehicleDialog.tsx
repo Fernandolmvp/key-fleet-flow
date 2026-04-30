@@ -323,9 +323,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       const { data: { user } } = await supabase.auth.getUser();
       const movs: any[] = [];
 
-      // Venda: registra se houve dados de venda novos OU mudou para vendido agora
+      // Venda: registra quando a aba de venda é salva com dados preenchidos
       const becameSold = finalStatus === SOLD_STATUS && prevStatus !== SOLD_STATUS;
-      if (becameSold || (hasSaleData && !isEdit)) {
+      const shouldRegisterSale = activeTab === "venda" && hasSaleData;
+      if (shouldRegisterSale || (becameSold && !shouldRegisterSale) || (hasSaleData && !isEdit)) {
         movs.push({
           company_id: currentCompanyId,
           vehicle_id: vehicleId,
@@ -343,9 +344,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
         });
       }
 
-      // Inativação: registra se o status passou a ser inativo agora
+      // Inativação: registra sempre que houver lançamento salvo nesta aba
       const becameInactive = INACTIVE_STATUSES.includes(finalStatus) && !INACTIVE_STATUSES.includes(prevStatus ?? "");
-      if (becameInactive) {
+      const shouldRegisterInactive = activeTab === "inativacao" && hasInactiveLaunch;
+      if (becameInactive || shouldRegisterInactive) {
         movs.push({
           company_id: currentCompanyId,
           vehicle_id: vehicleId,
@@ -408,7 +410,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     toast.success(isEdit ? "Veículo atualizado" : "Veículo cadastrado");
     onSaved();
     // Se houve inativação, mantém o diálogo aberto e mostra o histórico
-    const becameInactiveNow = INACTIVE_STATUSES.includes(finalStatus) && !INACTIVE_STATUSES.includes(prevStatus ?? "");
+    const becameInactiveNow = activeTab === "inativacao" && hasInactiveLaunch;
     if (becameInactiveNow && vehicleId) {
       await loadMovements();
       setActiveTab("movimentacoes");
