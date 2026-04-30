@@ -188,6 +188,7 @@ export default function Vehicles() {
             const insured = isInsured(v);
             const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
             const insuranceUrl = insurance?.file_url || null;
+            const isSold = tab === "vendidos" || v.status === "vendido";
             return (
             <div key={v.id} className="surface-card rounded-xl overflow-hidden hover:border-primary/40 transition-colors group">
               <div className="aspect-video bg-muted/30 relative">
@@ -207,40 +208,63 @@ export default function Vehicles() {
                   {v.owner_name && <div className="text-xs text-muted-foreground mt-0.5 truncate">Prop.: {v.owner_name}</div>}
                 </div>
 
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
-                    {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                    {licensed ? `Licenciado ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exercício"}
-                  </Badge>
-                  <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
-                    {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
-                    {insured ? "Segurado" : "Sem seguro"}
-                  </Badge>
-                </div>
+                {isSold ? (
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Comprador:</span>
+                      <span className="font-medium text-foreground truncate">{v.buyer_name || "—"}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Valor:</span>
+                      <span className="font-mono text-foreground">
+                        {v.sale_value != null ? v.sale_value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
+                      </span>
+                    </div>
+                    {v.sale_date && (
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Data:</span>
+                        <span className="text-foreground">{new Date(v.sale_date).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
+                      {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                      {licensed ? `Licenciado ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exercício"}
+                    </Badge>
+                    <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
+                      {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+                      {insured ? "Segurado" : "Sem seguro"}
+                    </Badge>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>KM: <span className="font-mono text-foreground">{v.current_km.toLocaleString("pt-BR")}</span></span>
                   <span className="capitalize">{v.fuel_type ?? "—"}</span>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm" variant="outline" className="flex-1 min-w-[120px]"
-                    disabled={!crlvUrl}
-                    onClick={() => crlvUrl && window.open(crlvUrl, "_blank")}
-                    title={crlvUrl ? "Abrir CRLV anexado" : "Nenhum CRLV anexado"}
-                  >
-                    <FileText className="h-3.5 w-3.5 mr-1" /> {crlvUrl ? "Ver CRLV" : "Sem CRLV"}
-                  </Button>
-                  <Button
-                    size="sm" variant="outline" className="flex-1 min-w-[120px]"
-                    disabled={!insuranceUrl}
-                    onClick={() => insuranceUrl && window.open(insuranceUrl, "_blank")}
-                    title={insuranceUrl ? "Abrir apólice anexada" : "Nenhuma apólice anexada em Documentação"}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5 mr-1" /> {insuranceUrl ? "Ver apólice" : "Sem apólice"}
-                  </Button>
-                </div>
+                {!isSold && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm" variant="outline" className="flex-1 min-w-[120px]"
+                      disabled={!crlvUrl}
+                      onClick={() => crlvUrl && window.open(crlvUrl, "_blank")}
+                      title={crlvUrl ? "Abrir CRLV anexado" : "Nenhum CRLV anexado"}
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1" /> {crlvUrl ? "Ver CRLV" : "Sem CRLV"}
+                    </Button>
+                    <Button
+                      size="sm" variant="outline" className="flex-1 min-w-[120px]"
+                      disabled={!insuranceUrl}
+                      onClick={() => insuranceUrl && window.open(insuranceUrl, "_blank")}
+                      title={insuranceUrl ? "Abrir apólice anexada" : "Nenhuma apólice anexada em Documentação"}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 mr-1" /> {insuranceUrl ? "Ver apólice" : "Sem apólice"}
+                    </Button>
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-2 border-t border-border">
                   <Button size="sm" variant="ghost" className="flex-1" onClick={() => { setEditing(v as any); setOpen(true); }}>
@@ -262,9 +286,19 @@ export default function Vehicles() {
               <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="text-left px-4 py-3">Veículo</th>
+                  <th className="text-left px-4 py-3">Proprietário</th>
                   <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-left px-4 py-3">Licenciamento</th>
-                  <th className="text-left px-4 py-3">Seguro</th>
+                  {tab === "vendidos" ? (
+                    <>
+                      <th className="text-left px-4 py-3">Comprador</th>
+                      <th className="text-left px-4 py-3">Valor venda</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="text-left px-4 py-3">Licenciamento</th>
+                      <th className="text-left px-4 py-3">Seguro</th>
+                    </>
+                  )}
                   <th className="text-left px-4 py-3">KM</th>
                   <th className="text-right px-4 py-3">Ações</th>
                 </tr>
@@ -277,6 +311,7 @@ export default function Vehicles() {
                   const insured = isInsured(v);
                   const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
                   const insuranceUrl = insurance?.file_url || null;
+                  const isSold = tab === "vendidos" || v.status === "vendido";
                   return (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/20">
                       <td className="px-4 py-3">
@@ -293,20 +328,34 @@ export default function Vehicles() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
+                        <span className="text-xs text-foreground truncate">{v.owner_name || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
                         <Badge className={`border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
                       </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
-                          {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                          {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exerc."}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
-                          {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
-                          {insured ? "Segurado" : "Sem seguro"}
-                        </Badge>
-                      </td>
+                      {isSold ? (
+                        <>
+                          <td className="px-4 py-3 text-xs">{v.buyer_name || "—"}</td>
+                          <td className="px-4 py-3 font-mono text-xs">
+                            {v.sale_value != null ? v.sale_value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
+                              {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                              {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exerc."}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
+                              {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+                              {insured ? "Segurado" : "Sem seguro"}
+                            </Badge>
+                          </td>
+                        </>
+                      )}
                       <td className="px-4 py-3 font-mono text-xs">{v.current_km.toLocaleString("pt-BR")}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
