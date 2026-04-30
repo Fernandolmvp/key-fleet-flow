@@ -56,7 +56,7 @@ const EMPTY_FORM = {
   plate: "", renavam: "", chassis: "", brand: "", model: "",
   year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
   tank_capacity: "", vehicle_type: "", current_km: 0, status: "ativo",
-  responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "",
+  responsible: "", insurer: "", insurance_policy: "", insurance_expires_at: "", insurance_responsible: "",
   fipe_value: "", photos: [] as string[], documents: [] as string[],
   licensing_year: "", owner_name: "", owner_doc: "", crlv_issue_date: "", crlv_city: "",
   inactivated_at: "", inactive_reason: "", inactive_notes: "", notes: "",
@@ -413,6 +413,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       insurer: form.insurer || null,
       insurance_policy: form.insurance_policy || null,
       insurance_expires_at: form.insurance_expires_at || null,
+      insurance_responsible: form.insurance_responsible || null,
       fipe_value: form.fipe_value ? Number(form.fipe_value) : null,
       photos: form.photos ?? [],
       documents: form.documents ?? [],
@@ -674,9 +675,22 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
             </Select>
           </div>
           <div className="space-y-2"><Label>Responsável</Label><Input value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Seguradora</Label><Input value={form.insurer} onChange={(e) => setForm({ ...form, insurer: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Apólice</Label><Input value={form.insurance_policy} onChange={(e) => setForm({ ...form, insurance_policy: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Vencimento seguro</Label><Input type="date" value={form.insurance_expires_at} onChange={(e) => setForm({ ...form, insurance_expires_at: e.target.value })} /></div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1">Seguradora <span className="text-[10px] text-muted-foreground font-normal">(auto via apólice)</span></Label>
+            <Input value={form.insurer} onChange={(e) => setForm({ ...form, insurer: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1">Apólice <span className="text-[10px] text-muted-foreground font-normal">(auto via apólice)</span></Label>
+            <Input value={form.insurance_policy} onChange={(e) => setForm({ ...form, insurance_policy: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1">Vencimento seguro <span className="text-[10px] text-muted-foreground font-normal">(auto via apólice)</span></Label>
+            <Input type="date" value={form.insurance_expires_at} onChange={(e) => setForm({ ...form, insurance_expires_at: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1">Responsável (corretor) <span className="text-[10px] text-muted-foreground font-normal">(auto via apólice)</span></Label>
+            <Input value={form.insurance_responsible} onChange={(e) => setForm({ ...form, insurance_responsible: e.target.value })} placeholder="Corretor responsável" />
+          </div>
           <div className="space-y-2"><Label>Valor FIPE (R$)</Label><Input type="number" step="0.01" value={form.fipe_value} onChange={(e) => setForm({ ...form, fipe_value: e.target.value })} /></div>
           <div className="space-y-2"><Label>Proprietário (CRLV)</Label><Input value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} placeholder="Nome conforme CRLV" /></div>
           <div className="space-y-2"><Label>CPF / CNPJ do proprietário</Label><Input value={form.owner_doc} onChange={(e) => setForm({ ...form, owner_doc: e.target.value.replace(/\D/g, "") })} placeholder="Somente números" /></div>

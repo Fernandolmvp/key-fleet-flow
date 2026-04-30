@@ -44,6 +44,53 @@ type Link = {
 
 const emptyPolicy: Partial<Policy> = { status: "ativa" };
 
+/**
+ * Sincroniza os campos de seguro no cadastro do veículo a partir das apólices
+ * vinculadas a ele (insurer, insurance_policy, insurance_expires_at, insurance_responsible).
+ * Escolhe a apólice ATIVA com a maior data de fim. Se não houver apólice ativa,
+ * limpa os campos do veículo.
+ */
+async function syncVehicleInsuranceFields(companyId: string, vehicleIds: string[]) {
+  if (!companyId || !vehicleIds.length) return;
+  const ids = Array.from(new Set(vehicleIds.filter(Boolean)));
+
+  const { data: links } = await supabase
+    .from("insurance_policy_vehicles")
+    .select("vehicle_id, removed_at, policy:insurance_policies(id,policy_number,insurer_name,end_date,status,broker_id)")
+    .eq("company_id", companyId)
+    .in("vehicle_id", ids);
+
+  // brokers cache
+  const brokerIds = Array.from(new Set(((links ?? []) as any[])
+    .map((l) => l.policy?.broker_id).filter(Boolean)));
+  let brokersById: Record<string, string> = {};
+  if (brokerIds.length) {
+    const { data: bs } = await supabase
+      .from("insurance_brokers").select("id,name").in("id", brokerIds);
+    brokersById = Object.fromEntries((bs ?? []).map((b: any) => [b.id, b.name]));
+  }
+
+  for (const vid of ids) {
+    const pols = ((links ?? []) as any[])
+      .filter((l) => l.vehicle_id === vid && !l.removed_at && l.policy && l.policy.status === "ativa")
+      .map((l) => l.policy)
+      .sort((a, b) => (b?.end_date || "").localeCompare(a?.end_date || ""));
+    const best = pols[0];
+    const update: any = best ? {
+      insurer: best.insurer_name || null,
+      insurance_policy: best.policy_number || null,
+      insurance_expires_at: best.end_date || null,
+      insurance_responsible: best.broker_id ? (brokersById[best.broker_id] || null) : null,
+    } : {
+      insurer: null,
+      insurance_policy: null,
+      insurance_expires_at: null,
+      insurance_responsible: null,
+    };
+    await supabase.from("vehicles").update(update).eq("id", vid);
+  }
+}
+
 export default function InsurancePanel() {
   const { currentCompanyId } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -202,12 +249,21 @@ export default function InsurancePanel() {
           inclusion_type: "apolice" as const,
         }));
         await supabase.from("insurance_policy_vehicles").upsert(rows, { onConflict: "policy_id,vehicle_id", ignoreDuplicates: true });
+        await syncVehicleInsuranceFields(currentCompanyId, matches.map((m) => m.id));
         toast.success(`${matches.length} veículo(s) vinculado(s) à apólice`);
       }
       const notFound = aiPlates.filter((p) => !vehicles.some((v) => v.plate.toUpperCase() === p));
       if (notFound.length) {
         toast.warning(`${notFound.length} placa(s) da apólice não estão cadastradas: ${notFound.join(", ")}`);
       }
+    }
+    // Se a apólice já existia (edição), ressincroniza todos os veículos vinculados
+    if (form.id && policyId) {
+      const { data: existing } = await supabase
+        .from("insurance_policy_vehicles").select("vehicle_id")
+        .eq("policy_id", policyId);
+      const vIds = (existing ?? []).map((x: any) => x.vehicle_id);
+      if (vIds.length) await syncVehicleInsuranceFields(currentCompanyId, vIds);
     }
     toast.success("Apólice salva");
     setPolicyDialog(false);
@@ -217,8 +273,13 @@ export default function InsurancePanel() {
 
   async function removePolicy(id: string) {
     if (!confirm("Excluir esta apólice e todos os vínculos?")) return;
+    // captura os veículos antes da exclusão para ressincronizar
+    const { data: existing } = await supabase
+      .from("insurance_policy_vehicles").select("vehicle_id").eq("policy_id", id);
+    const vIds = (existing ?? []).map((x: any) => x.vehicle_id);
     const r = await supabase.from("insurance_policies").delete().eq("id", id);
     if (r.error) { toast.error(r.error.message); return; }
+    if (currentCompanyId && vIds.length) await syncVehicleInsuranceFields(currentCompanyId, vIds);
     toast.success("Excluída");
     if (selectedPolicyId === id) setSelectedPolicyId(null);
     load();
@@ -233,13 +294,19 @@ export default function InsurancePanel() {
       inclusion_type: type,
     });
     if (r.error) { toast.error(r.error.message); return; }
+    await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
     toast.success(type === "adendo" ? "Adendo registrado" : "Veículo incluído");
     load();
   }
 
   async function unlinkVehicle(linkId: string) {
+    // capturar vehicle_id antes
+    const { data: link } = await supabase
+      .from("insurance_policy_vehicles").select("vehicle_id").eq("id", linkId).maybeSingle();
+    const vehicleId = (link as any)?.vehicle_id;
     const r = await supabase.from("insurance_policy_vehicles").delete().eq("id", linkId);
     if (r.error) { toast.error(r.error.message); return; }
+    if (currentCompanyId && vehicleId) await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
     toast.success("Vínculo removido");
     load();
   }
