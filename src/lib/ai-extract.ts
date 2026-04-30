@@ -32,7 +32,22 @@ export async function extractDocument(opts: {
   const { data: result, error } = await supabase.functions.invoke("extract-document", {
     body: { type, fileBase64: base64, mimeType: file.type || "application/octet-stream" },
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Tenta extrair a mensagem real do corpo da resposta (FunctionsHttpError esconde 4xx/5xx)
+    let msg = error.message || "Falha ao processar documento";
+    try {
+      const ctx: any = (error as any).context;
+      if (ctx?.json) {
+        const body = await ctx.json();
+        if (body?.error) msg = body.error;
+      } else if (ctx?.text) {
+        const txt = await ctx.text();
+        try { const j = JSON.parse(txt); if (j?.error) msg = j.error; } catch { /* keep msg */ }
+      }
+    } catch { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (result?.error) throw new Error(result.error);
   if (!result?.data) throw new Error("Sem dados extraídos");
 
   // 2) Arquivar arquivo (opcional)
