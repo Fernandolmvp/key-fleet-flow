@@ -21,6 +21,7 @@ interface Driver {
   cnh_number: string | null; cnh_category: string | null; cnh_expires_at: string | null;
   medical_exam_expires_at: string | null; status: string; photo_url: string | null;
   user_id: string | null; auto_fuel_authorized: boolean | null; manager_user_id: string | null;
+  has_assigned_vehicle?: boolean | null; assigned_vehicle_id?: string | null;
 }
 
 interface DriverDoc { id: string; entity_id: string; doc_type: string; file_url: string | null; expires_at: string | null; }
@@ -58,6 +59,7 @@ export default function Drivers() {
   const [items, setItems] = useState<Driver[]>([]);
   const [docsByDriver, setDocsByDriver] = useState<Record<string, DriverDoc[]>>({});
   const [managers, setManagers] = useState<{ user_id: string; name: string }[]>([]);
+  const [vehicles, setVehicles] = useState<{ id: string; plate: string; brand: string | null; model: string | null }[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
@@ -71,7 +73,7 @@ export default function Drivers() {
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
-    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "" };
+    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "", has_assigned_vehicle: false, assigned_vehicle_id: "" };
   }
 
   const load = async () => {
@@ -107,6 +109,14 @@ export default function Drivers() {
     } else {
       setManagers([]);
     }
+
+    // Veículos ativos da empresa (sem inativados/vendidos) para vincular ao motorista
+    const { data: vs } = await supabase
+      .from("vehicles")
+      .select("id, plate, brand, model, status")
+      .eq("company_id", currentCompanyId)
+      .order("plate");
+    setVehicles(((vs ?? []) as any[]).filter((v) => !["vendido", "inativo"].includes(String(v.status ?? "").toLowerCase())));
   };
   useEffect(() => { load(); }, [currentCompanyId]);
 
@@ -182,6 +192,8 @@ export default function Drivers() {
       user_id: form.user_id || null,
       manager_user_id: form.manager_user_id || null,
       auto_fuel_authorized: !!form.auto_fuel_authorized,
+      has_assigned_vehicle: !!form.has_assigned_vehicle,
+      assigned_vehicle_id: form.has_assigned_vehicle && form.assigned_vehicle_id ? form.assigned_vehicle_id : null,
     };
     delete payload.id; delete payload.created_at; delete payload.updated_at;
     const op = editing
