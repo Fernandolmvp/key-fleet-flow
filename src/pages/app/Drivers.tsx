@@ -437,34 +437,6 @@ export default function Drivers() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-display text-2xl">{editing ? "Editar motorista" : "Novo motorista"}</DialogTitle></DialogHeader>
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-primary grid place-items-center shrink-0">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Preencher com IA</p>
-              <p className="text-xs text-muted-foreground">Envie a foto ou PDF da CNH — extraímos os dados e arquivamos.</p>
-            </div>
-            <label>
-              <Button type="button" size="sm" disabled={aiBusy} asChild className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow cursor-pointer">
-                <span>
-                  {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
-                  {aiBusy ? "Lendo..." : "Enviar CNH"}
-                </span>
-              </Button>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) aiFill(f); e.currentTarget.value = ""; }}
-              />
-            </label>
-          </div>
-          {archivedDoc && (
-            <a href={archivedDoc.url} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
-              <FileText className="h-3 w-3" /> CNH arquivada — será vinculada ao salvar
-            </a>
-          )}
           <Tabs defaultValue="dados" className="w-full">
             <TabsList className={`grid w-full ${editing ? "grid-cols-4" : "grid-cols-3"}`}>
               <TabsTrigger value="dados">Dados</TabsTrigger>
@@ -475,7 +447,35 @@ export default function Drivers() {
               {editing && <TabsTrigger value="historico">Histórico</TabsTrigger>}
             </TabsList>
 
-            <TabsContent value="dados" className="mt-4">
+            <TabsContent value="dados" className="mt-4 space-y-4">
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-gradient-primary grid place-items-center shrink-0">
+                  <Sparkles className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">Preencher com IA</p>
+                  <p className="text-xs text-muted-foreground">Envie a foto ou PDF da CNH — extraímos os dados e arquivamos.</p>
+                </div>
+                <label>
+                  <Button type="button" size="sm" disabled={aiBusy} asChild className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow cursor-pointer">
+                    <span>
+                      {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                      {aiBusy ? "Lendo..." : "Enviar CNH"}
+                    </span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) aiFill(f); e.currentTarget.value = ""; }}
+                  />
+                </label>
+              </div>
+              {archivedDoc && (
+                <a href={archivedDoc.url} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
+                  <FileText className="h-3 w-3" /> CNH arquivada — será vinculada ao salvar
+                </a>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2 space-y-2">
               <Label>Foto</Label>
