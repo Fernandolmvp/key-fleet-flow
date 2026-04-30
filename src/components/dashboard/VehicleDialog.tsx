@@ -152,8 +152,11 @@ const buildVehicleStateFromHistory = (rows: MovementRow[]) => {
     const historicalStatus = latestMovement.metadata?.status;
     return {
       status: INACTIVE_STATUSES.includes(historicalStatus) ? historicalStatus : "inativo",
-      notes: null,
+      notes: latestMovement.metadata?.general_notes ?? null,
       ...clearedState,
+      inactivated_at: latestMovement.metadata?.inactivated_at ?? latestMovement.occurred_at ?? null,
+      inactive_reason: latestMovement.metadata?.inactive_reason ?? latestMovement.reason ?? null,
+      inactive_notes: latestMovement.metadata?.inactive_notes ?? latestMovement.notes ?? null,
     };
   }
 
