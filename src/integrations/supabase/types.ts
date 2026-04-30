@@ -53,6 +53,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "audit_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
         ]
       }
       branches: {
@@ -90,6 +97,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -147,6 +161,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "company_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
         ]
       }
       cost_centers: {
@@ -187,6 +208,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_centers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -427,6 +455,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -698,6 +733,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
           },
           {
             foreignKeyName: "fuel_records_cost_center_id_fkey"
@@ -973,6 +1015,48 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          active: boolean
+          created_at: string
+          features: Json
+          id: string
+          is_custom: boolean
+          monthly_price: number | null
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+          vehicle_limit: number | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          features?: Json
+          id?: string
+          is_custom?: boolean
+          monthly_price?: number | null
+          name: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+          vehicle_limit?: number | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          features?: Json
+          id?: string
+          is_custom?: boolean
+          monthly_price?: number | null
+          name?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+          vehicle_limit?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1009,7 +1093,161 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_current_company_id_fkey"
+            columns: ["current_company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
         ]
+      }
+      subscription_payments: {
+        Row: {
+          amount: number
+          company_id: string
+          covers_period_end: string | null
+          covers_period_start: string | null
+          created_at: string
+          id: string
+          method: Database["public"]["Enums"]["sub_payment_method"]
+          notes: string | null
+          paid_at: string
+          receipt_url: string | null
+          recorded_by: string | null
+          reference: string | null
+          subscription_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          covers_period_end?: string | null
+          covers_period_start?: string | null
+          created_at?: string
+          id?: string
+          method?: Database["public"]["Enums"]["sub_payment_method"]
+          notes?: string | null
+          paid_at?: string
+          receipt_url?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+          subscription_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          covers_period_end?: string | null
+          covers_period_start?: string | null
+          created_at?: string
+          id?: string
+          method?: Database["public"]["Enums"]["sub_payment_method"]
+          notes?: string | null
+          paid_at?: string
+          receipt_url?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          cancelled_at: string | null
+          company_id: string
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          custom_vehicle_limit: number | null
+          id: string
+          monthly_amount: number | null
+          notes: string | null
+          plan_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          suspended_at: string | null
+          suspended_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          company_id: string
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          custom_vehicle_limit?: number | null
+          id?: string
+          monthly_amount?: number | null
+          notes?: string | null
+          plan_id: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          suspended_at?: string | null
+          suspended_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          company_id?: string
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          custom_vehicle_limit?: number | null
+          id?: string
+          monthly_amount?: number | null
+          notes?: string | null
+          plan_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          suspended_at?: string | null
+          suspended_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["plan_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      super_admins: {
+        Row: {
+          created_at: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       tire_movements: {
         Row: {
@@ -1190,6 +1428,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -1432,6 +1677,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vehicles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "vehicles_cost_center_id_fkey"
             columns: ["cost_center_id"]
             isOneToOne: false
@@ -1442,7 +1694,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      company_usage: {
+        Row: {
+          cancelled_at: string | null
+          cnpj: string | null
+          company_created_at: string | null
+          company_id: string | null
+          company_name: string | null
+          current_period_end: string | null
+          drivers_count: number | null
+          last_payment_at: string | null
+          members_count: number | null
+          monthly_amount: number | null
+          plan_id: string | null
+          plan_name: string | null
+          plan_slug: string | null
+          subscription_id: string | null
+          subscription_status:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          suspended_at: string | null
+          vehicle_limit: number | null
+          vehicles_used: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       bootstrap_company: {
@@ -1454,6 +1730,10 @@ export type Database = {
         Returns: boolean
       }
       generate_fuel_auth_code: { Args: never; Returns: string }
+      get_company_vehicle_limit: {
+        Args: { _company_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _company_id: string
@@ -1466,6 +1746,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role:
@@ -1546,6 +1827,19 @@ export type Database = {
         | "faturado"
         | "outro"
       schedule_status: "pendente" | "proxima" | "vencida" | "concluida"
+      sub_payment_method:
+        | "pix"
+        | "boleto"
+        | "transferencia"
+        | "cartao"
+        | "dinheiro"
+        | "outro"
+      subscription_status:
+        | "aguardando_pagamento"
+        | "ativa"
+        | "atrasada"
+        | "suspensa"
+        | "cancelada"
       tire_kind: "novo" | "recapado" | "remold"
       tire_movement_type:
         | "instalacao"
@@ -1781,6 +2075,21 @@ export const Constants = {
         "outro",
       ],
       schedule_status: ["pendente", "proxima", "vencida", "concluida"],
+      sub_payment_method: [
+        "pix",
+        "boleto",
+        "transferencia",
+        "cartao",
+        "dinheiro",
+        "outro",
+      ],
+      subscription_status: [
+        "aguardando_pagamento",
+        "ativa",
+        "atrasada",
+        "suspensa",
+        "cancelada",
+      ],
       tire_kind: ["novo", "recapado", "remold"],
       tire_movement_type: [
         "instalacao",
