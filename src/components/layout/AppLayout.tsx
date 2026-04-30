@@ -4,13 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store, ClipboardCheck
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -22,6 +23,7 @@ const nav = [
   { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
   { to: "/app/tires", label: "Pneus", icon: CircleDot },
   { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents" },
+  { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
   { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
   { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true },
@@ -29,7 +31,7 @@ const nav = [
 ];
 
 export default function AppLayout() {
-  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly } = useAuth();
+  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin } = useAuth();
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
@@ -155,6 +157,11 @@ export default function AppLayout() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {isSuperAdmin && (
+                <DropdownMenuItem onClick={() => window.location.href = "/super-admin"}>
+                  <ShieldCheck className="h-4 w-4 mr-2" /> Painel Super Admin
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="h-4 w-4 mr-2" /> Sair
               </DropdownMenuItem>
@@ -162,6 +169,7 @@ export default function AppLayout() {
           </DropdownMenu>
         </header>
 
+        <SubscriptionBanner />
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
         </main>
