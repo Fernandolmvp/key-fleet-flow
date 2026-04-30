@@ -627,6 +627,12 @@ export default function Drivers() {
                 )}
               </div>
             </TabsContent>
+
+            {editing && currentCompanyId && (
+              <TabsContent value="historico" className="mt-4">
+                <DriverHistoryTab driverId={editing.id} companyId={currentCompanyId} driverStatus={editing.status} />
+              </TabsContent>
+            )}
           </Tabs>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
