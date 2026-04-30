@@ -295,7 +295,7 @@ export default function Drivers() {
                     <h3 className="font-semibold truncate">{d.full_name}</h3>
                     <p className="text-xs text-muted-foreground">CPF: {d.cpf ?? "—"}</p>
                     <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="secondary" className="capitalize text-xs">{d.status}</Badge>
+                      <Badge variant="secondary" className="text-xs">{STATUS_LABEL[d.status] ?? d.status}</Badge>
                       {d.cnh_category && <Badge variant="outline" className="text-xs font-mono">CNH {d.cnh_category}</Badge>}
                     </div>
                   </div>
@@ -391,7 +391,7 @@ export default function Drivers() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="secondary" className="capitalize text-xs">{d.status}</Badge>
+                        <Badge variant="secondary" className="text-xs">{STATUS_LABEL[d.status] ?? d.status}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
