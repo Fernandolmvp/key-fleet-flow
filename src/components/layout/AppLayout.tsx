@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -169,6 +170,7 @@ export default function AppLayout() {
           </DropdownMenu>
         </header>
 
+        <PaymentTestModeBanner />
         <SubscriptionBanner />
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
