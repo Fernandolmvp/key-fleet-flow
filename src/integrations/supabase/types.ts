@@ -1026,6 +1026,7 @@ export type Database = {
           name: string
           slug: string
           sort_order: number
+          stripe_price_id: string | null
           updated_at: string
           vehicle_limit: number | null
         }
@@ -1039,6 +1040,7 @@ export type Database = {
           name: string
           slug: string
           sort_order?: number
+          stripe_price_id?: string | null
           updated_at?: string
           vehicle_limit?: number | null
         }
@@ -1052,6 +1054,7 @@ export type Database = {
           name?: string
           slug?: string
           sort_order?: number
+          stripe_price_id?: string | null
           updated_at?: string
           vehicle_limit?: number | null
         }
@@ -1167,6 +1170,7 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          cancel_at_period_end: boolean
           cancelled_at: string | null
           company_id: string
           created_at: string
@@ -1174,15 +1178,20 @@ export type Database = {
           current_period_start: string
           custom_vehicle_limit: number | null
           id: string
+          last_payment_status: string | null
           monthly_amount: number | null
           notes: string | null
           plan_id: string
           status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_environment: string | null
+          stripe_subscription_id: string | null
           suspended_at: string | null
           suspended_reason: string | null
           updated_at: string
         }
         Insert: {
+          cancel_at_period_end?: boolean
           cancelled_at?: string | null
           company_id: string
           created_at?: string
@@ -1190,15 +1199,20 @@ export type Database = {
           current_period_start?: string
           custom_vehicle_limit?: number | null
           id?: string
+          last_payment_status?: string | null
           monthly_amount?: number | null
           notes?: string | null
           plan_id: string
           status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_environment?: string | null
+          stripe_subscription_id?: string | null
           suspended_at?: string | null
           suspended_reason?: string | null
           updated_at?: string
         }
         Update: {
+          cancel_at_period_end?: boolean
           cancelled_at?: string | null
           company_id?: string
           created_at?: string
@@ -1206,10 +1220,14 @@ export type Database = {
           current_period_start?: string
           custom_vehicle_limit?: number | null
           id?: string
+          last_payment_status?: string | null
           monthly_amount?: number | null
           notes?: string | null
           plan_id?: string
           status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_environment?: string | null
+          stripe_subscription_id?: string | null
           suspended_at?: string | null
           suspended_reason?: string | null
           updated_at?: string
@@ -1721,6 +1739,20 @@ export type Database = {
       }
     }
     Functions: {
+      apply_stripe_subscription: {
+        Args: {
+          _cancel_at_period_end: boolean
+          _company_id: string
+          _current_period_end: string
+          _current_period_start: string
+          _environment: string
+          _stripe_customer_id: string
+          _stripe_price_id: string
+          _stripe_status: string
+          _stripe_subscription_id: string
+        }
+        Returns: undefined
+      }
       bootstrap_company: {
         Args: { _company_name: string; _full_name: string }
         Returns: string
@@ -1748,6 +1780,16 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      record_stripe_payment: {
+        Args: {
+          _amount: number
+          _company_id: string
+          _paid_at: string
+          _stripe_invoice_id: string
+          _stripe_payment_intent_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:
