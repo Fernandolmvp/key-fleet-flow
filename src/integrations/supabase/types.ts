@@ -1223,6 +1223,45 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_movements: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json
+          movement_type: string
+          notes: string | null
+          occurred_at: string | null
+          reason: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          movement_type: string
+          notes?: string | null
+          occurred_at?: string | null
+          reason?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          movement_type?: string
+          notes?: string | null
+          occurred_at?: string | null
+          reason?: string | null
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
       vehicles: {
         Row: {
           branch_id: string | null

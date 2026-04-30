@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Sparkles, FileText } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, FileText, History } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
 const STATUSES = [
@@ -26,6 +26,30 @@ const STATUSES = [
 const SOLD_STATUS = "vendido";
 const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
+
+const INACTIVE_REASONS = [
+  { value: "sinistro_total", label: "Sinistro total" },
+  { value: "sinistro_parcial", label: "Sinistro parcial" },
+  { value: "roubo", label: "Roubo" },
+  { value: "furto", label: "Furto" },
+  { value: "transferencia", label: "Transferência interna" },
+  { value: "leilao", label: "Leilão" },
+  { value: "manutencao_prolongada", label: "Manutenção prolongada" },
+  { value: "fim_vida_util", label: "Fim de vida útil" },
+  { value: "documentacao_pendente", label: "Documentação pendente" },
+  { value: "judicial", label: "Bloqueio judicial" },
+  { value: "outros", label: "Outros" },
+];
+
+interface MovementRow {
+  id: string;
+  movement_type: string;
+  reason: string | null;
+  notes: string | null;
+  occurred_at: string | null;
+  created_at: string;
+  metadata: any;
+}
 
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
   const { currentCompanyId, refreshCompanies } = useAuth();
@@ -50,6 +74,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
   const [uploading, setUploading] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [archivedDoc, setArchivedDoc] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("dados");
+  const [movements, setMovements] = useState<MovementRow[]>([]);
   const [form, setForm] = useState<any>({
     plate: "", renavam: "", chassis: "", brand: "", model: "",
     year_manufacture: "", year_model: "", color: "", fuel_type: "flex",
@@ -78,8 +104,25 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
     });
     setArchivedDoc(null);
+    setActiveTab("dados");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle, open]);
+
+  const loadMovements = async () => {
+    if (!vehicle?.id) { setMovements([]); return; }
+    const { data } = await supabase
+      .from("vehicle_movements")
+      .select("id,movement_type,reason,notes,occurred_at,created_at,metadata")
+      .eq("vehicle_id", vehicle.id)
+      .order("created_at", { ascending: false });
+    setMovements((data ?? []) as MovementRow[]);
+  };
+
+  useEffect(() => {
+    if (open && vehicle?.id) loadMovements();
+    else setMovements([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, vehicle?.id]);
 
   const upload = async (file: File) => {
     if (!currentCompanyId) return;
@@ -134,8 +177,18 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
     if (!currentCompanyId) return toast.error("Selecione uma empresa");
     if (!form.plate.trim() || !form.brand.trim() || !form.model.trim()) return toast.error("Placa, marca e modelo são obrigatórios");
     setBusy(true);
+
+    // Auto-flag: se preencheu data de venda mas o status não foi alterado, marca como vendido.
+    const hasSaleData = !!(form.sale_date || form.sale_value || form.buyer_name);
+    const prevStatus = vehicle?.status ?? null;
+    let finalStatus = form.status;
+    if (hasSaleData && finalStatus !== SOLD_STATUS) {
+      finalStatus = SOLD_STATUS;
+    }
+
     const payload: any = {
       ...form,
+      status: finalStatus,
       company_id: currentCompanyId,
       plate: form.plate.toUpperCase().trim(),
       year_manufacture: form.year_manufacture ? Number(form.year_manufacture) : null,
@@ -172,8 +225,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       ? supabase.from("vehicles").update(payload).eq("id", vehicle.id)
       : supabase.from("vehicles").insert(payload).select("id").single();
     const { data: saved, error } = await (op as any);
-    setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { setBusy(false); return toast.error(error.message); }
 
     // Vincula CRLV anexado pela IA na tabela `documents`
     const vehicleId = isEdit ? vehicle.id : saved?.id;
@@ -201,6 +253,69 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       if (docErr) console.warn("vehicle CRLV archive failed:", docErr.message);
     }
 
+    // Movimentações automáticas
+    if (vehicleId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const movs: any[] = [];
+
+      // Venda: registra se houve dados de venda novos OU mudou para vendido agora
+      const becameSold = finalStatus === SOLD_STATUS && prevStatus !== SOLD_STATUS;
+      if (becameSold || (hasSaleData && !isEdit)) {
+        movs.push({
+          company_id: currentCompanyId,
+          vehicle_id: vehicleId,
+          movement_type: "venda",
+          reason: "Venda do veículo",
+          notes: form.sale_notes || null,
+          occurred_at: form.sale_date || new Date().toISOString().slice(0, 10),
+          created_by: user?.id ?? null,
+          metadata: {
+            buyer_name: form.buyer_name || null,
+            buyer_doc: form.buyer_doc || null,
+            sale_value: payload.sale_value,
+            payment_method: form.sale_payment_method || null,
+          },
+        });
+      }
+
+      // Inativação: registra se o status passou a ser inativo agora
+      const becameInactive = INACTIVE_STATUSES.includes(finalStatus) && !INACTIVE_STATUSES.includes(prevStatus ?? "");
+      if (becameInactive) {
+        movs.push({
+          company_id: currentCompanyId,
+          vehicle_id: vehicleId,
+          movement_type: "inativacao",
+          reason: form.inactive_reason || finalStatus,
+          notes: form.inactive_notes || null,
+          occurred_at: form.inactivated_at || new Date().toISOString().slice(0, 10),
+          created_by: user?.id ?? null,
+          metadata: { status: finalStatus },
+        });
+      }
+
+      // Reativação
+      const wasInactiveOrSold = INACTIVE_STATUSES.includes(prevStatus ?? "") || prevStatus === SOLD_STATUS;
+      const nowActive = finalStatus === "ativo" || finalStatus === "manutencao";
+      if (wasInactiveOrSold && nowActive) {
+        movs.push({
+          company_id: currentCompanyId,
+          vehicle_id: vehicleId,
+          movement_type: "reativacao",
+          reason: "Reativação do veículo",
+          notes: null,
+          occurred_at: new Date().toISOString().slice(0, 10),
+          created_by: user?.id ?? null,
+          metadata: { from: prevStatus, to: finalStatus },
+        });
+      }
+
+      if (movs.length) {
+        const { error: mErr } = await supabase.from("vehicle_movements").insert(movs);
+        if (mErr) console.warn("vehicle movement insert failed:", mErr.message);
+      }
+    }
+
+    setBusy(false);
     toast.success(isEdit ? "Veículo atualizado" : "Veículo cadastrado");
     onOpenChange(false); onSaved();
   };
@@ -212,6 +327,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           <DialogTitle className="font-display text-2xl">{isEdit ? "Editar veículo" : "Novo veículo"}</DialogTitle>
         </DialogHeader>
 
+        {activeTab === "dados" && (
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-gradient-primary grid place-items-center shrink-0">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
@@ -235,17 +351,19 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
             />
           </label>
         </div>
-        {archivedDoc && (
+        )}
+        {activeTab === "dados" && archivedDoc && (
           <a href={archivedDoc} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
             <FileText className="h-3 w-3" /> Documento arquivado
           </a>
         )}
 
-        <Tabs defaultValue="dados" className="mt-2">
-          <TabsList className="grid grid-cols-3 w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="venda">Venda</TabsTrigger>
             <TabsTrigger value="inativacao">Observações & Inativação</TabsTrigger>
+            <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dados" className="space-y-4 mt-4">
@@ -356,15 +474,59 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Data da inativação</Label><Input type="date" value={form.inactivated_at} onChange={(e) => setForm({ ...form, inactivated_at: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Motivo</Label><Input value={form.inactive_reason} onChange={(e) => setForm({ ...form, inactive_reason: e.target.value })} placeholder="Ex: BO de furto, transferência..." /></div>
+                <div className="space-y-2">
+                  <Label>Motivo</Label>
+                  <Select value={form.inactive_reason || ""} onValueChange={(v) => setForm({ ...form, inactive_reason: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                    <SelectContent>
+                      {INACTIVE_REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2"><Label>Detalhes da inativação</Label><Textarea rows={3} value={form.inactive_notes} onChange={(e) => setForm({ ...form, inactive_notes: e.target.value })} placeholder="Número do BO, processo, contraparte, anexos..." /></div>
+              <div className="space-y-2">
+                <Label>Observação (linha única)</Label>
+                <Input value={form.inactive_notes} onChange={(e) => setForm({ ...form, inactive_notes: e.target.value })} placeholder="Resumo curto — será adicionado ao histórico de movimentações" />
+              </div>
             </div>
 
             <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
               <p className="text-sm font-semibold">Observações gerais</p>
               <Textarea rows={5} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notas livres sobre o veículo, histórico, particularidades..." />
             </div>
+          </TabsContent>
+
+          <TabsContent value="movimentacoes" className="space-y-3 mt-4">
+            {!isEdit ? (
+              <div className="rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">
+                Salve o veículo primeiro para visualizar o histórico de movimentações.
+              </div>
+            ) : movements.length === 0 ? (
+              <div className="rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">
+                <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                Nenhuma movimentação registrada ainda.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {movements.map((m) => (
+                  <div key={m.id} className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold capitalize">{m.movement_type}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {m.occurred_at ? new Date(m.occurred_at).toLocaleDateString("pt-BR") : new Date(m.created_at).toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+                    {m.reason && <div className="text-xs text-muted-foreground mt-1">Motivo: {m.reason}</div>}
+                    {m.notes && <div className="text-xs mt-1">{m.notes}</div>}
+                    {m.metadata && Object.keys(m.metadata).length > 0 && (
+                      <div className="text-[11px] text-muted-foreground mt-1 font-mono">
+                        {Object.entries(m.metadata).filter(([,v]) => v != null && v !== "").map(([k,v]) => `${k}: ${v}`).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
