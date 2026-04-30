@@ -25,6 +25,7 @@ const STATUSES = [
 ];
 const SOLD_STATUS = "vendido";
 const INACTIVE_STATUSES = ["inativo","sinistrado","transferido","roubado_furtado","leiloado","parado"];
+const UNDOABLE_MOVEMENT_TYPES = ["venda", "inativacao"];
 const FUELS = ["gasolina","etanol","diesel","diesel_s10","flex","gnv","eletrico","hibrido"];
 
 const INACTIVE_REASONS = [
@@ -70,6 +71,102 @@ const buildFormState = (data?: any) => ({
   photos: data?.photos ?? [],
   documents: data?.documents ?? [],
 });
+
+const getMovementTimestamp = (movement: MovementRow) => {
+  if (movement.occurred_at) {
+    return new Date(`${movement.occurred_at}T23:59:59`).getTime();
+  }
+
+  return new Date(movement.created_at).getTime();
+};
+
+const sortMovementsChronologically = (rows: MovementRow[]) => (
+  [...rows].sort((a, b) => {
+    const timeDiff = getMovementTimestamp(b) - getMovementTimestamp(a);
+    if (timeDiff !== 0) return timeDiff;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  })
+);
+
+const getRevertedMovementIds = (rows: MovementRow[]) => (
+  new Set(
+    rows
+      .filter((movement) => movement.movement_type === "reversao")
+      .map((movement) => String(movement.metadata?.reverted_movement_id ?? ""))
+      .filter(Boolean)
+  )
+);
+
+const getEffectiveMovements = (rows: MovementRow[]) => {
+  const revertedIds = getRevertedMovementIds(rows);
+
+  return sortMovementsChronologically(rows).filter(
+    (movement) => movement.movement_type !== "reversao" && !revertedIds.has(movement.id)
+  );
+};
+
+const getLatestUndoableMovement = (rows: MovementRow[]) => (
+  getEffectiveMovements(rows).find((movement) => UNDOABLE_MOVEMENT_TYPES.includes(movement.movement_type)) ?? null
+);
+
+const buildVehicleStateFromHistory = (rows: MovementRow[]) => {
+  const latestMovement = getEffectiveMovements(rows)[0] ?? null;
+  const clearedState = {
+    sale_date: null,
+    sale_value: null,
+    buyer_name: null,
+    buyer_doc: null,
+    buyer_phone: null,
+    buyer_email: null,
+    buyer_address: null,
+    sale_notary: null,
+    sale_city: null,
+    sale_state: null,
+    sale_payment_method: null,
+    sale_notes: null,
+    sale_contract_url: null,
+    inactivated_at: null,
+    inactive_reason: null,
+    inactive_notes: null,
+  };
+
+  if (!latestMovement) {
+    return { status: "ativo", notes: null, ...clearedState };
+  }
+
+  if (latestMovement.movement_type === "venda") {
+    return {
+      status: SOLD_STATUS,
+      notes: null,
+      ...clearedState,
+      sale_date: latestMovement.occurred_at ?? null,
+      sale_value: latestMovement.metadata?.sale_value ?? null,
+      buyer_name: latestMovement.metadata?.buyer_name ?? null,
+      buyer_doc: latestMovement.metadata?.buyer_doc ?? null,
+      sale_payment_method: latestMovement.metadata?.payment_method ?? null,
+      sale_notes: latestMovement.notes ?? null,
+    };
+  }
+
+  if (latestMovement.movement_type === "inativacao") {
+    const historicalStatus = latestMovement.metadata?.status;
+    return {
+      status: INACTIVE_STATUSES.includes(historicalStatus) ? historicalStatus : "inativo",
+      notes: null,
+      ...clearedState,
+    };
+  }
+
+  if (latestMovement.movement_type === "reativacao") {
+    return {
+      status: latestMovement.metadata?.to === "manutencao" ? "manutencao" : "ativo",
+      notes: null,
+      ...clearedState,
+    };
+  }
+
+  return { status: "ativo", notes: null, ...clearedState };
+};
 
 export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
   const { currentCompanyId, refreshCompanies } = useAuth();
@@ -139,36 +236,25 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       .select("id,movement_type,reason,notes,occurred_at,created_at,metadata")
       .eq("vehicle_id", vehicle.id)
       .order("created_at", { ascending: false });
-    setMovements((data ?? []) as MovementRow[]);
+    setMovements(sortMovementsChronologically((data ?? []) as MovementRow[]));
   };
 
   const undoMovement = async (m: MovementRow) => {
     if (!vehicle?.id || !currentCompanyId) return;
+    const latestUndoableMovement = getLatestUndoableMovement(movements);
+    if (!latestUndoableMovement || latestUndoableMovement.id !== m.id) {
+      return toast.error("Só é possível desfazer a última movimentação cronológica.");
+    }
     const tipo = m.movement_type === "venda" ? "venda" : m.movement_type === "inativacao" ? "inativação" : m.movement_type;
-    if (!confirm(`Desfazer este movimento de ${tipo}? O veículo voltará para Ativo e os dados desta movimentação serão removidos.`)) return;
+    if (!confirm(`Desfazer este movimento de ${tipo}? O veículo voltará para o estado anterior no histórico.`)) return;
 
     setBusy(true);
     try {
-      const resetPayload: any = { status: "ativo" };
-      if (m.movement_type === "venda") {
-        Object.assign(resetPayload, {
-          sale_date: null, sale_value: null,
-          buyer_name: null, buyer_doc: null, buyer_phone: null, buyer_email: null, buyer_address: null,
-          sale_notary: null, sale_city: null, sale_state: null,
-          sale_payment_method: null, sale_notes: null, sale_contract_url: null,
-        });
-      } else if (m.movement_type === "inativacao") {
-        Object.assign(resetPayload, {
-          inactivated_at: null, inactive_reason: null, inactive_notes: null,
-        });
-      } else {
+      if (!UNDOABLE_MOVEMENT_TYPES.includes(m.movement_type)) {
         toast.error("Somente movimentos de venda ou inativação podem ser desfeitos.");
         setBusy(false);
         return;
       }
-
-      const { error: upErr } = await supabase.from("vehicles").update(resetPayload).eq("id", vehicle.id);
-      if (upErr) throw upErr;
 
       const { data: { user } } = await supabase.auth.getUser();
       const { error: revErr } = await supabase.from("vehicle_movements").insert({
@@ -183,25 +269,50 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       });
       if (revErr) console.warn("reversal insert failed:", revErr.message);
 
-      const { error: delErr } = await supabase.from("vehicle_movements").delete().eq("id", m.id);
-      if (delErr) console.warn("original movement delete failed:", delErr.message);
+      const nextHistory = sortMovementsChronologically([
+        ...movements,
+        {
+          id: crypto.randomUUID(),
+          company_id: currentCompanyId,
+          vehicle_id: vehicle.id,
+          movement_type: "reversao",
+          reason: `Reversão de ${tipo}`,
+          notes: `Desfeito movimento original de ${m.occurred_at || m.created_at?.slice(0,10)}`,
+          occurred_at: new Date().toISOString().slice(0, 10),
+          created_at: new Date().toISOString(),
+          metadata: { reverted_movement_id: m.id, original_type: m.movement_type, original_metadata: m.metadata ?? {} },
+        } as MovementRow,
+      ]);
+
+      const resetPayload = buildVehicleStateFromHistory(nextHistory);
+      const { error: upErr } = await supabase.from("vehicles").update(resetPayload).eq("id", vehicle.id);
+      if (upErr) throw upErr;
 
       setForm((f: any) => ({
         ...f,
-        status: "ativo",
-        ...(m.movement_type === "venda" ? {
-          sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "", buyer_phone: "",
-          buyer_email: "", buyer_address: "", sale_notary: "", sale_city: "", sale_state: "",
-          sale_payment_method: "", sale_notes: "", sale_contract_url: "",
-        } : {}),
-        ...(m.movement_type === "inativacao" ? {
-          inactivated_at: "", inactive_reason: "", inactive_notes: "",
-        } : {}),
+        status: resetPayload.status ?? "ativo",
+        sale_date: resetPayload.sale_date ?? "",
+        sale_value: resetPayload.sale_value ?? "",
+        buyer_name: resetPayload.buyer_name ?? "",
+        buyer_doc: resetPayload.buyer_doc ?? "",
+        buyer_phone: resetPayload.buyer_phone ?? "",
+        buyer_email: resetPayload.buyer_email ?? "",
+        buyer_address: resetPayload.buyer_address ?? "",
+        sale_notary: resetPayload.sale_notary ?? "",
+        sale_city: resetPayload.sale_city ?? "",
+        sale_state: resetPayload.sale_state ?? "",
+        sale_payment_method: resetPayload.sale_payment_method ?? "",
+        sale_notes: resetPayload.sale_notes ?? "",
+        sale_contract_url: resetPayload.sale_contract_url ?? "",
+        inactivated_at: resetPayload.inactivated_at ?? "",
+        inactive_reason: resetPayload.inactive_reason ?? "",
+        inactive_notes: resetPayload.inactive_notes ?? "",
+        notes: resetPayload.notes ?? f.notes,
       }));
 
       await loadMovements();
       onSaved?.();
-      toast.success(`Movimento de ${tipo} desfeito. Veículo voltou para Ativo.`);
+      toast.success(`Movimento de ${tipo} desfeito. O veículo voltou para o estado anterior do histórico.`);
     } catch (e: any) {
       toast.error(e?.message || "Falha ao desfazer movimento");
     } finally {
@@ -674,7 +785,9 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
               </div>
             ) : (
               <div className="space-y-2">
-                {movements.map((m) => (
+                {(() => {
+                  const latestUndoableMovement = getLatestUndoableMovement(movements);
+                  return movements.map((m) => (
                   <div key={m.id} className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold capitalize">{m.movement_type}</span>
@@ -682,14 +795,14 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
                         <span className="text-xs text-muted-foreground">
                           {m.occurred_at ? new Date(m.occurred_at).toLocaleDateString("pt-BR") : new Date(m.created_at).toLocaleDateString("pt-BR")}
                         </span>
-                        {(m.movement_type === "venda" || m.movement_type === "inativacao") && (
+                        {UNDOABLE_MOVEMENT_TYPES.includes(m.movement_type) && (
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                            disabled={busy}
+                            disabled={busy || latestUndoableMovement?.id !== m.id}
                             onClick={() => undoMovement(m)}
-                            title="Desfazer este movimento"
+                            title={latestUndoableMovement?.id === m.id ? "Desfazer este movimento" : "Desfaça primeiro a última movimentação cronológica"}
                           >
                             <Undo2 className="h-3.5 w-3.5 mr-1" /> Desfazer
                           </Button>
@@ -704,7 +817,8 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
                       </div>
                     )}
                   </div>
-                ))}
+                ));
+                })()}
               </div>
             )}
           </TabsContent>
