@@ -549,6 +549,38 @@ export default function Drivers() {
                   <p className="text-[11px] text-muted-foreground">O nome aparece para o colaborador no app, indicando quem precisa autorizar.</p>
                 </div>
               )}
+
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Possui veículo vinculado?</p>
+                    <p className="text-xs text-muted-foreground">Marque quando o motorista usar sempre o mesmo veículo (uso exclusivo).</p>
+                  </div>
+                  <Switch
+                    checked={!!form.has_assigned_vehicle}
+                    onCheckedChange={(v) => setForm({ ...form, has_assigned_vehicle: v, assigned_vehicle_id: v ? form.assigned_vehicle_id : "" })}
+                  />
+                </div>
+
+                {form.has_assigned_vehicle && (
+                  <div className="space-y-2 mt-3">
+                    <Label>Veículo vinculado</Label>
+                    <Select value={form.assigned_vehicle_id || ""} onValueChange={(v) => setForm({ ...form, assigned_vehicle_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar veículo..." /></SelectTrigger>
+                      <SelectContent>
+                        {vehicles.length === 0 ? (
+                          <div className="p-2 text-xs text-muted-foreground">Nenhum veículo ativo cadastrado</div>
+                        ) : vehicles.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.plate} — {v.brand ?? ""} {v.model ?? ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">No app do motorista, este veículo será pré-selecionado nas solicitações de abastecimento.</p>
+                  </div>
+                )}
+              </div>
             </div>
             </TabsContent>
 
