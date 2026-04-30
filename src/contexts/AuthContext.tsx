@@ -13,6 +13,7 @@ interface AuthCtx {
   roles: string[];
   isManager: boolean;
   isDriverOnly: boolean;
+  isSuperAdmin: boolean;
   setCurrentCompany: (id: string) => Promise<void>;
   refreshCompanies: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -27,8 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<CompanyMembership[]>([]);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const loadCompanies = async (uid: string) => {
+    const { data: sa } = await supabase
+      .from("super_admins").select("user_id").eq("user_id", uid).maybeSingle();
+    setIsSuperAdmin(!!sa);
+
     const { data: members } = await supabase
       .from("company_members")
       .select("company_id, companies:company_id(id,name,cnpj,logo_url)")
@@ -66,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sess?.user) {
         setTimeout(() => loadCompanies(sess.user.id), 0);
       } else {
-        setCompanies([]); setCurrentCompanyId(null);
+        setCompanies([]); setCurrentCompanyId(null); setIsSuperAdmin(false);
       }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -98,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isDriverOnly = roles.length > 0 && !isManager && roles.includes("motorista");
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, companies, currentCompanyId, roles, isManager, isDriverOnly, setCurrentCompany, refreshCompanies, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, companies, currentCompanyId, roles, isManager, isDriverOnly, isSuperAdmin, setCurrentCompany, refreshCompanies, signOut }}>
       {children}
     </AuthContext.Provider>
   );

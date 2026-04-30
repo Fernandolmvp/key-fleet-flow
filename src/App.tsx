@@ -18,6 +18,9 @@ import Colaborador from "./pages/app/Colaborador";
 import Documents from "./pages/app/Documents";
 import Approvals from "./pages/app/Approvals";
 import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
+import Subscription from "./pages/app/Subscription";
+import SuperAdmin from "./pages/admin/SuperAdmin";
+import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +37,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
+            <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="vehicles" element={<Vehicles />} />
@@ -44,6 +49,7 @@ const App = () => (
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="tires" element={<Tires />} />
               <Route path="documents" element={<Documents />} />
+              <Route path="assinatura" element={<Subscription />} />
               <Route path="colaborador" element={<Colaborador />} />
             </Route>
             <Route path="*" element={<NotFound />} />
