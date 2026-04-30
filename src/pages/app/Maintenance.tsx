@@ -60,7 +60,7 @@ export default function Maintenance() {
     const [{ data: r }, { data: s }, { data: v }, { data: f }] = await Promise.all([
       supabase.from("maintenance_records").select("*").eq("company_id", currentCompanyId).order("service_at", { ascending: false }),
       supabase.from("maintenance_schedules").select("*").eq("company_id", currentCompanyId).neq("status", "concluida"),
-      supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId),
+      supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId).eq("status", "ativo"),
       supabase.from("fuel_records").select("vehicle_id,km_at_fueling,fueled_at").eq("company_id", currentCompanyId).order("fueled_at", { ascending: false }),
     ]);
     setRecords((r ?? []) as MRec[]);
