@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Plus, FileText, AlertTriangle, Search, Pencil, Trash2, ExternalLink,
-  ShieldAlert, Truck, User, Paperclip, FileWarning, CheckCircle2,
+  ShieldAlert, Truck, User, Paperclip, FileWarning, CheckCircle2, ShieldCheck,
 } from "lucide-react";
 import DocumentDialog, { DocFormDoc } from "@/components/dashboard/DocumentDialog";
+import InsurancePanel from "@/components/dashboard/InsurancePanel";
 import {
   DOC_TYPE_LABELS, STATUS_COLOR, STATUS_LABEL, daysUntil, DocStatus,
   evaluateLicensing, LICENSING_LABEL, LICENSING_COLOR, plateLastDigit,
@@ -40,7 +41,7 @@ type Driver = { id: string; full_name: string; cpf: string | null; cnh_number: s
 
 export default function Documents() {
   const { currentCompanyId } = useAuth();
-  const [tab, setTab] = useState<"vehicles" | "drivers">("vehicles");
+  const [tab, setTab] = useState<"vehicles" | "drivers" | "insurance">("vehicles");
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -55,8 +56,8 @@ export default function Documents() {
     setLoading(true);
     const [d, v, dr] = await Promise.all([
       supabase.from("documents").select("*").eq("company_id", currentCompanyId).order("expires_at", { ascending: true, nullsFirst: false }),
-      supabase.from("vehicles").select("id,plate,brand,model,year_model").eq("company_id", currentCompanyId).order("plate"),
-      supabase.from("drivers").select("id,full_name,cpf,cnh_number,cnh_expires_at,medical_exam_expires_at").eq("company_id", currentCompanyId).order("full_name"),
+      supabase.from("vehicles").select("id,plate,brand,model,year_model").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("drivers").select("id,full_name,cpf,cnh_number,cnh_expires_at,medical_exam_expires_at").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
     ]);
     if (d.error) toast.error(d.error.message);
     setDocs((d.data as any[]) || []);
@@ -110,6 +111,7 @@ export default function Documents() {
         <TabsList>
           <TabsTrigger value="vehicles" className="gap-2"><Truck className="h-4 w-4" /> Veículos</TabsTrigger>
           <TabsTrigger value="drivers" className="gap-2"><User className="h-4 w-4" /> Motoristas</TabsTrigger>
+          <TabsTrigger value="insurance" className="gap-2"><ShieldCheck className="h-4 w-4" /> Seguros</TabsTrigger>
         </TabsList>
 
         <TabsContent value="vehicles" className="mt-4">
@@ -134,6 +136,10 @@ export default function Documents() {
             onEdit={openEdit}
             onDelete={remove}
           />
+        </TabsContent>
+
+        <TabsContent value="insurance" className="mt-4">
+          <InsurancePanel />
         </TabsContent>
       </Tabs>
 
