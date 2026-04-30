@@ -53,7 +53,7 @@ export default function Drivers() {
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
-    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "" };
+    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "" };
   }
 
   const load = async () => {
