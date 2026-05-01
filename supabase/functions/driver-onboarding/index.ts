@@ -203,6 +203,103 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ===== lookup-by-cpf: retorna email do motorista a partir do CPF (para login) =====
+    if (action === "lookup-by-cpf") {
+      const cpf = onlyDigits(payload.cpf || "");
+      if (cpf.length !== 11) return json({ error: "CPF inválido" }, 400);
+
+      // Rate limit reaproveitando attempts table
+      const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const { count: attemptsCount } = await admin
+        .from("driver_onboarding_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("cpf", cpf).gte("attempted_at", since).eq("success", false);
+      if ((attemptsCount ?? 0) >= 10) {
+        return json({ error: "Muitas tentativas. Tente novamente em 30 minutos." }, 429);
+      }
+
+      const { data: drivers } = await admin
+        .from("drivers")
+        .select("id, email, phone, status, cpf, phone_verified_at")
+        .eq("status", "ativo");
+      const driver = (drivers ?? []).find((d: any) => onlyDigits(d.cpf || "") === cpf);
+
+      await admin.from("driver_onboarding_attempts").insert({ cpf, ip, success: !!driver });
+
+      if (!driver) return json({ error: "CPF não encontrado ou motorista inativo" }, 404);
+      if (!driver.email) return json({ error: "Motorista sem email cadastrado. Procure o gestor." }, 404);
+      if (!driver.phone_verified_at) {
+        return json({ error: "Você ainda não ativou seu acesso. Use 'Ativar acesso de motorista'." }, 409);
+      }
+      return json({ email: driver.email, has_phone: !!driver.phone });
+    }
+
+    // ===== reset-password-send-otp: envia SMS para resetar senha =====
+    if (action === "reset-password-send-otp") {
+      const cpf = onlyDigits(payload.cpf || "");
+      if (cpf.length !== 11) return json({ error: "CPF inválido" }, 400);
+
+      const { data: drivers } = await admin
+        .from("drivers").select("id, company_id, phone, email, cpf, status, phone_verified_at")
+        .eq("status", "ativo");
+      const driver = (drivers ?? []).find((d: any) => onlyDigits(d.cpf || "") === cpf);
+      if (!driver) return json({ error: "CPF não encontrado" }, 404);
+      if (!driver.phone) return json({ error: "Sem telefone cadastrado. Procure o gestor." }, 400);
+
+      const normalized = normalizePhone(driver.phone);
+
+      await admin.from("driver_otp_codes")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("driver_id", driver.id).is("consumed_at", null);
+
+      const code = genCode();
+      const expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      const { error: insErr } = await admin.from("driver_otp_codes").insert({
+        driver_id: driver.id, company_id: driver.company_id, phone: normalized, code, expires_at, created_ip: ip,
+      });
+      if (insErr) return json({ error: insErr.message }, 500);
+
+      const sms = await sendSms(normalized, `FrotaOps: código para redefinir sua senha: ${code}. Válido por 5 minutos.`);
+      if (!sms.ok) return json({ error: sms.error || "Falha ao enviar SMS" }, 500);
+
+      const dev = !TWILIO_API_KEY || !TWILIO_FROM;
+      // Máscara do telefone para retornar ao cliente: (**) ****-1234
+      const masked = normalized.replace(/.(?=.{4})/g, "*");
+      return json({ ok: true, driver_id: driver.id, expires_at, masked_phone: masked, dev_code: dev ? code : undefined });
+    }
+
+    // ===== reset-password-confirm: valida OTP e define nova senha =====
+    if (action === "reset-password-confirm") {
+      const { driver_id, code, new_password } = payload;
+      if (!driver_id || !code || !new_password) return json({ error: "Dados obrigatórios faltando" }, 400);
+      if (String(new_password).length < 8) return json({ error: "Senha deve ter pelo menos 8 caracteres" }, 400);
+
+      const { data: otp } = await admin
+        .from("driver_otp_codes").select("*").eq("driver_id", driver_id)
+        .is("consumed_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (!otp) return json({ error: "Nenhum código ativo. Solicite um novo." }, 404);
+      if (new Date(otp.expires_at).getTime() < Date.now()) {
+        return json({ error: "Código expirado. Solicite um novo." }, 410);
+      }
+      if ((otp.attempts ?? 0) >= 5) {
+        await admin.from("driver_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", otp.id);
+        return json({ error: "Muitas tentativas. Solicite um novo código." }, 429);
+      }
+      if (String(code).trim() !== otp.code) {
+        await admin.from("driver_otp_codes").update({ attempts: (otp.attempts ?? 0) + 1 }).eq("id", otp.id);
+        return json({ error: "Código inválido" }, 401);
+      }
+      await admin.from("driver_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", otp.id);
+
+      const { data: drv } = await admin.from("drivers").select("user_id, email").eq("id", driver_id).maybeSingle();
+      if (!drv?.user_id) return json({ error: "Usuário do motorista não encontrado" }, 404);
+
+      const { error: upErr } = await admin.auth.admin.updateUserById(drv.user_id, { password: String(new_password) });
+      if (upErr) return json({ error: upErr.message }, 500);
+
+      return json({ ok: true, email: drv.email });
+    }
+
     return json({ error: "Ação desconhecida" }, 400);
   } catch (e) {
     console.error(e);
