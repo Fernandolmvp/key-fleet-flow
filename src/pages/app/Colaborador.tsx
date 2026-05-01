@@ -236,10 +236,27 @@ export default function Colaborador() {
       }
       const cnpjMatch = stationCnpj && cupomCnpj ? stationCnpj === cupomCnpj : null;
 
+      // Calcula litros / valor unitário / total a partir do que o motorista digitou,
+      // caindo para o que a IA extraiu se algum campo estiver vazio.
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const fuelItem = items.find((it: any) => it.is_fuel) || items[0];
+      const driverLiters = Number(receiptLiters);
+      const driverPpl = Number(receiptUnitValue);
+      const liters = driverLiters > 0
+        ? driverLiters
+        : Number(fuelItem?.quantity ?? (data as any)?.liters ?? 0);
+      const ppl = driverPpl > 0
+        ? driverPpl
+        : Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
+      const aiTotal = Number(data?.total_value ?? fuelItem?.total ?? 0);
+      const total = aiTotal > 0
+        ? aiTotal
+        : (liters > 0 && ppl > 0 ? Number((liters * ppl).toFixed(2)) : 0);
+
       const updateData: any = {
         receipt_photo_url: archivedUrl,
         receipt_cnpj: cupomCnpj || null,
-        receipt_total: data?.total_value ?? null,
+        receipt_total: total > 0 ? total : (data?.total_value ?? null),
         receipt_extracted: data,
         cnpj_match: cnpjMatch,
         confirmed_at: new Date().toISOString(),
@@ -259,7 +276,6 @@ export default function Colaborador() {
       if (upErr) throw upErr;
 
       // Insere itens do cupom (motorista não pode editar/excluir depois)
-      const items = Array.isArray(data?.items) ? data.items : [];
       if (items.length) {
         const rows = items.map((it: any) => ({
           company_id: currentCompanyId,
@@ -276,21 +292,6 @@ export default function Colaborador() {
 
       // Cria registro em fuel_records (módulo de Abastecimentos) quando válido
       if (cnpjMatch !== false) {
-        const fuelItem = items.find((it: any) => it.is_fuel) || items[0];
-        // Prioriza o que o motorista informou na hora de enviar o cupom;
-        // a IA valida e a empresa vê tudo no módulo Abastecimentos.
-        const driverLiters = Number(receiptLiters);
-        const driverPpl = Number(receiptUnitValue);
-        const liters = driverLiters > 0
-          ? driverLiters
-          : Number(fuelItem?.quantity ?? (data as any)?.liters ?? 0);
-        const ppl = driverPpl > 0
-          ? driverPpl
-          : Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
-        const aiTotal = Number(data?.total_value ?? fuelItem?.total ?? 0);
-        const total = aiTotal > 0
-          ? aiTotal
-          : (liters > 0 && ppl > 0 ? Number((liters * ppl).toFixed(2)) : 0);
         if (liters > 0 && total > 0) {
           const station = stations.find((x) => x.id === auth.fuel_station_id);
           const fuelType = (receiptFuelType || fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
@@ -312,9 +313,14 @@ export default function Colaborador() {
             receipt_url: archivedUrl,
             created_by: user?.id,
           }).select("id").maybeSingle();
-          if (!frErr && fr?.id) {
+          if (frErr) {
+            console.error("Erro ao gravar em fuel_records:", frErr);
+            toast.error("Cupom salvo, mas falhou registrar em Abastecimentos: " + frErr.message);
+          } else if (fr?.id) {
             await supabase.from("fuel_authorizations").update({ fuel_record_id: fr.id }).eq("id", auth.id);
           }
+        } else {
+          toast.warning("Abastecimento não foi lançado em Abastecimentos: informe litros e valor unitário.");
         }
       }
 
