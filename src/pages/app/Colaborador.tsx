@@ -695,16 +695,28 @@ export default function Colaborador() {
 
       {/* Rodapé fixo: vínculo com veículo */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background-elevated/95 backdrop-blur px-4 py-2 z-40">
-        <div className="max-w-md mx-auto flex items-center gap-2 text-xs">
-          <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
-          {assignedVehicle ? (
-            <>
-              <span className="text-muted-foreground">Veículo vinculado:</span>
-              <span className="font-mono font-semibold text-primary">{assignedVehicle.plate}</span>
-              <span className="text-muted-foreground truncate">· {assignedVehicle.brand} {assignedVehicle.model}</span>
-            </>
+        <div className="max-w-md mx-auto flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
+            {assignedVehicle ? (
+              <>
+                <span className="font-mono font-semibold text-primary">{assignedVehicle.plate}</span>
+                <span className="text-muted-foreground truncate">· {assignedVehicle.brand} {assignedVehicle.model}</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">Sem veículo vinculado</span>
+            )}
+          </div>
+          {driver?.auto_fuel_authorized ? (
+            <div className="flex items-center gap-1 text-success shrink-0" title="Você está pré-autorizado">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span className="font-semibold">Autorizado</span>
+            </div>
           ) : (
-            <span className="text-muted-foreground">Sem veículo vinculado · solicite ao gestor</span>
+            <div className="flex items-center gap-1 text-warning shrink-0" title={managerName ? `Gestor: ${managerName}` : "Aguarda aprovação do gestor"}>
+              <Clock className="h-3.5 w-3.5" />
+              <span className="font-semibold">Requer aprovação</span>
+            </div>
           )}
         </div>
       </div>
