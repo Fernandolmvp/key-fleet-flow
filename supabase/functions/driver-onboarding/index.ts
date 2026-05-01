@@ -35,7 +35,24 @@ function isValidEmail(email: string) {
 }
 
 function isStrongPassword(password: string) {
-  return password.length >= 6;
+  return password.length >= 8
+    && /[a-z]/.test(password)
+    && /[A-Z]/.test(password)
+    && /\d/.test(password);
+}
+
+function getFriendlyErrorMessage(error: unknown) {
+  const authError = error as { code?: string; name?: string; reasons?: string[]; message?: string } | null;
+
+  if (authError?.code === "weak_password" || authError?.name === "AuthWeakPasswordError") {
+    if (authError?.reasons?.includes("pwned")) {
+      return "Essa senha é fraca ou já apareceu em vazamentos. Use outra com pelo menos 8 caracteres, incluindo letra maiúscula, minúscula e número.";
+    }
+
+    return "A senha precisa ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número.";
+  }
+
+  return authError?.message || String(error);
 }
 
 async function findAuthUserByEmail(email: string) {
@@ -272,7 +289,7 @@ Deno.serve(async (req) => {
         return json({ error: "Email inválido" }, 400);
       }
       if (!isStrongPassword(password)) {
-        return json({ error: "A senha deve ter pelo menos 6 caracteres" }, 400);
+        return json({ error: "A senha precisa ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número." }, 400);
       }
 
       const { data: otp } = await admin
@@ -432,7 +449,9 @@ Deno.serve(async (req) => {
     return json({ error: "Ação desconhecida" }, 400);
   } catch (error) {
     console.error(error);
-    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    const friendlyMessage = getFriendlyErrorMessage(error);
+    const status = (error as { status?: number } | null)?.status ?? 500;
+    return json({ error: friendlyMessage }, status);
   }
 });
 
