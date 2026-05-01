@@ -411,12 +411,12 @@ export default function Colaborador() {
 
         <TabsContent value="abastecimento" className="space-y-5 mt-4">
           {/* Último código aprovado em destaque (sempre visível, é o que importa) */}
-          {latestApproved?.authorization_code && (
+          {latestApproved?.authorization_code && codeStillVisible(latestApproved.approved_at) && (
         <div className="rounded-xl border border-success/40 bg-success/10 p-5 text-center">
           <div className="text-[10px] uppercase tracking-widest text-success/80 mb-1">Código de autorização</div>
           <div className="font-mono text-4xl font-bold text-success tracking-widest">{latestApproved.authorization_code}</div>
           <div className="text-[10px] text-muted-foreground mt-2">
-            Informe ao posto · válido até {latestApproved.expires_at ? new Date(latestApproved.expires_at).toLocaleString("pt-BR") : "—"}
+            Informe ao posto · visível por {CODE_VISIBLE_MINUTES} min após aprovação
           </div>
         </div>
       )}
@@ -429,7 +429,21 @@ export default function Colaborador() {
             </TabsList>
 
             <TabsContent value="novo" className="space-y-3 mt-4">
-              {!showWizard ? (
+              {blockingPending ? (
+                <div className="rounded-xl border border-warning/40 bg-warning/10 p-5 text-center space-y-2">
+                  <AlertTriangle className="h-7 w-7 mx-auto text-warning" />
+                  <div className="font-semibold text-sm">Cupom fiscal pendente</div>
+                  <p className="text-xs text-muted-foreground">
+                    Você precisa enviar a foto do cupom da última autorização aprovada antes de fazer uma nova solicitação.
+                  </p>
+                  <Button
+                    onClick={() => setFuelTab("minhas")}
+                    className="w-full bg-gradient-primary text-primary-foreground"
+                  >
+                    Enviar cupom agora
+                  </Button>
+                </div>
+              ) : !showWizard ? (
                 <Button
                   onClick={() => { reset(); setShowWizard(true); setStep(1); }}
                   className="w-full h-20 text-base bg-gradient-primary text-primary-foreground rounded-xl shadow-glow"
