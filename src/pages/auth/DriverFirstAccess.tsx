@@ -43,9 +43,10 @@ export default function DriverFirstAccess() {
   const [cpf, setCpf] = useState("");
   const [birth, setBirth] = useState("");
 
-  const [driver, setDriver] = useState<{ id: string; full_name: string; existing_phone: string | null; existing_email: string | null } | null>(null);
-  const [phone, setPhone] = useState("");
+  const [driver, setDriver] = useState<{ id: string; full_name: string; existing_email: string | null } | null>(null);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
 
   const [code, setCode] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -63,8 +64,7 @@ export default function DriverFirstAccess() {
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
-    setDriver(data);
-    setPhone(data.existing_phone ? maskPhone(data.existing_phone) : "");
+    setDriver({ id: data.driver_id, full_name: data.full_name, existing_email: data.existing_email });
     setEmail(data.existing_email || "");
     setStep("contact");
   };
@@ -72,15 +72,15 @@ export default function DriverFirstAccess() {
   const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!driver) return;
-    const phoneDigits = phone.replace(/\D/g, "");
-    if (phoneDigits.length < 10) return toast.error("Telefone inválido");
     if (!email.trim() || !/.+@.+\..+/.test(email)) return toast.error("Email inválido");
+    if (password.length < 6) return toast.error("A senha deve ter pelo menos 6 caracteres");
+    if (password !== password2) return toast.error("As senhas não conferem");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
       body: { action: "send-otp", driver_id: driver.id, email: email.trim().toLowerCase() },
     });
     setBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha ao enviar SMS");
+    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha ao enviar email");
     setExpiresAt(data.expires_at);
     setDevCode(data.dev_code || null);
     setStep("otp");
@@ -93,7 +93,7 @@ export default function DriverFirstAccess() {
     if (code.replace(/\D/g, "").length !== 6) return toast.error("Código deve ter 6 dígitos");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "confirm-otp", driver_id: driver.id, code: code.trim(), phone: phone.replace(/\D/g, ""), email: email.trim() },
+      body: { action: "confirm-otp", driver_id: driver.id, code: code.trim(), email: email.trim().toLowerCase(), password },
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Código inválido");
@@ -156,7 +156,7 @@ export default function DriverFirstAccess() {
           <>
             <div>
               <h2 className="font-display text-2xl font-bold">Olá, {driver.full_name.split(" ")[0]}</h2>
-              <p className="text-sm text-muted-foreground mt-1">Confirme seus dados de contato</p>
+              <p className="text-sm text-muted-foreground mt-1">Crie sua senha e confirme seu email</p>
             </div>
             <form onSubmit={sendOtp} className="space-y-4">
               <div className="space-y-2">
@@ -164,12 +164,16 @@ export default function DriverFirstAccess() {
                 <Input value={driver.full_name} disabled />
               </div>
               <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(11) 99999-9999" inputMode="tel" required />
-              </div>
-              <div className="space-y-2">
                 <Label>Email (receberá o código)</Label>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Crie sua senha (mín. 6 caracteres)</Label>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" required minLength={6} />
+              </div>
+              <div className="space-y-2">
+                <Label>Confirme sua senha</Label>
+                <Input type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} placeholder="••••••" required minLength={6} />
               </div>
               <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4" /> Enviar código por email</>}
@@ -213,7 +217,7 @@ export default function DriverFirstAccess() {
                 <Check className="h-7 w-7 text-emerald-400" />
               </div>
               <h2 className="font-display text-2xl font-bold">Tudo certo!</h2>
-              <p className="text-sm text-muted-foreground mt-2">Seus dados foram confirmados. Procure o gestor para receber suas credenciais de acesso ao app.</p>
+              <p className="text-sm text-muted-foreground mt-2">Acesso ativado! Use seu CPF e a senha que você acabou de criar para entrar.</p>
             </div>
             <Link to="/login" className="block">
               <Button variant="outline" className="w-full">Ir para o login</Button>
