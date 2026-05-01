@@ -47,6 +47,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "al_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "al_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "audit_logs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -91,6 +105,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "branches_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branches_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "branches_company_id_fkey"
             columns: ["company_id"]
@@ -173,6 +201,34 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ca_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ca_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "ca_question_fk"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ca_run_fk"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_runs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "checklist_answers_question_id_fkey"
             columns: ["question_id"]
             isOneToOne: false
@@ -246,6 +302,27 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "checklist_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cq_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cq_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "cq_template_fk"
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "checklist_templates"
@@ -337,6 +414,48 @@ export type Database = {
             referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cr_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cr_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "cr_driver_fk"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cr_maintenance_fk"
+            columns: ["generated_maintenance_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cr_template_fk"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cr_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       checklist_templates: {
@@ -379,7 +498,22 @@ export type Database = {
           updated_at?: string
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ct_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ct_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -429,6 +563,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "company_members_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_members_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "company_members_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -476,6 +624,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cost_centers_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_centers_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "cost_centers_company_id_fkey"
             columns: ["company_id"]
@@ -562,7 +724,22 @@ export type Database = {
           updated_at?: string
           validation_warning?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "documents_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
       }
       driver_onboarding_attempts: {
         Row: {
@@ -625,7 +802,29 @@ export type Database = {
           id?: string
           phone?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "otp_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "otp_driver_fk"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       driver_status_history: {
         Row: {
@@ -664,7 +863,29 @@ export type Database = {
           reason?: string | null
           termination_date?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dsh_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dsh_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "dsh_driver_fk"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       drivers: {
         Row: {
@@ -762,11 +983,39 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "drivers_assigned_vehicle_fk"
+            columns: ["assigned_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_branch_fk"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "drivers_branch_id_fkey"
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
           },
           {
             foreignKeyName: "drivers_company_id_fkey"
@@ -822,6 +1071,27 @@ export type Database = {
           unit_value?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fai_auth_fk"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fai_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fai_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "fuel_authorization_items_authorization_id_fkey"
             columns: ["authorization_id"]
@@ -931,7 +1201,50 @@ export type Database = {
           used_at?: string | null
           vehicle_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fa_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fa_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "fa_driver_fk"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fa_record_fk"
+            columns: ["fuel_record_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fa_station_fk"
+            columns: ["fuel_station_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fa_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fuel_records: {
         Row: {
@@ -1047,6 +1360,48 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fr_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fr_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "fr_cost_center_fk"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fr_driver_fk"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fr_station_fk"
+            columns: ["fuel_station_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fr_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fuel_records_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -1144,7 +1499,22 @@ export type Database = {
           state?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fs_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fs_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
       }
       insurance_brokers: {
         Row: {
@@ -1198,7 +1568,22 @@ export type Database = {
           susep?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ib_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ib_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
       }
       insurance_policies: {
         Row: {
@@ -1275,6 +1660,27 @@ export type Database = {
             referencedRelation: "insurance_brokers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ip_broker_fk"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_brokers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ip_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ip_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
         ]
       }
       insurance_policy_vehicles: {
@@ -1328,6 +1734,34 @@ export type Database = {
             referencedRelation: "insurance_policies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ipv_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipv_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "ipv_policy_fk"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipv_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       maintenance_checklist_items: {
@@ -1364,7 +1798,29 @@ export type Database = {
           maintenance_record_id?: string
           notes?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mci_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mci_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "mci_record_fk"
+            columns: ["maintenance_record_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       maintenance_records: {
         Row: {
@@ -1454,7 +1910,43 @@ export type Database = {
           workshop_cnpj?: string | null
           workshop_name?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mr_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mr_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "mr_cost_center_fk"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mr_driver_fk"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mr_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       maintenance_schedules: {
         Row: {
@@ -1514,6 +2006,34 @@ export type Database = {
             columns: ["completed_record_id"]
             isOneToOne: false
             referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ms_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ms_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "ms_completed_fk"
+            columns: ["completed_record_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ms_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -1593,6 +2113,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "profiles_current_company_fk"
+            columns: ["current_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_current_company_fk"
+            columns: ["current_company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "profiles_current_company_id_fkey"
             columns: ["current_company_id"]
             isOneToOne: false
@@ -1655,6 +2189,34 @@ export type Database = {
           subscription_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sp_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sp_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "sp_subscription_fk"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "sp_subscription_fk"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subscription_payments_subscription_id_fkey"
             columns: ["subscription_id"]
@@ -1736,6 +2298,34 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sub_company_fk"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_company_fk"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "sub_plan_fk"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["plan_id"]
+          },
+          {
+            foreignKeyName: "sub_plan_fk"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subscriptions_plan_id_fkey"
             columns: ["plan_id"]
@@ -1828,7 +2418,36 @@ export type Database = {
           vehicle_id?: string | null
           vehicle_km?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tm_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tm_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "tm_tire_fk"
+            columns: ["tire_id"]
+            isOneToOne: false
+            referencedRelation: "tires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tm_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tires: {
         Row: {
@@ -1918,7 +2537,29 @@ export type Database = {
           supplier?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tires_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tires_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "tires_vehicle_fk"
+            columns: ["current_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -1943,6 +2584,20 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_roles_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "user_roles_company_id_fkey"
             columns: ["company_id"]
@@ -1987,7 +2642,29 @@ export type Database = {
           updated_at?: string
           vehicle_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "val_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "val_company_fk"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "val_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: true
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicle_movements: {
         Row: {
