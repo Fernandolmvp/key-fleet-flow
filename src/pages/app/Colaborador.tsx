@@ -554,16 +554,6 @@ export default function Colaborador() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Litros est.</Label>
-                <Input type="number" step="0.01" inputMode="decimal" value={estLiters} onChange={(e) => setEstLiters(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Valor R$</Label>
-                <Input type="number" step="0.01" inputMode="decimal" value={estValue} onChange={(e) => setEstValue(e.target.value)} />
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
               <Button onClick={() => setStep(4)} disabled={!stationId} className="bg-gradient-primary text-primary-foreground">
@@ -580,8 +570,6 @@ export default function Colaborador() {
               <div><span className="text-muted-foreground">Veículo:</span> <strong>{matchedVehicle.plate}</strong> · {matchedVehicle.brand} {matchedVehicle.model}</div>
               <div><span className="text-muted-foreground">KM:</span> {kmRead?.toLocaleString("pt-BR")}</div>
               <div><span className="text-muted-foreground">Posto:</span> {stations.find((s) => s.id === stationId)?.name}</div>
-              {estLiters && <div><span className="text-muted-foreground">Litros est.:</span> {estLiters}</div>}
-              {estValue && <div><span className="text-muted-foreground">Valor est.:</span> R$ {estValue}</div>}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setStep(3)}>Voltar</Button>
