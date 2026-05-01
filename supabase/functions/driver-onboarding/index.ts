@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
 
       const { data: activeDrivers } = await admin
         .from("drivers")
-        .select("id, full_name, company_id, email, birth_date, status, onboarded_at, cpf")
+        .select("id, full_name, company_id, email, phone, birth_date, status, onboarded_at, cpf")
         .eq("status", "ativo");
 
       const sameCpf = (activeDrivers ?? []).filter((driver: any) => onlyDigits(driver.cpf || "") === cpf);
