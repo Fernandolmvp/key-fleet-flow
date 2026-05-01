@@ -165,6 +165,9 @@ export default function Colaborador() {
         setPlatePhoto(file); setPlatePhotoUrl(archivedUrl); setPlateRead(plate); setMatchedVehicle(null);
         throw new Error(`Placa ${plate} não está cadastrada. Procure seu gestor.`);
       }
+      if (assignedVehicle && veh.id !== assignedVehicle.id) {
+        throw new Error(`Você está vinculado ao veículo ${assignedVehicle.plate}. Esta placa (${plate}) não corresponde.`);
+      }
       // KM lido tem que ser >= current_km
       if (kmRead != null && veh.current_km != null && kmRead < veh.current_km) {
         toast.warning(`Atenção: KM lido (${kmRead}) é menor que o último registrado (${veh.current_km}).`);
