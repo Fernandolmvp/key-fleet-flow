@@ -21,6 +21,20 @@ function maskPhone(v: string) {
   if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3").trim();
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").trim();
 }
+function maskDate(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+function brToIso(v: string): string | null {
+  const d = v.replace(/\D/g, "");
+  if (d.length !== 8) return null;
+  const dd = d.slice(0, 2), mm = d.slice(2, 4), yyyy = d.slice(4, 8);
+  const day = parseInt(dd, 10), mon = parseInt(mm, 10), year = parseInt(yyyy, 10);
+  if (mon < 1 || mon > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 export default function DriverFirstAccess() {
   const [step, setStep] = useState<Step>("identity");
@@ -41,10 +55,11 @@ export default function DriverFirstAccess() {
     e.preventDefault();
     const cpfDigits = cpf.replace(/\D/g, "");
     if (cpfDigits.length !== 11) return toast.error("CPF inválido");
-    if (!birth) return toast.error("Informe a data de nascimento");
+    const iso = brToIso(birth);
+    if (!iso) return toast.error("Data de nascimento inválida (use DD/MM/AAAA)");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "verify-identity", cpf: cpfDigits, birth_date: birth },
+      body: { action: "verify-identity", cpf: cpfDigits, birth_date: iso },
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
@@ -121,7 +136,14 @@ export default function DriverFirstAccess() {
               </div>
               <div className="space-y-2">
                 <Label>Data de nascimento</Label>
-                <Input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} required />
+                <Input
+                  inputMode="numeric"
+                  placeholder="DD/MM/AAAA"
+                  value={birth}
+                  onChange={(e) => setBirth(maskDate(e.target.value))}
+                  maxLength={10}
+                  required
+                />
               </div>
               <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="h-4 w-4" /> Validar</>}
