@@ -45,6 +45,7 @@ export default function DriverFirstAccess() {
 
   const [driver, setDriver] = useState<{ id: string; full_name: string; existing_email: string | null } | null>(null);
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
 
@@ -73,6 +74,7 @@ export default function DriverFirstAccess() {
     e.preventDefault();
     if (!driver) return;
     if (!email.trim() || !/.+@.+\..+/.test(email)) return toast.error("Email inválido");
+    if (phone.replace(/\D/g, "").length < 10) return toast.error("Telefone inválido");
     if (password.length < 6) return toast.error("A senha deve ter pelo menos 6 caracteres");
     if (password !== password2) return toast.error("As senhas não conferem");
     setBusy(true);
@@ -93,11 +95,31 @@ export default function DriverFirstAccess() {
     if (code.replace(/\D/g, "").length !== 6) return toast.error("Código deve ter 6 dígitos");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "confirm-otp", driver_id: driver.id, code: code.trim(), email: email.trim().toLowerCase(), password },
+      body: {
+        action: "confirm-otp",
+        driver_id: driver.id,
+        code: code.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phone: phone.replace(/\D/g, ""),
+      },
+    });
+    if (error || data?.error) {
+      setBusy(false);
+      return toast.error(data?.error || error?.message || "Código inválido");
+    }
+    // Login automático após confirmar OTP
+    const { error: sErr } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
     });
     setBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Código inválido");
-    setStep("done");
+    if (sErr) {
+      setStep("done");
+      return toast.success("Acesso ativado! Faça login com seu CPF e senha.");
+    }
+    toast.success("Bem-vindo!");
+    window.location.href = "/app";
   };
 
   const resend = async () => {
@@ -166,6 +188,16 @@ export default function DriverFirstAccess() {
               <div className="space-y-2">
                 <Label>Email (receberá o código)</Label>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone (com DDD)</Label>
+                <Input
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => setPhone(maskPhone(e.target.value))}
+                  placeholder="(11) 99999-9999"
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>Crie sua senha (mín. 6 caracteres)</Label>
