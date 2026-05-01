@@ -578,6 +578,7 @@ export default function Colaborador() {
           auths.map((a) => {
             const veh = vehicles.find((v) => v.id === a.vehicle_id);
             const canConfirm = a.status === "aprovada" && !a.confirmed_at;
+            const pendingReceipt = a.status === "aprovada" && !a.confirmed_at;
             return (
               <div key={a.id} className="surface-card rounded-xl p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -592,8 +593,21 @@ export default function Colaborador() {
                       {new Date(a.requested_at).toLocaleString("pt-BR")}
                     </div>
                   </div>
-                  <Badge className={`capitalize border text-[10px] ${STATUS_TONE[a.status]}`}>{a.status}</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge className={`capitalize border text-[10px] ${STATUS_TONE[a.status]}`}>{a.status}</Badge>
+                    {pendingReceipt && (
+                      <Badge className="bg-warning/15 text-warning border-warning/40 border text-[10px] gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Cupom pendente
+                      </Badge>
+                    )}
+                  </div>
                 </div>
+                {pendingReceipt && (
+                  <div className="rounded-md bg-warning/10 border border-warning/30 p-2 text-[11px] flex items-start gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                    <span>Envie a foto do cupom fiscal para concluir este abastecimento.</span>
+                  </div>
+                )}
                 {a.status === "aprovada" && a.authorization_code && (
                   <div className="font-mono text-center text-lg font-bold text-success tracking-widest bg-success/5 rounded-md py-1.5">
                     {a.authorization_code}
