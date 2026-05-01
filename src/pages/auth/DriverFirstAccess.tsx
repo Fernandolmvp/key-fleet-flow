@@ -98,8 +98,8 @@ export default function DriverFirstAccess() {
     if (!driver) return;
     if (!email.trim() || !/.+@.+\..+/.test(email)) return toast.error("Email inválido");
     if (phone.replace(/\D/g, "").length < 10) return toast.error("Telefone inválido");
-    if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
-      return toast.error("Use 8+ caracteres com letra maiúscula, minúscula e número");
+    if (password.length < 4) {
+      return toast.error("A senha precisa ter pelo menos 4 caracteres");
     }
     if (password !== password2) return toast.error("As senhas não conferem");
     setBusy(true);
@@ -220,12 +220,12 @@ export default function DriverFirstAccess() {
               </div>
               <div className="space-y-2">
                 <Label>Crie sua senha</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" required minLength={8} />
-                <p className="text-xs text-muted-foreground">Use 8+ caracteres com letra maiúscula, minúscula e número.</p>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••" required minLength={4} />
+                <p className="text-xs text-muted-foreground">Mínimo de 4 caracteres.</p>
               </div>
               <div className="space-y-2">
                 <Label>Confirme sua senha</Label>
-                <Input type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} placeholder="••••••" required minLength={8} />
+                <Input type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} placeholder="••••" required minLength={4} />
               </div>
               <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4" /> Enviar código por email</>}
