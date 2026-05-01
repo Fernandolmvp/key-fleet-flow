@@ -174,7 +174,7 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pwd-mot">Senha</Label>
-                  <Input id="pwd-mot" type="password" required value={pwdMot} onChange={(e) => setPwdMot(e.target.value)} />
+                  <Input id="pwd-mot" type="password" inputMode="numeric" maxLength={6} required value={pwdMot} onChange={(e) => setPwdMot(e.target.value.replace(/\D/g, "").slice(0, 6))} />
                 </div>
                 <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar como motorista"}

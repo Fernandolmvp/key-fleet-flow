@@ -98,13 +98,18 @@ export default function DriverFirstAccess() {
     if (!driver) return;
     if (!email.trim() || !/.+@.+\..+/.test(email)) return toast.error("Email inválido");
     if (phone.replace(/\D/g, "").length < 10) return toast.error("Telefone inválido");
-    if (!/^\d{6,}$/.test(password)) {
-      return toast.error("A senha precisa ter pelo menos 6 dígitos numéricos");
+    if (!/^\d{6}$/.test(password)) {
+      return toast.error("A senha deve ter exatamente 6 dígitos numéricos");
     }
     if (password !== password2) return toast.error("As senhas não conferem");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "send-otp", driver_id: driver.id, email: email.trim().toLowerCase() },
+      body: {
+        action: "send-otp",
+        driver_id: driver.id,
+        email: email.trim().toLowerCase(),
+        phone: phone.replace(/\D/g, ""),
+      },
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha ao enviar email");
@@ -145,7 +150,12 @@ export default function DriverFirstAccess() {
     if (!driver) return;
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "send-otp", driver_id: driver.id, email: email.trim().toLowerCase() },
+      body: {
+        action: "send-otp",
+        driver_id: driver.id,
+        email: email.trim().toLowerCase(),
+        phone: phone.replace(/\D/g, ""),
+      },
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
@@ -224,13 +234,13 @@ export default function DriverFirstAccess() {
                   type="password"
                   inputMode="numeric"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setPassword(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   placeholder="••••••"
                   required
                   minLength={6}
-                  maxLength={12}
+                  maxLength={6}
                 />
-                <p className="text-xs text-muted-foreground">Use apenas números, mínimo de 6 dígitos.</p>
+                <p className="text-xs text-muted-foreground">Use apenas números. A senha deve ter exatamente 6 dígitos.</p>
               </div>
               <div className="space-y-2">
                 <Label>Confirme sua senha</Label>
@@ -238,11 +248,11 @@ export default function DriverFirstAccess() {
                   type="password"
                   inputMode="numeric"
                   value={password2}
-                  onChange={(e) => setPassword2(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setPassword2(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   placeholder="••••••"
                   required
                   minLength={6}
-                  maxLength={12}
+                  maxLength={6}
                 />
               </div>
               <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
