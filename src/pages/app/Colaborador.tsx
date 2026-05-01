@@ -46,6 +46,8 @@ export default function Colaborador() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"abastecimento" | "checklist" | "manutencao">("abastecimento");
+  const [fuelTab, setFuelTab] = useState<"novo" | "minhas">("novo");
+  const [showWizard, setShowWizard] = useState(false);
   const [maintDesc, setMaintDesc] = useState("");
   const [maintCategory, setMaintCategory] = useState("Outros");
   const [maintBusy, setMaintBusy] = useState(false);
@@ -128,6 +130,7 @@ export default function Colaborador() {
     setStep(1); setKmPhoto(null); setKmPhotoUrl(null); setKmRead(null);
     setPlatePhoto(null); setPlatePhotoUrl(null); setPlateRead(null); setMatchedVehicle(null);
     setStationSearch(""); setStationId(""); setEstLiters(""); setEstValue("");
+    setShowWizard(false);
   };
 
   // ETAPA 1 — Foto do KM
