@@ -477,20 +477,45 @@ export default function Colaborador() {
             <div className="flex items-center gap-2 text-xs font-semibold text-primary">
               <Search className="h-4 w-4" /> 3. Selecione o posto
             </div>
-            <Input placeholder="Buscar por nome, CNPJ ou cidade..." value={stationSearch}
-              onChange={(e) => setStationSearch(e.target.value)} />
-            <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-md p-1">
-              {filteredStations.length === 0 ? (
-                <p className="text-center text-xs text-muted-foreground py-4">Nenhum posto encontrado.</p>
-              ) : filteredStations.map((s) => (
-                <button key={s.id} type="button"
-                  onClick={() => setStationId(s.id)}
-                  className={`w-full text-left rounded-md p-2 text-xs transition ${stationId === s.id ? "bg-primary/15 border border-primary/40" : "hover:bg-muted/40 border border-transparent"}`}>
-                  <div className="font-semibold">{s.name}</div>
-                  <div className="text-muted-foreground">{s.brand && `${s.brand} · `}{s.city ?? "—"}{s.state && `/${s.state}`} {s.cnpj && ` · CNPJ ${s.cnpj}`}</div>
-                </button>
-              ))}
+            {/* 3a. Cidade */}
+            <div className="space-y-1">
+              <Label className="text-xs">Cidade</Label>
+              {stationCities.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">Nenhum posto cadastrado.</p>
+              ) : (
+                <Select
+                  value={stationCity}
+                  onValueChange={(v) => { setStationCity(v); setStationId(""); }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione a cidade" /></SelectTrigger>
+                  <SelectContent>
+                    {stationCities.map((c) => (
+                      <SelectItem key={`${c.city}|${c.state ?? ""}`} value={`${c.city}|${c.state ?? ""}`}>
+                        {c.city}{c.state ? `/${c.state}` : ""} · {c.count} posto{c.count > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
+            {/* 3b. Posto na cidade */}
+            {stationCity && (
+              <div className="space-y-1">
+                <Label className="text-xs">Posto</Label>
+                <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-md p-1">
+                  {stationsInCity.length === 0 ? (
+                    <p className="text-center text-xs text-muted-foreground py-4">Nenhum posto nesta cidade.</p>
+                  ) : stationsInCity.map((s) => (
+                    <button key={s.id} type="button"
+                      onClick={() => setStationId(s.id)}
+                      className={`w-full text-left rounded-md p-2 text-xs transition ${stationId === s.id ? "bg-primary/15 border border-primary/40" : "hover:bg-muted/40 border border-transparent"}`}>
+                      <div className="font-semibold">{s.name}</div>
+                      <div className="text-muted-foreground">{s.brand && `${s.brand} · `}{s.cnpj && `CNPJ ${s.cnpj}`}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Litros est.</Label>
