@@ -111,8 +111,19 @@ async function ensureDriverAccessBindings(
   if (profileError) throw profileError;
 }
 
+async function findDriverByUserId(userId: string) {
+  const { data, error } = await admin
+    .from("drivers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 async function ensureDriverAuthUser(
-  driver: { user_id: string | null; full_name: string; company_id: string },
+  driver: { id: string; user_id: string | null; full_name: string; company_id: string },
   email: string,
   password: string,
   phone: string | null,
@@ -126,7 +137,13 @@ async function ensureDriverAuthUser(
 
   if (!authUserId) {
     const existingUser = await findAuthUserByEmail(email);
-    authUserId = existingUser?.id ?? null;
+    if (existingUser?.id) {
+      const linkedDriver = await findDriverByUserId(existingUser.id);
+      if (linkedDriver && linkedDriver.id !== driver.id) {
+        throw new Error("Este email já está vinculado a outro motorista. Use outro email ou peça para a empresa corrigir o cadastro.");
+      }
+      authUserId = existingUser.id;
+    }
   }
 
   if (authUserId) {
@@ -316,7 +333,7 @@ Deno.serve(async (req) => {
 
       const { data: driver } = await admin
         .from("drivers")
-        .select("id, company_id, full_name, user_id")
+        .select("id, company_id, full_name, user_id, cpf")
         .eq("id", driverId)
         .maybeSingle();
 
