@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Truck, Loader2, Building2, IdCard, KeyRound, Phone, Check } from "lucide-react";
+import { Truck, Loader2, Building2, IdCard, KeyRound, Mail, Check } from "lucide-react";
 
 function maskCpf(v: string) {
   const d = v.replace(/\D/g, "").slice(0, 11);
@@ -29,13 +29,9 @@ export default function Login() {
 
   // Reset senha motorista
   const [resetOpen, setResetOpen] = useState(false);
-  const [resetStep, setResetStep] = useState<"cpf" | "otp" | "new">("cpf");
+  const [resetStep, setResetStep] = useState<"cpf" | "sent">("cpf");
   const [resetCpf, setResetCpf] = useState("");
-  const [resetDriverId, setResetDriverId] = useState("");
-  const [resetMaskedPhone, setResetMaskedPhone] = useState("");
-  const [resetCode, setResetCode] = useState("");
-  const [resetDevCode, setResetDevCode] = useState<string | null>(null);
-  const [resetNewPwd, setResetNewPwd] = useState("");
+  const [resetMaskedEmail, setResetMaskedEmail] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
 
   if (!loading && user) return <Navigate to="/app" replace />;
@@ -73,49 +69,27 @@ export default function Login() {
   const openReset = () => {
     setResetStep("cpf");
     setResetCpf(cpf || "");
-    setResetDriverId("");
-    setResetMaskedPhone("");
-    setResetCode("");
-    setResetDevCode(null);
-    setResetNewPwd("");
+    setResetMaskedEmail("");
     setResetOpen(true);
   };
 
-  const sendResetOtp = async (e: React.FormEvent) => {
+  const sendResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     const d = resetCpf.replace(/\D/g, "");
     if (d.length !== 11) return toast.error("CPF inválido");
     setResetBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "reset-password-send-otp", cpf: d },
+      body: {
+        action: "reset-password-send-email",
+        cpf: d,
+        redirect_to: `${window.location.origin}/reset-password`,
+      },
     });
     setResetBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
-    setResetDriverId(data.driver_id);
-    setResetMaskedPhone(data.masked_phone || "");
-    setResetDevCode(data.dev_code || null);
-    setResetStep("otp");
-    toast.success("Código enviado por SMS");
-  };
-
-  const confirmResetOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (resetCode.replace(/\D/g, "").length !== 6) return toast.error("Código deve ter 6 dígitos");
-    setResetStep("new");
-  };
-
-  const submitNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (resetNewPwd.length < 8) return toast.error("Senha deve ter ao menos 8 caracteres");
-    setResetBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "reset-password-confirm", driver_id: resetDriverId, code: resetCode, new_password: resetNewPwd },
-    });
-    setResetBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
-    toast.success("Senha redefinida! Faça login.");
-    setResetOpen(false);
-    setPwdMot(resetNewPwd);
+    setResetMaskedEmail(data.masked_email || "");
+    setResetStep("sent");
+    toast.success("Email de redefinição enviado");
   };
 
   return (
@@ -211,7 +185,7 @@ export default function Login() {
                 onClick={openReset}
                 className="text-sm text-primary hover:underline w-full text-center"
               >
-                Esqueci minha senha (receber SMS)
+                Esqueci minha senha (receber email)
               </button>
               <div className="surface-card rounded-lg p-4 text-center space-y-2">
                 <p className="text-sm font-medium">É seu primeiro acesso?</p>
@@ -238,51 +212,30 @@ export default function Login() {
               Redefinir senha do motorista
             </DialogTitle>
             <DialogDescription>
-              {resetStep === "cpf" && "Informe seu CPF. Enviaremos um código por SMS."}
-              {resetStep === "otp" && `Digite o código enviado para ${resetMaskedPhone}.`}
-              {resetStep === "new" && "Defina sua nova senha (mínimo 8 caracteres)."}
+              {resetStep === "cpf" && "Informe seu CPF. Enviaremos um link de redefinição por email."}
+              {resetStep === "sent" && `Enviamos um email para ${resetMaskedEmail}. Abra a mensagem e clique no link para definir uma nova senha.`}
             </DialogDescription>
           </DialogHeader>
 
           {resetStep === "cpf" && (
-            <form onSubmit={sendResetOtp} className="space-y-4">
+            <form onSubmit={sendResetEmail} className="space-y-4">
               <div className="space-y-2">
                 <Label>CPF</Label>
                 <Input value={resetCpf} onChange={(e) => setResetCpf(maskCpf(e.target.value))} placeholder="000.000.000-00" inputMode="numeric" required />
               </div>
               <Button type="submit" disabled={resetBusy} className="w-full bg-gradient-primary text-primary-foreground h-11">
-                {resetBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Phone className="h-4 w-4" /> Enviar código por SMS</>}
+                {resetBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4" /> Enviar link por email</>}
               </Button>
             </form>
           )}
 
-          {resetStep === "otp" && (
-            <form onSubmit={confirmResetOtp} className="space-y-4">
-              {resetDevCode && (
-                <p className="text-xs rounded-md bg-amber-500/10 text-amber-200 border border-amber-500/30 px-3 py-2">
-                  Modo dev (SMS não conectado). Código: <strong>{resetDevCode}</strong>
-                </p>
-              )}
-              <div className="space-y-2">
-                <Label>Código (6 dígitos)</Label>
-                <Input value={resetCode} onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" maxLength={6} className="text-center tracking-[0.5em] text-lg" required />
+          {resetStep === "sent" && (
+            <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 p-4 text-sm text-emerald-200 flex gap-2">
+              <Check className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                Caso não receba em alguns minutos, verifique a caixa de spam. O link expira após o uso.
               </div>
-              <Button type="submit" disabled={resetBusy} className="w-full bg-gradient-primary text-primary-foreground h-11">
-                {resetBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" /> Validar código</>}
-              </Button>
-            </form>
-          )}
-
-          {resetStep === "new" && (
-            <form onSubmit={submitNewPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nova senha</Label>
-                <Input type="password" value={resetNewPwd} onChange={(e) => setResetNewPwd(e.target.value)} minLength={8} required />
-              </div>
-              <Button type="submit" disabled={resetBusy} className="w-full bg-gradient-primary text-primary-foreground h-11">
-                {resetBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Redefinir senha"}
-              </Button>
-            </form>
+            </div>
           )}
         </DialogContent>
       </Dialog>

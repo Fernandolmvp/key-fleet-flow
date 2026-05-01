@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Truck, Loader2, ShieldCheck, Phone, Check } from "lucide-react";
+import { Truck, Loader2, ShieldCheck, Mail, Check } from "lucide-react";
 
 type Step = "identity" | "contact" | "otp" | "done";
 
@@ -77,14 +77,14 @@ export default function DriverFirstAccess() {
     if (!email.trim() || !/.+@.+\..+/.test(email)) return toast.error("Email inválido");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "send-otp", driver_id: driver.id, phone: phoneDigits },
+      body: { action: "send-otp", driver_id: driver.id, email: email.trim().toLowerCase() },
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha ao enviar SMS");
     setExpiresAt(data.expires_at);
     setDevCode(data.dev_code || null);
     setStep("otp");
-    toast.success("Código enviado por SMS");
+    toast.success("Código enviado por email");
   };
 
   const confirmOtp = async (e: React.FormEvent) => {
@@ -104,7 +104,7 @@ export default function DriverFirstAccess() {
     if (!driver) return;
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "send-otp", driver_id: driver.id, phone: phone.replace(/\D/g, "") },
+      body: { action: "send-otp", driver_id: driver.id, email: email.trim().toLowerCase() },
     });
     setBusy(false);
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
@@ -164,15 +164,15 @@ export default function DriverFirstAccess() {
                 <Input value={driver.full_name} disabled />
               </div>
               <div className="space-y-2">
-                <Label>Telefone (receberá SMS)</Label>
+                <Label>Telefone</Label>
                 <Input value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(11) 99999-9999" inputMode="tel" required />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>Email (receberá o código)</Label>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" required />
               </div>
               <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Phone className="h-4 w-4" /> Enviar código por SMS</>}
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4" /> Enviar código por email</>}
               </Button>
             </form>
           </>
@@ -183,11 +183,11 @@ export default function DriverFirstAccess() {
             <div>
               <h2 className="font-display text-2xl font-bold">Confirme o código</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Enviamos um código de 6 dígitos para {phone}. Válido por 5 minutos.
+                Enviamos um código de 6 dígitos para {email}. Válido por 10 minutos.
               </p>
               {devCode && (
                 <p className="mt-2 text-xs rounded-md bg-amber-500/10 text-amber-200 border border-amber-500/30 px-3 py-2">
-                  Modo desenvolvimento (Twilio não conectado). Código: <strong>{devCode}</strong>
+                  Modo desenvolvimento (template de email não configurado). Código: <strong>{devCode}</strong>
                 </p>
               )}
             </div>

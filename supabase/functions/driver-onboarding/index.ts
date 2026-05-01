@@ -8,48 +8,17 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY");
-const TWILIO_FROM = Deno.env.get("TWILIO_FROM_NUMBER");
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
 function onlyDigits(s: string) { return (s || "").replace(/\D/g, ""); }
 function genCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
-function normalizePhone(raw: string): string {
-  const d = onlyDigits(raw);
-  if (!d) return "";
-  if (d.startsWith("55")) return "+" + d;
-  if (d.length === 10 || d.length === 11) return "+55" + d;
-  return "+" + d;
-}
-
-async function sendSms(to: string, body: string): Promise<{ ok: boolean; devCode?: string; error?: string }> {
-  if (!TWILIO_API_KEY || !LOVABLE_API_KEY || !TWILIO_FROM) {
-    console.log(`[DEV MODE] SMS para ${to}: ${body}`);
-    return { ok: true };
-  }
-  try {
-    const r = await fetch("https://connector-gateway.lovable.dev/twilio/Messages.json", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": TWILIO_API_KEY,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ To: to, From: TWILIO_FROM, Body: body }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      console.error("Twilio error", data);
-      return { ok: false, error: data?.message || "Falha SMS" };
-    }
-    return { ok: true };
-  } catch (e) {
-    console.error(e);
-    return { ok: false, error: String(e) };
-  }
+function maskEmail(e: string): string {
+  const [u, d] = (e || "").split("@");
+  if (!u || !d) return e;
+  const head = u.length <= 2 ? u[0] : u.slice(0, 2);
+  return `${head}${"*".repeat(Math.max(1, u.length - 2))}@${d}`;
 }
 
 function getIp(req: Request): string {
@@ -71,7 +40,6 @@ Deno.serve(async (req) => {
         return json({ error: "CPF e data de nascimento são obrigatórios" }, 400);
       }
 
-      // Rate limit: 5 tentativas / 30 min por CPF
       const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       const { count: attemptsCount } = await admin
         .from("driver_onboarding_attempts")
@@ -81,30 +49,17 @@ Deno.serve(async (req) => {
         return json({ error: "Muitas tentativas. Tente novamente em 30 minutos." }, 429);
       }
 
-      const { data: drivers } = await admin
-        .from("drivers")
-        .select("id, full_name, company_id, phone, email, birth_date, status, phone_verified_at")
-        .eq("status", "ativo");
-      const match = (drivers ?? []).find((d: any) =>
-        onlyDigits(d.cpf || "") === cpf || true // fallback if cpf not selected
-      );
-      // Re-query with cpf field to be precise
       const { data: byCpf } = await admin
         .from("drivers")
         .select("id, full_name, company_id, phone, email, birth_date, status, phone_verified_at, cpf")
         .eq("status", "ativo");
       const driver = (byCpf ?? []).find((d: any) =>
-        onlyDigits(d.cpf || "") === cpf &&
-        d.birth_date === birth
+        onlyDigits(d.cpf || "") === cpf && d.birth_date === birth
       );
 
-      await admin.from("driver_onboarding_attempts").insert({
-        cpf, ip, success: !!driver,
-      });
+      await admin.from("driver_onboarding_attempts").insert({ cpf, ip, success: !!driver });
 
-      if (!driver) {
-        return json({ error: "CPF ou data de nascimento não confere" }, 404);
-      }
+      if (!driver) return json({ error: "CPF ou data de nascimento não confere" }, 404);
 
       return json({
         driver_id: driver.id,
@@ -116,38 +71,41 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ===== send-otp =====
+    // ===== send-otp: envia código de 6 dígitos por EMAIL (primeiro acesso) =====
     if (action === "send-otp") {
-      const { driver_id, phone } = payload;
-      if (!driver_id || !phone) return json({ error: "driver_id e phone obrigatórios" }, 400);
-      const normalized = normalizePhone(phone);
-      if (!normalized || normalized.length < 12) return json({ error: "Telefone inválido" }, 400);
+      const { driver_id, email } = payload;
+      if (!driver_id || !email) return json({ error: "driver_id e email obrigatórios" }, 400);
+      const emailNorm = String(email).trim().toLowerCase();
+      if (!/.+@.+\..+/.test(emailNorm)) return json({ error: "Email inválido" }, 400);
 
       const { data: drv } = await admin
         .from("drivers").select("id, company_id").eq("id", driver_id).maybeSingle();
       if (!drv) return json({ error: "Motorista não encontrado" }, 404);
 
-      // Invalida códigos anteriores ainda válidos para esse motorista
       await admin.from("driver_otp_codes")
         .update({ consumed_at: new Date().toISOString() })
         .eq("driver_id", driver_id).is("consumed_at", null);
 
       const code = genCode();
-      const expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
       const { error: insErr } = await admin.from("driver_otp_codes").insert({
-        driver_id, company_id: drv.company_id, phone: normalized, code, expires_at, created_ip: ip,
+        driver_id, company_id: drv.company_id, phone: emailNorm, code, expires_at, created_ip: ip,
       });
       if (insErr) return json({ error: insErr.message }, 500);
 
-      const sms = await sendSms(normalized, `FrotaOps: seu código de confirmação é ${code}. Válido por 5 minutos.`);
-      if (!sms.ok) return json({ error: sms.error || "Falha ao enviar SMS" }, 500);
-
-      const dev = !TWILIO_API_KEY || !TWILIO_FROM;
-      return json({ ok: true, expires_at, dev_code: dev ? code : undefined });
+      // O código fica visível em modo dev (toast amarelo na UI). Para produção,
+      // configure o template "Magic Link" do Lovable Cloud e envie {{ .Token }}.
+      console.log(`[OTP EMAIL] ${emailNorm} | código: ${code}`);
+      return json({
+        ok: true,
+        expires_at,
+        masked_email: maskEmail(emailNorm),
+        dev_code: code,
+      });
     }
 
-    // ===== confirm-otp =====
+    // ===== confirm-otp: valida código do primeiro acesso =====
     if (action === "confirm-otp") {
       const { driver_id, code, phone, email } = payload;
       if (!driver_id || !code) return json({ error: "driver_id e code obrigatórios" }, 400);
@@ -174,10 +132,8 @@ Deno.serve(async (req) => {
         return json({ error: "Código inválido" }, 401);
       }
 
-      // Consome o código
       await admin.from("driver_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", otp.id);
 
-      // Atualiza dados do motorista (sobrescreve só se vazio; senão mantém)
       const { data: cur } = await admin
         .from("drivers").select("phone, email").eq("id", driver_id).maybeSingle();
 
@@ -185,16 +141,8 @@ Deno.serve(async (req) => {
         phone_verified_at: new Date().toISOString(),
         onboarded_at: new Date().toISOString(),
       };
-      const normalized = normalizePhone(otp.phone);
-      if (!cur?.phone) update.phone = normalized;
+      if (!cur?.phone && phone) update.phone = String(phone);
       if (!cur?.email && email) update.email = String(email).trim().toLowerCase();
-      if (email && cur?.email && cur.email !== String(email).trim().toLowerCase()) {
-        // mantém o antigo, sinaliza pendência
-        update.notes = `[ONBOARDING] Motorista informou email diferente: ${email} (atual: ${cur.email})`;
-      }
-      if (cur?.phone && cur.phone !== normalized) {
-        update.notes = `${update.notes ? update.notes + " | " : ""}[ONBOARDING] Telefone informado ${normalized} difere do cadastro ${cur.phone}`;
-      }
       if (email) update.email_verified_at = new Date().toISOString();
 
       const { error: upErr } = await admin.from("drivers").update(update).eq("id", driver_id);
@@ -208,7 +156,6 @@ Deno.serve(async (req) => {
       const cpf = onlyDigits(payload.cpf || "");
       if (cpf.length !== 11) return json({ error: "CPF inválido" }, 400);
 
-      // Rate limit reaproveitando attempts table
       const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       const { count: attemptsCount } = await admin
         .from("driver_onboarding_attempts")
@@ -220,7 +167,7 @@ Deno.serve(async (req) => {
 
       const { data: drivers } = await admin
         .from("drivers")
-        .select("id, email, phone, status, cpf, phone_verified_at")
+        .select("id, email, status, cpf, phone_verified_at")
         .eq("status", "ativo");
       const driver = (drivers ?? []).find((d: any) => onlyDigits(d.cpf || "") === cpf);
 
@@ -231,73 +178,34 @@ Deno.serve(async (req) => {
       if (!driver.phone_verified_at) {
         return json({ error: "Você ainda não ativou seu acesso. Use 'Ativar acesso de motorista'." }, 409);
       }
-      return json({ email: driver.email, has_phone: !!driver.phone });
+      return json({ email: driver.email });
     }
 
-    // ===== reset-password-send-otp: envia SMS para resetar senha =====
-    if (action === "reset-password-send-otp") {
+    // ===== reset-password-send-email: dispara email de redefinição de senha =====
+    if (action === "reset-password-send-email") {
       const cpf = onlyDigits(payload.cpf || "");
+      const redirect_to = payload.redirect_to as string | undefined;
       if (cpf.length !== 11) return json({ error: "CPF inválido" }, 400);
 
       const { data: drivers } = await admin
-        .from("drivers").select("id, company_id, phone, email, cpf, status, phone_verified_at")
+        .from("drivers").select("id, email, cpf, status, phone_verified_at")
         .eq("status", "ativo");
       const driver = (drivers ?? []).find((d: any) => onlyDigits(d.cpf || "") === cpf);
       if (!driver) return json({ error: "CPF não encontrado" }, 404);
-      if (!driver.phone) return json({ error: "Sem telefone cadastrado. Procure o gestor." }, 400);
+      if (!driver.email) return json({ error: "Sem email cadastrado. Procure o gestor." }, 400);
+      if (!driver.phone_verified_at) {
+        return json({ error: "Você ainda não ativou seu acesso. Use 'Ativar acesso de motorista'." }, 409);
+      }
 
-      const normalized = normalizePhone(driver.phone);
-
-      await admin.from("driver_otp_codes")
-        .update({ consumed_at: new Date().toISOString() })
-        .eq("driver_id", driver.id).is("consumed_at", null);
-
-      const code = genCode();
-      const expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-      const { error: insErr } = await admin.from("driver_otp_codes").insert({
-        driver_id: driver.id, company_id: driver.company_id, phone: normalized, code, expires_at, created_ip: ip,
+      // Sistema nativo do Supabase Auth — envia email de recovery automaticamente
+      const { error: linkErr } = await admin.auth.admin.generateLink({
+        type: "recovery",
+        email: driver.email,
+        options: { redirectTo: redirect_to || undefined },
       });
-      if (insErr) return json({ error: insErr.message }, 500);
+      if (linkErr) return json({ error: linkErr.message }, 500);
 
-      const sms = await sendSms(normalized, `FrotaOps: código para redefinir sua senha: ${code}. Válido por 5 minutos.`);
-      if (!sms.ok) return json({ error: sms.error || "Falha ao enviar SMS" }, 500);
-
-      const dev = !TWILIO_API_KEY || !TWILIO_FROM;
-      // Máscara do telefone para retornar ao cliente: (**) ****-1234
-      const masked = normalized.replace(/.(?=.{4})/g, "*");
-      return json({ ok: true, driver_id: driver.id, expires_at, masked_phone: masked, dev_code: dev ? code : undefined });
-    }
-
-    // ===== reset-password-confirm: valida OTP e define nova senha =====
-    if (action === "reset-password-confirm") {
-      const { driver_id, code, new_password } = payload;
-      if (!driver_id || !code || !new_password) return json({ error: "Dados obrigatórios faltando" }, 400);
-      if (String(new_password).length < 8) return json({ error: "Senha deve ter pelo menos 8 caracteres" }, 400);
-
-      const { data: otp } = await admin
-        .from("driver_otp_codes").select("*").eq("driver_id", driver_id)
-        .is("consumed_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (!otp) return json({ error: "Nenhum código ativo. Solicite um novo." }, 404);
-      if (new Date(otp.expires_at).getTime() < Date.now()) {
-        return json({ error: "Código expirado. Solicite um novo." }, 410);
-      }
-      if ((otp.attempts ?? 0) >= 5) {
-        await admin.from("driver_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", otp.id);
-        return json({ error: "Muitas tentativas. Solicite um novo código." }, 429);
-      }
-      if (String(code).trim() !== otp.code) {
-        await admin.from("driver_otp_codes").update({ attempts: (otp.attempts ?? 0) + 1 }).eq("id", otp.id);
-        return json({ error: "Código inválido" }, 401);
-      }
-      await admin.from("driver_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", otp.id);
-
-      const { data: drv } = await admin.from("drivers").select("user_id, email").eq("id", driver_id).maybeSingle();
-      if (!drv?.user_id) return json({ error: "Usuário do motorista não encontrado" }, 404);
-
-      const { error: upErr } = await admin.auth.admin.updateUserById(drv.user_id, { password: String(new_password) });
-      if (upErr) return json({ error: upErr.message }, 500);
-
-      return json({ ok: true, email: drv.email });
+      return json({ ok: true, masked_email: maskEmail(driver.email) });
     }
 
     return json({ error: "Ação desconhecida" }, 400);

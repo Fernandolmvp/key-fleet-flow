@@ -18,6 +18,7 @@ import Colaborador from "./pages/app/Colaborador";
 import Documents from "./pages/app/Documents";
 import Approvals from "./pages/app/Approvals";
 import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
+import ResetPassword from "./pages/auth/ResetPassword";
 import Subscription from "./pages/app/Subscription";
 import Brokers from "./pages/app/Brokers";
 import Checklists from "./pages/app/Checklists";
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/app" element={<AppLayout />}>
