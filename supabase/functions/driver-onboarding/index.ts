@@ -35,7 +35,8 @@ function isValidEmail(email: string) {
 }
 
 function isStrongPassword(password: string) {
-  return /^\d{4,}$/.test(password);
+  // Aceita qualquer senha com 4+ caracteres (sem checar força/vazamento)
+  return (password || "").length >= 4;
 }
 
 function getFriendlyErrorMessage(error: unknown) {
