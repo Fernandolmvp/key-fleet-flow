@@ -78,16 +78,40 @@ export default function Colaborador() {
   const load = async () => {
     if (!currentCompanyId || !user) return;
     setLoading(true);
-    const [{ data: v }, { data: a }, { data: drv }, { data: st }] = await Promise.all([
+    const [{ data: v }, { data: a }, { data: drv }, { data: st }, { data: tpl }] = await Promise.all([
       supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("company_id", currentCompanyId).in("status", ["ativo","manutencao"]).order("plate"),
       supabase.from("fuel_authorizations").select("*").eq("company_id", currentCompanyId).eq("requested_by", user.id).order("requested_at", { ascending: false }).limit(20),
-      supabase.from("drivers").select("id,full_name,auto_fuel_authorized,manager_user_id").eq("company_id", currentCompanyId).eq("user_id", user.id).maybeSingle(),
+      supabase.from("drivers").select("id,full_name,auto_fuel_authorized,manager_user_id,has_assigned_vehicle,assigned_vehicle_id").eq("company_id", currentCompanyId).eq("user_id", user.id).maybeSingle(),
       supabase.from("fuel_stations").select("id,name,cnpj,brand,city,state").eq("company_id", currentCompanyId).eq("active", true).order("name"),
+      supabase.from("checklist_templates").select("id,name,frequency,active").eq("company_id", currentCompanyId).eq("active", true).order("name"),
     ]);
     setVehicles(v ?? []);
     setAuths((a ?? []) as Auth[]);
     setDriver(drv ?? null);
     setStations(st ?? []);
+    setTemplates(tpl ?? []);
+
+    if (drv?.has_assigned_vehicle && drv?.assigned_vehicle_id) {
+      const av = (v ?? []).find((x: any) => x.id === drv.assigned_vehicle_id);
+      if (av) setAssignedVehicle(av);
+      else {
+        const { data: avFetch } = await supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("id", drv.assigned_vehicle_id).maybeSingle();
+        setAssignedVehicle(avFetch ?? null);
+      }
+    } else {
+      setAssignedVehicle(null);
+    }
+
+    if (drv?.id) {
+      const [{ data: mr }, { data: cr }] = await Promise.all([
+        supabase.from("maintenance_records").select("id,description,category,status,service_at,vehicle_id").eq("company_id", currentCompanyId).eq("driver_id", drv.id).eq("type", "corretiva").order("service_at", { ascending: false }).limit(10),
+        supabase.from("checklist_runs").select("id,status,started_at,completed_at,template_id,vehicle_id,score").eq("company_id", currentCompanyId).eq("driver_id", drv.id).order("created_at", { ascending: false }).limit(10),
+      ]);
+      setMyMaint(mr ?? []);
+      setMyRuns(cr ?? []);
+    } else {
+      setMyMaint([]); setMyRuns([]);
+    }
 
     if (drv?.manager_user_id) {
       const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", drv.manager_user_id).maybeSingle();
