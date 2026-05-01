@@ -346,6 +346,28 @@ export default function Colaborador() {
 
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
 
+  // Código fica visível por 20 minutos após a aprovação. Depois disso some da tela
+  // do motorista (mas continua válido no backend até expires_at de 24h, para o gestor).
+  const CODE_VISIBLE_MINUTES = 20;
+  const codeStillVisible = (approvedAt: string | null) => {
+    if (!approvedAt) return false;
+    const ageMs = Date.now() - new Date(approvedAt).getTime();
+    return ageMs <= CODE_VISIBLE_MINUTES * 60 * 1000;
+  };
+
+  // Tick a cada 30s para que o código suma sozinho ao passar dos 20 min
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((n) => n + 1), 30 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Bloqueia nova solicitação se houver alguma aprovada sem cupom enviado
+  const blockingPending = useMemo(
+    () => auths.find((a) => a.status === "aprovada" && !a.confirmed_at) ?? null,
+    [auths],
+  );
+
   // Cidades distintas que possuem postos cadastrados
   const stationCities = useMemo(() => {
     const map = new Map<string, { city: string; state: string | null; count: number }>();
