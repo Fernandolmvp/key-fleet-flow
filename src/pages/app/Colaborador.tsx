@@ -66,12 +66,14 @@ export default function Colaborador() {
   const [matchedVehicle, setMatchedVehicle] = useState<any | null>(null);
   const [stationCity, setStationCity] = useState("");
   const [stationId, setStationId] = useState("");
-  const [estLiters, setEstLiters] = useState("");
-  const [estValue, setEstValue] = useState("");
 
   // Confirmação pós-abastecimento
   const [confirmAuthId, setConfirmAuthId] = useState<string | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
+  // Dados que o motorista informa ao enviar o cupom
+  const [receiptFuelType, setReceiptFuelType] = useState<string>("diesel_s10");
+  const [receiptLiters, setReceiptLiters] = useState<string>("");
+  const [receiptUnitValue, setReceiptUnitValue] = useState<string>("");
 
   const kmInputRef = useRef<HTMLInputElement>(null);
   const plateInputRef = useRef<HTMLInputElement>(null);
@@ -129,7 +131,7 @@ export default function Colaborador() {
   const reset = () => {
     setStep(1); setKmPhoto(null); setKmPhotoUrl(null); setKmRead(null);
     setPlatePhoto(null); setPlatePhotoUrl(null); setPlateRead(null); setMatchedVehicle(null);
-    setStationCity(""); setStationId(""); setEstLiters(""); setEstValue("");
+    setStationCity(""); setStationId("");
     setShowWizard(false);
   };
 
@@ -199,8 +201,8 @@ export default function Colaborador() {
       driver_id: driver?.id ?? null,
       fuel_station_id: stationId,
       station_name: station?.name ?? null,
-      estimated_liters: estLiters ? Number(estLiters) : null,
-      estimated_value: estValue ? Number(estValue) : null,
+      estimated_liters: null,
+      estimated_value: null,
       fuel_type: matchedVehicle.fuel_type || null,
       km_at_request: kmRead,
       km_photo_url: kmPhotoUrl,
