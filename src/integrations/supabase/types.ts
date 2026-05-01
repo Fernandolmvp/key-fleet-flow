@@ -834,8 +834,8 @@ export type Database = {
           driver_id: string
           id: string
           inactivated_at: string | null
-          new_status: string
-          previous_status: string | null
+          new_status: Database["public"]["Enums"]["driver_status"]
+          previous_status: Database["public"]["Enums"]["driver_status"] | null
           reason: string | null
           termination_date: string | null
         }
@@ -846,8 +846,8 @@ export type Database = {
           driver_id: string
           id?: string
           inactivated_at?: string | null
-          new_status: string
-          previous_status?: string | null
+          new_status: Database["public"]["Enums"]["driver_status"]
+          previous_status?: Database["public"]["Enums"]["driver_status"] | null
           reason?: string | null
           termination_date?: string | null
         }
@@ -858,8 +858,8 @@ export type Database = {
           driver_id?: string
           id?: string
           inactivated_at?: string | null
-          new_status?: string
-          previous_status?: string | null
+          new_status?: Database["public"]["Enums"]["driver_status"]
+          previous_status?: Database["public"]["Enums"]["driver_status"] | null
           reason?: string | null
           termination_date?: string | null
         }
