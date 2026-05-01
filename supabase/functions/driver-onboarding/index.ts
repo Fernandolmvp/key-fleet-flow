@@ -79,6 +79,27 @@ async function ensureDriverRole(companyId: string, userId: string) {
   }
 }
 
+async function ensureDriverAccessBindings(
+  driver: { company_id: string; full_name: string },
+  userId: string,
+  phone: string | null,
+) {
+  await ensureCompanyMember(driver.company_id, userId);
+  await ensureDriverRole(driver.company_id, userId);
+
+  const { error: profileError } = await admin.from("profiles").upsert(
+    {
+      id: userId,
+      full_name: driver.full_name,
+      phone: phone || null,
+      current_company_id: driver.company_id,
+    },
+    { onConflict: "id" },
+  );
+
+  if (profileError) throw profileError;
+}
+
 async function ensureDriverAuthUser(
   driver: { user_id: string | null; full_name: string; company_id: string },
   email: string,
@@ -118,19 +139,12 @@ async function ensureDriverAuthUser(
 
   if (!authUserId) throw new Error("Não foi possível preparar o acesso do motorista.");
 
-  await ensureCompanyMember(driver.company_id, authUserId);
-  await ensureDriverRole(driver.company_id, authUserId);
+  await ensureDriverAccessBindings(driver, authUserId, phone || null);
 
-  // Garante profile com nome e telefone
-  await admin.from("profiles").upsert(
-    {
-      id: authUserId,
-      full_name: driver.full_name,
-      phone: phone || null,
-      current_company_id: driver.company_id,
-    },
-    { onConflict: "id" },
-  );
+  const { data: confirmedUser, error: confirmedUserError } = await admin.auth.admin.getUserById(authUserId);
+  if (confirmedUserError || !confirmedUser.user) {
+    throw confirmedUserError ?? new Error("Usuário do motorista não encontrado após a ativação.");
+  }
 
   return authUserId;
 }
@@ -186,6 +200,7 @@ Deno.serve(async (req) => {
         full_name: driver.full_name,
         company_id: driver.company_id,
         existing_email: driver.email || null,
+        existing_phone: driver.phone || null,
         already_onboarded: !!driver.onboarded_at,
       });
     }
@@ -309,6 +324,7 @@ Deno.serve(async (req) => {
           email,
           phone: phone || null,
           email_verified_at: new Date().toISOString(),
+          phone_verified_at: phone ? new Date().toISOString() : null,
           onboarded_at: new Date().toISOString(),
         })
         .eq("id", driverId);
@@ -338,7 +354,7 @@ Deno.serve(async (req) => {
 
       const { data: drivers } = await admin
         .from("drivers")
-        .select("id, email, status, cpf, onboarded_at")
+        .select("id, email, status, cpf, onboarded_at, user_id, company_id, full_name, phone, email_verified_at")
         .eq("status", "ativo");
 
       const driver = (drivers ?? []).find((item: any) => onlyDigits(item.cpf || "") === cpf);
@@ -349,6 +365,37 @@ Deno.serve(async (req) => {
       if (!driver.email) return json({ error: "Motorista sem email cadastrado. Procure o gestor." }, 404);
       if (!driver.onboarded_at) {
         return json({ error: "Você ainda não ativou seu acesso. Use 'Ativar acesso de motorista'." }, 409);
+      }
+
+      let authUserId = driver.user_id || null;
+
+      if (authUserId) {
+        const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(authUserId);
+        if (authUserError || !authUser.user) authUserId = null;
+      }
+
+      if (!authUserId) {
+        const authUser = await findAuthUserByEmail(String(driver.email).toLowerCase());
+        authUserId = authUser?.id ?? null;
+      }
+
+      if (!authUserId) {
+        return json({ error: "Seu acesso anterior não foi concluído corretamente. Use 'Ativar acesso de motorista' novamente para finalizar." }, 409);
+      }
+
+      await ensureDriverAccessBindings(driver, authUserId, driver.phone || null);
+
+      if (driver.user_id !== authUserId) {
+        const { error: repairError } = await admin
+          .from("drivers")
+          .update({
+            user_id: authUserId,
+            email_verified_at: driver.email_verified_at || new Date().toISOString(),
+            onboarded_at: driver.onboarded_at || new Date().toISOString(),
+          })
+          .eq("id", driver.id);
+
+        if (repairError) return json({ error: repairError.message }, 500);
       }
 
       return json({ email: driver.email });
