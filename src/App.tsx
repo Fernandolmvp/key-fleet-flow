@@ -15,6 +15,7 @@ import FuelStations from "./pages/app/FuelStations";
 import Maintenance from "./pages/app/Maintenance";
 import Tires from "./pages/app/Tires";
 import Colaborador from "./pages/app/Colaborador";
+import MotoristaShell from "./pages/motorista/MotoristaShell";
 import Documents from "./pages/app/Documents";
 import Approvals from "./pages/app/Approvals";
 import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
+            <Route path="/motorista" element={<MotoristaShell />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />

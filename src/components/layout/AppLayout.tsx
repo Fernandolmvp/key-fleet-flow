@@ -96,9 +96,9 @@ export default function AppLayout() {
   );
   if (!user) return <Navigate to="/login" replace state={{ from: loc }} />;
 
-  // Motorista (sem cargo de gestão) só acessa /app/colaborador
-  if (isDriverOnly && loc.pathname !== "/app/colaborador") {
-    return <Navigate to="/app/colaborador" replace />;
+  // Motorista (sem cargo de gestão) usa interface dedicada mobile, fora do AppLayout
+  if (isDriverOnly) {
+    return <Navigate to="/motorista" replace />;
   }
 
   const currentCompany = companies.find((c) => c.id === currentCompanyId);
