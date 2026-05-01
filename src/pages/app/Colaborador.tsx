@@ -64,7 +64,7 @@ export default function Colaborador() {
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [plateRead, setPlateRead] = useState<string | null>(null);
   const [matchedVehicle, setMatchedVehicle] = useState<any | null>(null);
-  const [stationSearch, setStationSearch] = useState("");
+  const [stationCity, setStationCity] = useState("");
   const [stationId, setStationId] = useState("");
   const [estLiters, setEstLiters] = useState("");
   const [estValue, setEstValue] = useState("");
@@ -129,7 +129,7 @@ export default function Colaborador() {
   const reset = () => {
     setStep(1); setKmPhoto(null); setKmPhotoUrl(null); setKmRead(null);
     setPlatePhoto(null); setPlatePhotoUrl(null); setPlateRead(null); setMatchedVehicle(null);
-    setStationSearch(""); setStationId(""); setEstLiters(""); setEstValue("");
+    setStationCity(""); setStationId(""); setEstLiters(""); setEstValue("");
     setShowWizard(false);
   };
 
@@ -346,13 +346,27 @@ export default function Colaborador() {
 
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
 
-  const filteredStations = useMemo(() => {
-    const q = stationSearch.trim().toLowerCase();
-    if (!q) return stations;
-    return stations.filter((s) =>
-      [s.name, s.brand, s.cnpj, s.city].filter(Boolean).some((v: string) => String(v).toLowerCase().includes(q))
+  // Cidades distintas que possuem postos cadastrados
+  const stationCities = useMemo(() => {
+    const map = new Map<string, { city: string; state: string | null; count: number }>();
+    stations.forEach((s) => {
+      const city = (s.city ?? "").trim();
+      if (!city) return;
+      const key = `${city}|${s.state ?? ""}`;
+      const cur = map.get(key);
+      if (cur) cur.count += 1;
+      else map.set(key, { city, state: s.state ?? null, count: 1 });
+    });
+    return Array.from(map.values()).sort((a, b) => a.city.localeCompare(b.city));
+  }, [stations]);
+
+  const stationsInCity = useMemo(() => {
+    if (!stationCity) return [];
+    const [city, state] = stationCity.split("|");
+    return stations.filter(
+      (s) => (s.city ?? "") === city && (s.state ?? "") === (state ?? ""),
     );
-  }, [stations, stationSearch]);
+  }, [stations, stationCity]);
 
   return (
     <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-24">
