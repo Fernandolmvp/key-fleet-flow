@@ -60,7 +60,6 @@ const App = () => (
               <Route path="insurance" element={<Insurance />} />
               <Route path="brokers" element={<Brokers />} />
               <Route path="assinatura" element={<Subscription />} />
-              <Route path="colaborador" element={<Colaborador />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
