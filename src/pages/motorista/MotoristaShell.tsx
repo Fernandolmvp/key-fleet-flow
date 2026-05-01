@@ -16,8 +16,12 @@ export default function MotoristaShell() {
   }
   if (!user) return <Navigate to="/login" replace state={{ from: loc }} />;
 
-  // Precisa ter o papel de motorista para acessar este painel
-  if (!roles.includes("motorista")) return <Navigate to="/app" replace />;
+  // Permite motoristas, admins e gestores acessarem o modo motorista
+  const allowed =
+    roles.includes("motorista") ||
+    roles.includes("admin") ||
+    roles.includes("gestor_frota");
+  if (!allowed) return <Navigate to="/app" replace />;
 
   return (
     <div className="min-h-screen bg-background">
