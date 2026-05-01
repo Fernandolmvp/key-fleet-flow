@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, ShieldCheck, Clock, Truck, LogOut, Receipt, CheckCircle2, UserCheck, Camera, Gauge, Search, AlertTriangle, FileCheck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Plus, ShieldCheck, Clock, Truck, LogOut, Receipt, CheckCircle2, UserCheck, Camera, Gauge, Search, AlertTriangle, FileCheck, Fuel as FuelIcon, ClipboardList, Wrench, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { extractDocument } from "@/lib/ai-extract";
 
@@ -39,9 +41,17 @@ export default function Colaborador() {
   const [auths, setAuths] = useState<Auth[]>([]);
   const [driver, setDriver] = useState<any | null>(null);
   const [managerName, setManagerName] = useState<string | null>(null);
+  const [assignedVehicle, setAssignedVehicle] = useState<any | null>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"abastecimento" | "checklist" | "manutencao">("abastecimento");
+  const [maintDesc, setMaintDesc] = useState("");
+  const [maintCategory, setMaintCategory] = useState("Outros");
+  const [maintBusy, setMaintBusy] = useState(false);
+  const [myMaint, setMyMaint] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [myRuns, setMyRuns] = useState<any[]>([]);
 
   // Etapas: 1-foto KM, 2-foto placa (IA valida), 3-posto, 4-revisar/enviar
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -68,16 +78,40 @@ export default function Colaborador() {
   const load = async () => {
     if (!currentCompanyId || !user) return;
     setLoading(true);
-    const [{ data: v }, { data: a }, { data: drv }, { data: st }] = await Promise.all([
+    const [{ data: v }, { data: a }, { data: drv }, { data: st }, { data: tpl }] = await Promise.all([
       supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("company_id", currentCompanyId).in("status", ["ativo","manutencao"]).order("plate"),
       supabase.from("fuel_authorizations").select("*").eq("company_id", currentCompanyId).eq("requested_by", user.id).order("requested_at", { ascending: false }).limit(20),
-      supabase.from("drivers").select("id,full_name,auto_fuel_authorized,manager_user_id").eq("company_id", currentCompanyId).eq("user_id", user.id).maybeSingle(),
+      supabase.from("drivers").select("id,full_name,auto_fuel_authorized,manager_user_id,has_assigned_vehicle,assigned_vehicle_id").eq("company_id", currentCompanyId).eq("user_id", user.id).maybeSingle(),
       supabase.from("fuel_stations").select("id,name,cnpj,brand,city,state").eq("company_id", currentCompanyId).eq("active", true).order("name"),
+      supabase.from("checklist_templates").select("id,name,frequency,active").eq("company_id", currentCompanyId).eq("active", true).order("name"),
     ]);
     setVehicles(v ?? []);
     setAuths((a ?? []) as Auth[]);
     setDriver(drv ?? null);
     setStations(st ?? []);
+    setTemplates(tpl ?? []);
+
+    if (drv?.has_assigned_vehicle && drv?.assigned_vehicle_id) {
+      const av = (v ?? []).find((x: any) => x.id === drv.assigned_vehicle_id);
+      if (av) setAssignedVehicle(av);
+      else {
+        const { data: avFetch } = await supabase.from("vehicles").select("id,plate,brand,model,fuel_type,current_km").eq("id", drv.assigned_vehicle_id).maybeSingle();
+        setAssignedVehicle(avFetch ?? null);
+      }
+    } else {
+      setAssignedVehicle(null);
+    }
+
+    if (drv?.id) {
+      const [{ data: mr }, { data: cr }] = await Promise.all([
+        supabase.from("maintenance_records").select("id,description,category,status,service_at,vehicle_id").eq("company_id", currentCompanyId).eq("driver_id", drv.id).eq("type", "corretiva").order("service_at", { ascending: false }).limit(10),
+        supabase.from("checklist_runs").select("id,status,started_at,completed_at,template_id,vehicle_id,score").eq("company_id", currentCompanyId).eq("driver_id", drv.id).order("created_at", { ascending: false }).limit(10),
+      ]);
+      setMyMaint(mr ?? []);
+      setMyRuns(cr ?? []);
+    } else {
+      setMyMaint([]); setMyRuns([]);
+    }
 
     if (drv?.manager_user_id) {
       const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", drv.manager_user_id).maybeSingle();
@@ -130,6 +164,9 @@ export default function Colaborador() {
       if (!veh) {
         setPlatePhoto(file); setPlatePhotoUrl(archivedUrl); setPlateRead(plate); setMatchedVehicle(null);
         throw new Error(`Placa ${plate} não está cadastrada. Procure seu gestor.`);
+      }
+      if (assignedVehicle && veh.id !== assignedVehicle.id) {
+        throw new Error(`Você está vinculado ao veículo ${assignedVehicle.plate}. Esta placa (${plate}) não corresponde.`);
       }
       // KM lido tem que ser >= current_km
       if (kmRead != null && veh.current_km != null && kmRead < veh.current_km) {
@@ -231,10 +268,43 @@ export default function Colaborador() {
         await supabase.from("fuel_authorization_items").insert(rows);
       }
 
+      // Cria registro em fuel_records (módulo de Abastecimentos) quando válido
+      if (cnpjMatch !== false) {
+        const fuelItem = items.find((it: any) => it.is_fuel) || items[0];
+        const liters = Number(fuelItem?.quantity ?? (data as any)?.liters ?? auth.estimated_liters ?? 0);
+        const ppl = Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
+        const total = Number(data?.total_value ?? fuelItem?.total ?? auth.estimated_value ?? 0);
+        if (liters > 0 && total > 0) {
+          const station = stations.find((x) => x.id === auth.fuel_station_id);
+          const fuelType = (fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
+          const { data: fr, error: frErr } = await supabase.from("fuel_records").insert({
+            company_id: currentCompanyId,
+            vehicle_id: auth.vehicle_id,
+            driver_id: driver?.id ?? null,
+            fuel_station_id: auth.fuel_station_id,
+            station_name: station?.name ?? auth.station_name,
+            station_cnpj: station?.cnpj ?? cupomCnpj ?? null,
+            city: station?.city ?? null,
+            state: station?.state ?? null,
+            fuel_type: fuelType,
+            liters,
+            price_per_liter: ppl > 0 ? ppl : Number((total / liters).toFixed(3)),
+            total_value: total,
+            km_at_fueling: auth.km_at_request ?? 0,
+            payment_method: "cartao_frota",
+            receipt_url: archivedUrl,
+            created_by: user?.id,
+          }).select("id").maybeSingle();
+          if (!frErr && fr?.id) {
+            await supabase.from("fuel_authorizations").update({ fuel_record_id: fr.id }).eq("id", auth.id);
+          }
+        }
+      }
+
       if (cnpjMatch === false) {
         toast.error("CNPJ do cupom não confere com o posto. Solicitação enviada para revisão do gestor.");
       } else {
-        toast.success("Abastecimento confirmado!");
+        toast.success("Abastecimento confirmado e registrado!");
       }
       setConfirmAuthId(null);
       load();
@@ -243,6 +313,31 @@ export default function Colaborador() {
     } finally {
       setReceiptBusy(false);
     }
+  };
+
+  // ====== MANUTENÇÃO CORRETIVA ======
+  const submitMaintenance = async () => {
+    if (!currentCompanyId || !user) return;
+    if (!maintDesc.trim()) return toast.error("Descreva o problema observado");
+    const vehicleId = assignedVehicle?.id;
+    if (!vehicleId) return toast.error("Sem veículo vinculado. Procure seu gestor.");
+    setMaintBusy(true);
+    const { error } = await supabase.from("maintenance_records").insert({
+      company_id: currentCompanyId,
+      vehicle_id: vehicleId,
+      driver_id: driver?.id ?? null,
+      type: "corretiva",
+      category: maintCategory,
+      status: "agendada",
+      service_at: new Date().toISOString(),
+      description: `[SOLICITAÇÃO MOTORISTA] ${maintDesc}`,
+      created_by: user.id,
+    });
+    setMaintBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Solicitação de manutenção enviada ao gestor");
+    setMaintDesc(""); setMaintCategory("Outros");
+    load();
   };
 
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
@@ -256,19 +351,27 @@ export default function Colaborador() {
   }, [stations, stationSearch]);
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-10">
+    <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-24">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-bold flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" /> Abastecimento
+            <ShieldCheck className="h-5 w-5 text-primary" /> Painel do Motorista
           </h1>
           <p className="text-xs text-muted-foreground">{driver?.full_name ?? user?.email}</p>
         </div>
         <Button variant="outline" size="sm" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
       </div>
 
-      {/* Status de autorização */}
-      <div className={`rounded-xl border p-4 ${driver?.auto_fuel_authorized ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"}`}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <TabsList className="grid grid-cols-3 w-full">
+          <TabsTrigger value="abastecimento" className="text-xs gap-1"><FuelIcon className="h-3.5 w-3.5" />Abastec.</TabsTrigger>
+          <TabsTrigger value="checklist" className="text-xs gap-1"><ClipboardList className="h-3.5 w-3.5" />Checklist</TabsTrigger>
+          <TabsTrigger value="manutencao" className="text-xs gap-1"><Wrench className="h-3.5 w-3.5" />Manut.</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="abastecimento" className="space-y-5 mt-4">
+          {/* Status de autorização */}
+          <div className={`rounded-xl border p-4 ${driver?.auto_fuel_authorized ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"}`}>
         <div className="flex items-center gap-3">
           {driver?.auto_fuel_authorized ? (
             <CheckCircle2 className="h-6 w-6 text-success" />
@@ -488,6 +591,128 @@ export default function Colaborador() {
             );
           })
         )}
+      </div>
+        </TabsContent>
+
+        {/* ===== CHECKLIST ===== */}
+        <TabsContent value="checklist" className="space-y-3 mt-4">
+          <div className="surface-card rounded-xl p-4 space-y-2">
+            <h3 className="font-display font-semibold text-sm flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" /> Checklists disponíveis
+            </h3>
+            {templates.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhum modelo de checklist publicado pela empresa.</p>
+            ) : templates.map((t) => (
+              <div key={t.id} className="rounded-md border border-border p-3 text-xs flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{t.name}</div>
+                  <div className="text-muted-foreground capitalize">{t.frequency}</div>
+                </div>
+                <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">Pelo gestor</Badge>
+              </div>
+            ))}
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Os checklists são abertos pelo gestor a partir do veículo. Em breve, preenchimento direto pelo motorista.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-display font-semibold text-sm px-1">Meus últimos checklists</h3>
+            {myRuns.length === 0 ? (
+              <div className="surface-card rounded-xl p-6 text-center text-xs text-muted-foreground">
+                Nenhum checklist registrado ainda.
+              </div>
+            ) : myRuns.map((r) => {
+              const veh = vehicles.find((v) => v.id === r.vehicle_id);
+              return (
+                <div key={r.id} className="surface-card rounded-xl p-3 text-xs flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5"><Truck className="h-3 w-3 text-primary" /> <span className="font-mono">{veh?.plate ?? "—"}</span></div>
+                    <div className="text-muted-foreground text-[10px] mt-0.5">{r.completed_at ? new Date(r.completed_at).toLocaleString("pt-BR") : "Em andamento"}</div>
+                  </div>
+                  <Badge className="text-[10px] capitalize">{r.status}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* ===== MANUTENÇÃO CORRETIVA ===== */}
+        <TabsContent value="manutencao" className="space-y-3 mt-4">
+          <div className="surface-card rounded-xl p-4 space-y-3">
+            <h3 className="font-display font-semibold text-sm flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-primary" /> Solicitar manutenção corretiva
+            </h3>
+            {!assignedVehicle ? (
+              <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs flex items-start gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                <span>Você não tem veículo vinculado. Procure seu gestor para abrir solicitações.</span>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-md bg-primary/5 border border-primary/20 p-2 text-xs">
+                  <div className="flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-primary" /><span className="font-mono font-semibold">{assignedVehicle.plate}</span> · {assignedVehicle.brand} {assignedVehicle.model}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Categoria</Label>
+                  <Select value={maintCategory} onValueChange={setMaintCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["Motor","Freios","Suspensão","Elétrica","Câmbio","Pneus","Arrefecimento","Vidros","Funilaria/Pintura","Outros"].map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Descreva o problema</Label>
+                  <Textarea rows={4} value={maintDesc} onChange={(e) => setMaintDesc(e.target.value)} placeholder="Ex.: Barulho ao frear, pisca-alerta não funciona, perda de potência..." />
+                </div>
+                <Button onClick={submitMaintenance} disabled={maintBusy} className="w-full bg-gradient-primary text-primary-foreground">
+                  {maintBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Enviar solicitação
+                </Button>
+              </>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-display font-semibold text-sm px-1">Minhas solicitações</h3>
+            {myMaint.length === 0 ? (
+              <div className="surface-card rounded-xl p-6 text-center text-xs text-muted-foreground">
+                Nenhuma solicitação registrada.
+              </div>
+            ) : myMaint.map((m) => {
+              const veh = vehicles.find((v) => v.id === m.vehicle_id);
+              return (
+                <div key={m.id} className="surface-card rounded-xl p-3 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5"><Truck className="h-3 w-3 text-primary" /><span className="font-mono">{veh?.plate ?? "—"}</span> · {m.category}</div>
+                    <Badge className="text-[10px] capitalize">{m.status}</Badge>
+                  </div>
+                  <div className="text-muted-foreground line-clamp-2">{m.description}</div>
+                  <div className="text-[10px] text-muted-foreground">{new Date(m.service_at).toLocaleString("pt-BR")}</div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Rodapé fixo: vínculo com veículo */}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background-elevated/95 backdrop-blur px-4 py-2 z-40">
+        <div className="max-w-md mx-auto flex items-center gap-2 text-xs">
+          <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
+          {assignedVehicle ? (
+            <>
+              <span className="text-muted-foreground">Veículo vinculado:</span>
+              <span className="font-mono font-semibold text-primary">{assignedVehicle.plate}</span>
+              <span className="text-muted-foreground truncate">· {assignedVehicle.brand} {assignedVehicle.model}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">Sem veículo vinculado · solicite ao gestor</span>
+          )}
+        </div>
       </div>
     </div>
   );
