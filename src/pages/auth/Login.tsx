@@ -63,7 +63,7 @@ export default function Login() {
     setBusy(false);
     if (sErr) return toast.error("CPF ou senha inválidos");
     toast.success("Bem-vindo");
-    nav("/app");
+    nav("/motorista");
   };
 
   const openReset = () => {
