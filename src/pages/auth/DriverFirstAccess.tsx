@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ function brToIso(v: string): string | null {
 }
 
 export default function DriverFirstAccess() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>("identity");
   const [busy, setBusy] = useState(false);
 
@@ -53,6 +54,27 @@ export default function DriverFirstAccess() {
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
 
+  const signInAfterActivation = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (!signInError) {
+        toast.success("Bem-vindo!");
+        navigate("/app/colaborador", { replace: true });
+        return true;
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 700));
+    }
+
+    return false;
+  };
+
   const verifyIdentity = async (e: React.FormEvent) => {
     e.preventDefault();
     const cpfDigits = cpf.replace(/\D/g, "");
@@ -67,6 +89,7 @@ export default function DriverFirstAccess() {
     if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
     setDriver({ id: data.driver_id, full_name: data.full_name, existing_email: data.existing_email });
     setEmail(data.existing_email || "");
+    setPhone(maskPhone(data.existing_phone || ""));
     setStep("contact");
   };
 
@@ -108,18 +131,12 @@ export default function DriverFirstAccess() {
       setBusy(false);
       return toast.error(data?.error || error?.message || "Código inválido");
     }
-    // Login automático após confirmar OTP
-    const { error: sErr } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+
+    const loggedIn = await signInAfterActivation();
     setBusy(false);
-    if (sErr) {
-      setStep("done");
-      return toast.success("Acesso ativado! Faça login com seu CPF e senha.");
+    if (!loggedIn) {
+      return toast.error("Seu acesso foi ativado, mas a entrada automática falhou. Tente entrar novamente em alguns segundos.");
     }
-    toast.success("Bem-vindo!");
-    window.location.href = "/app";
   };
 
   const resend = async () => {
