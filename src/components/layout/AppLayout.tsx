@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +53,7 @@ function isGroup(e: NavEntry): e is NavGroup {
 }
 
 export default function AppLayout() {
-  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin } = useAuth();
+  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin, roles } = useAuth();
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
@@ -102,6 +102,7 @@ export default function AppLayout() {
   }
 
   const currentCompany = companies.find((c) => c.id === currentCompanyId);
+  const hasDriverRole = roles.includes("motorista");
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
     : nav;
@@ -253,6 +254,11 @@ export default function AppLayout() {
               {isSuperAdmin && (
                 <DropdownMenuItem onClick={() => window.location.href = "/super-admin"}>
                   <ShieldCheck className="h-4 w-4 mr-2" /> Painel Super Admin
+                </DropdownMenuItem>
+              )}
+              {hasDriverRole && (
+                <DropdownMenuItem onClick={() => window.location.href = "/motorista"}>
+                  <UserCheck className="h-4 w-4 mr-2" /> Modo Motorista
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={signOut} className="text-destructive">

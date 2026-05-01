@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import Colaborador from "@/pages/app/Colaborador";
 
 export default function MotoristaShell() {
-  const { user, loading, isDriverOnly, isManager, isSuperAdmin } = useAuth();
+  const { user, loading, roles } = useAuth();
   const loc = useLocation();
 
   if (loading) {
@@ -16,11 +16,8 @@ export default function MotoristaShell() {
   }
   if (!user) return <Navigate to="/login" replace state={{ from: loc }} />;
 
-  // Gestores/admins não acessam o painel do motorista
-  if (isManager || isSuperAdmin) return <Navigate to="/app" replace />;
-
-  // Apenas motoristas devidamente cadastrados
-  if (!isDriverOnly) return <Navigate to="/app" replace />;
+  // Precisa ter o papel de motorista para acessar este painel
+  if (!roles.includes("motorista")) return <Navigate to="/app" replace />;
 
   return (
     <div className="min-h-screen bg-background">
