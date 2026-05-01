@@ -79,7 +79,12 @@ async function ensureDriverRole(companyId: string, userId: string) {
   }
 }
 
-async function ensureDriverAuthUser(driver: { user_id: string | null; full_name: string; company_id: string }, email: string, password: string) {
+async function ensureDriverAuthUser(
+  driver: { user_id: string | null; full_name: string; company_id: string },
+  email: string,
+  password: string,
+  phone: string | null,
+) {
   let authUserId = driver.user_id;
 
   if (authUserId) {
@@ -97,7 +102,7 @@ async function ensureDriverAuthUser(driver: { user_id: string | null; full_name:
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: driver.full_name },
+      user_metadata: { full_name: driver.full_name, phone: phone || undefined },
     });
     if (error) throw error;
   } else {
@@ -105,7 +110,7 @@ async function ensureDriverAuthUser(driver: { user_id: string | null; full_name:
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: driver.full_name },
+      user_metadata: { full_name: driver.full_name, phone: phone || undefined },
     });
     if (error) throw error;
     authUserId = data.user?.id ?? null;
@@ -115,6 +120,17 @@ async function ensureDriverAuthUser(driver: { user_id: string | null; full_name:
 
   await ensureCompanyMember(driver.company_id, authUserId);
   await ensureDriverRole(driver.company_id, authUserId);
+
+  // Garante profile com nome e telefone
+  await admin.from("profiles").upsert(
+    {
+      id: authUserId,
+      full_name: driver.full_name,
+      phone: phone || null,
+      current_company_id: driver.company_id,
+    },
+    { onConflict: "id" },
+  );
 
   return authUserId;
 }
@@ -232,6 +248,7 @@ Deno.serve(async (req) => {
       const code = String(payload.code || "").trim();
       const email = String(payload.email || "").trim().toLowerCase();
       const password = String(payload.password || "");
+      const phone = onlyDigits(String(payload.phone || ""));
 
       if (!driverId || !code || !email || !password) {
         return json({ error: "driver_id, code, email e senha são obrigatórios" }, 400);
@@ -281,7 +298,7 @@ Deno.serve(async (req) => {
         return json({ error: "Motorista não encontrado" }, 404);
       }
 
-      const authUserId = await ensureDriverAuthUser(driver, email, password);
+      const authUserId = await ensureDriverAuthUser(driver, email, password, phone || null);
 
       await admin.from("driver_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", otp.id);
 
@@ -290,6 +307,7 @@ Deno.serve(async (req) => {
         .update({
           user_id: authUserId,
           email,
+          phone: phone || null,
           email_verified_at: new Date().toISOString(),
           onboarded_at: new Date().toISOString(),
         })
