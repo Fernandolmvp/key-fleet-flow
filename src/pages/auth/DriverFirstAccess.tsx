@@ -98,8 +98,8 @@ export default function DriverFirstAccess() {
     if (!driver) return;
     if (!email.trim() || !/.+@.+\..+/.test(email)) return toast.error("Email inválido");
     if (phone.replace(/\D/g, "").length < 10) return toast.error("Telefone inválido");
-    if (password.length < 4) {
-      return toast.error("A senha precisa ter pelo menos 4 caracteres");
+    if (!/^\d{6,}$/.test(password)) {
+      return toast.error("A senha precisa ter pelo menos 6 dígitos numéricos");
     }
     if (password !== password2) return toast.error("As senhas não conferem");
     setBusy(true);
@@ -219,13 +219,31 @@ export default function DriverFirstAccess() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Crie sua senha</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••" required minLength={4} />
-                <p className="text-xs text-muted-foreground">Mínimo de 4 caracteres.</p>
+                <Label>Crie sua senha (6 dígitos numéricos)</Label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value.replace(/\D/g, ""))}
+                  placeholder="••••••"
+                  required
+                  minLength={6}
+                  maxLength={12}
+                />
+                <p className="text-xs text-muted-foreground">Use apenas números, mínimo de 6 dígitos.</p>
               </div>
               <div className="space-y-2">
                 <Label>Confirme sua senha</Label>
-                <Input type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} placeholder="••••" required minLength={4} />
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value.replace(/\D/g, ""))}
+                  placeholder="••••••"
+                  required
+                  minLength={6}
+                  maxLength={12}
+                />
               </div>
               <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4" /> Enviar código por email</>}
