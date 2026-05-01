@@ -64,7 +64,7 @@ export default function Colaborador() {
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [plateRead, setPlateRead] = useState<string | null>(null);
   const [matchedVehicle, setMatchedVehicle] = useState<any | null>(null);
-  const [stationSearch, setStationSearch] = useState("");
+  const [stationCity, setStationCity] = useState("");
   const [stationId, setStationId] = useState("");
   const [estLiters, setEstLiters] = useState("");
   const [estValue, setEstValue] = useState("");
@@ -129,7 +129,7 @@ export default function Colaborador() {
   const reset = () => {
     setStep(1); setKmPhoto(null); setKmPhotoUrl(null); setKmRead(null);
     setPlatePhoto(null); setPlatePhotoUrl(null); setPlateRead(null); setMatchedVehicle(null);
-    setStationSearch(""); setStationId(""); setEstLiters(""); setEstValue("");
+    setStationCity(""); setStationId(""); setEstLiters(""); setEstValue("");
     setShowWizard(false);
   };
 
@@ -346,13 +346,27 @@ export default function Colaborador() {
 
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
 
-  const filteredStations = useMemo(() => {
-    const q = stationSearch.trim().toLowerCase();
-    if (!q) return stations;
-    return stations.filter((s) =>
-      [s.name, s.brand, s.cnpj, s.city].filter(Boolean).some((v: string) => String(v).toLowerCase().includes(q))
+  // Cidades distintas que possuem postos cadastrados
+  const stationCities = useMemo(() => {
+    const map = new Map<string, { city: string; state: string | null; count: number }>();
+    stations.forEach((s) => {
+      const city = (s.city ?? "").trim();
+      if (!city) return;
+      const key = `${city}|${s.state ?? ""}`;
+      const cur = map.get(key);
+      if (cur) cur.count += 1;
+      else map.set(key, { city, state: s.state ?? null, count: 1 });
+    });
+    return Array.from(map.values()).sort((a, b) => a.city.localeCompare(b.city));
+  }, [stations]);
+
+  const stationsInCity = useMemo(() => {
+    if (!stationCity) return [];
+    const [city, state] = stationCity.split("|");
+    return stations.filter(
+      (s) => (s.city ?? "") === city && (s.state ?? "") === (state ?? ""),
     );
-  }, [stations, stationSearch]);
+  }, [stations, stationCity]);
 
   return (
     <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-24">
@@ -463,20 +477,45 @@ export default function Colaborador() {
             <div className="flex items-center gap-2 text-xs font-semibold text-primary">
               <Search className="h-4 w-4" /> 3. Selecione o posto
             </div>
-            <Input placeholder="Buscar por nome, CNPJ ou cidade..." value={stationSearch}
-              onChange={(e) => setStationSearch(e.target.value)} />
-            <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-md p-1">
-              {filteredStations.length === 0 ? (
-                <p className="text-center text-xs text-muted-foreground py-4">Nenhum posto encontrado.</p>
-              ) : filteredStations.map((s) => (
-                <button key={s.id} type="button"
-                  onClick={() => setStationId(s.id)}
-                  className={`w-full text-left rounded-md p-2 text-xs transition ${stationId === s.id ? "bg-primary/15 border border-primary/40" : "hover:bg-muted/40 border border-transparent"}`}>
-                  <div className="font-semibold">{s.name}</div>
-                  <div className="text-muted-foreground">{s.brand && `${s.brand} · `}{s.city ?? "—"}{s.state && `/${s.state}`} {s.cnpj && ` · CNPJ ${s.cnpj}`}</div>
-                </button>
-              ))}
+            {/* 3a. Cidade */}
+            <div className="space-y-1">
+              <Label className="text-xs">Cidade</Label>
+              {stationCities.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">Nenhum posto cadastrado.</p>
+              ) : (
+                <Select
+                  value={stationCity}
+                  onValueChange={(v) => { setStationCity(v); setStationId(""); }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione a cidade" /></SelectTrigger>
+                  <SelectContent>
+                    {stationCities.map((c) => (
+                      <SelectItem key={`${c.city}|${c.state ?? ""}`} value={`${c.city}|${c.state ?? ""}`}>
+                        {c.city}{c.state ? `/${c.state}` : ""} · {c.count} posto{c.count > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
+            {/* 3b. Posto na cidade */}
+            {stationCity && (
+              <div className="space-y-1">
+                <Label className="text-xs">Posto</Label>
+                <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-md p-1">
+                  {stationsInCity.length === 0 ? (
+                    <p className="text-center text-xs text-muted-foreground py-4">Nenhum posto nesta cidade.</p>
+                  ) : stationsInCity.map((s) => (
+                    <button key={s.id} type="button"
+                      onClick={() => setStationId(s.id)}
+                      className={`w-full text-left rounded-md p-2 text-xs transition ${stationId === s.id ? "bg-primary/15 border border-primary/40" : "hover:bg-muted/40 border border-transparent"}`}>
+                      <div className="font-semibold">{s.name}</div>
+                      <div className="text-muted-foreground">{s.brand && `${s.brand} · `}{s.cnpj && `CNPJ ${s.cnpj}`}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Litros est.</Label>
@@ -539,6 +578,7 @@ export default function Colaborador() {
           auths.map((a) => {
             const veh = vehicles.find((v) => v.id === a.vehicle_id);
             const canConfirm = a.status === "aprovada" && !a.confirmed_at;
+            const pendingReceipt = a.status === "aprovada" && !a.confirmed_at;
             return (
               <div key={a.id} className="surface-card rounded-xl p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -553,8 +593,21 @@ export default function Colaborador() {
                       {new Date(a.requested_at).toLocaleString("pt-BR")}
                     </div>
                   </div>
-                  <Badge className={`capitalize border text-[10px] ${STATUS_TONE[a.status]}`}>{a.status}</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge className={`capitalize border text-[10px] ${STATUS_TONE[a.status]}`}>{a.status}</Badge>
+                    {pendingReceipt && (
+                      <Badge className="bg-warning/15 text-warning border-warning/40 border text-[10px] gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Cupom pendente
+                      </Badge>
+                    )}
+                  </div>
                 </div>
+                {pendingReceipt && (
+                  <div className="rounded-md bg-warning/10 border border-warning/30 p-2 text-[11px] flex items-start gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                    <span>Envie a foto do cupom fiscal para concluir este abastecimento.</span>
+                  </div>
+                )}
                 {a.status === "aprovada" && a.authorization_code && (
                   <div className="font-mono text-center text-lg font-bold text-success tracking-widest bg-success/5 rounded-md py-1.5">
                     {a.authorization_code}
