@@ -592,6 +592,128 @@ export default function Colaborador() {
           })
         )}
       </div>
+        </TabsContent>
+
+        {/* ===== CHECKLIST ===== */}
+        <TabsContent value="checklist" className="space-y-3 mt-4">
+          <div className="surface-card rounded-xl p-4 space-y-2">
+            <h3 className="font-display font-semibold text-sm flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" /> Checklists disponíveis
+            </h3>
+            {templates.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhum modelo de checklist publicado pela empresa.</p>
+            ) : templates.map((t) => (
+              <div key={t.id} className="rounded-md border border-border p-3 text-xs flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{t.name}</div>
+                  <div className="text-muted-foreground capitalize">{t.frequency}</div>
+                </div>
+                <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">Pelo gestor</Badge>
+              </div>
+            ))}
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Os checklists são abertos pelo gestor a partir do veículo. Em breve, preenchimento direto pelo motorista.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-display font-semibold text-sm px-1">Meus últimos checklists</h3>
+            {myRuns.length === 0 ? (
+              <div className="surface-card rounded-xl p-6 text-center text-xs text-muted-foreground">
+                Nenhum checklist registrado ainda.
+              </div>
+            ) : myRuns.map((r) => {
+              const veh = vehicles.find((v) => v.id === r.vehicle_id);
+              return (
+                <div key={r.id} className="surface-card rounded-xl p-3 text-xs flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5"><Truck className="h-3 w-3 text-primary" /> <span className="font-mono">{veh?.plate ?? "—"}</span></div>
+                    <div className="text-muted-foreground text-[10px] mt-0.5">{r.completed_at ? new Date(r.completed_at).toLocaleString("pt-BR") : "Em andamento"}</div>
+                  </div>
+                  <Badge className="text-[10px] capitalize">{r.status}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* ===== MANUTENÇÃO CORRETIVA ===== */}
+        <TabsContent value="manutencao" className="space-y-3 mt-4">
+          <div className="surface-card rounded-xl p-4 space-y-3">
+            <h3 className="font-display font-semibold text-sm flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-primary" /> Solicitar manutenção corretiva
+            </h3>
+            {!assignedVehicle ? (
+              <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs flex items-start gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                <span>Você não tem veículo vinculado. Procure seu gestor para abrir solicitações.</span>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-md bg-primary/5 border border-primary/20 p-2 text-xs">
+                  <div className="flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-primary" /><span className="font-mono font-semibold">{assignedVehicle.plate}</span> · {assignedVehicle.brand} {assignedVehicle.model}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Categoria</Label>
+                  <Select value={maintCategory} onValueChange={setMaintCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["Motor","Freios","Suspensão","Elétrica","Câmbio","Pneus","Arrefecimento","Vidros","Funilaria/Pintura","Outros"].map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Descreva o problema</Label>
+                  <Textarea rows={4} value={maintDesc} onChange={(e) => setMaintDesc(e.target.value)} placeholder="Ex.: Barulho ao frear, pisca-alerta não funciona, perda de potência..." />
+                </div>
+                <Button onClick={submitMaintenance} disabled={maintBusy} className="w-full bg-gradient-primary text-primary-foreground">
+                  {maintBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Enviar solicitação
+                </Button>
+              </>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-display font-semibold text-sm px-1">Minhas solicitações</h3>
+            {myMaint.length === 0 ? (
+              <div className="surface-card rounded-xl p-6 text-center text-xs text-muted-foreground">
+                Nenhuma solicitação registrada.
+              </div>
+            ) : myMaint.map((m) => {
+              const veh = vehicles.find((v) => v.id === m.vehicle_id);
+              return (
+                <div key={m.id} className="surface-card rounded-xl p-3 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5"><Truck className="h-3 w-3 text-primary" /><span className="font-mono">{veh?.plate ?? "—"}</span> · {m.category}</div>
+                    <Badge className="text-[10px] capitalize">{m.status}</Badge>
+                  </div>
+                  <div className="text-muted-foreground line-clamp-2">{m.description}</div>
+                  <div className="text-[10px] text-muted-foreground">{new Date(m.service_at).toLocaleString("pt-BR")}</div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Rodapé fixo: vínculo com veículo */}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background-elevated/95 backdrop-blur px-4 py-2 z-40">
+        <div className="max-w-md mx-auto flex items-center gap-2 text-xs">
+          <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
+          {assignedVehicle ? (
+            <>
+              <span className="text-muted-foreground">Veículo vinculado:</span>
+              <span className="font-mono font-semibold text-primary">{assignedVehicle.plate}</span>
+              <span className="text-muted-foreground truncate">· {assignedVehicle.brand} {assignedVehicle.model}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">Sem veículo vinculado · solicite ao gestor</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
