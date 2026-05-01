@@ -268,10 +268,43 @@ export default function Colaborador() {
         await supabase.from("fuel_authorization_items").insert(rows);
       }
 
+      // Cria registro em fuel_records (módulo de Abastecimentos) quando válido
+      if (cnpjMatch !== false) {
+        const fuelItem = items.find((it: any) => it.is_fuel) || items[0];
+        const liters = Number(fuelItem?.quantity ?? (data as any)?.liters ?? auth.estimated_liters ?? 0);
+        const ppl = Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
+        const total = Number(data?.total_value ?? fuelItem?.total ?? auth.estimated_value ?? 0);
+        if (liters > 0 && total > 0) {
+          const station = stations.find((x) => x.id === auth.fuel_station_id);
+          const fuelType = (fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
+          const { data: fr, error: frErr } = await supabase.from("fuel_records").insert({
+            company_id: currentCompanyId,
+            vehicle_id: auth.vehicle_id,
+            driver_id: driver?.id ?? null,
+            fuel_station_id: auth.fuel_station_id,
+            station_name: station?.name ?? auth.station_name,
+            station_cnpj: station?.cnpj ?? cupomCnpj ?? null,
+            city: station?.city ?? null,
+            state: station?.state ?? null,
+            fuel_type: fuelType,
+            liters,
+            price_per_liter: ppl > 0 ? ppl : Number((total / liters).toFixed(3)),
+            total_value: total,
+            km_at_fueling: auth.km_at_request ?? 0,
+            payment_method: "cartao_frota",
+            receipt_url: archivedUrl,
+            created_by: user?.id,
+          }).select("id").maybeSingle();
+          if (!frErr && fr?.id) {
+            await supabase.from("fuel_authorizations").update({ fuel_record_id: fr.id }).eq("id", auth.id);
+          }
+        }
+      }
+
       if (cnpjMatch === false) {
         toast.error("CNPJ do cupom não confere com o posto. Solicitação enviada para revisão do gestor.");
       } else {
-        toast.success("Abastecimento confirmado!");
+        toast.success("Abastecimento confirmado e registrado!");
       }
       setConfirmAuthId(null);
       load();
@@ -280,6 +313,31 @@ export default function Colaborador() {
     } finally {
       setReceiptBusy(false);
     }
+  };
+
+  // ====== MANUTENÇÃO CORRETIVA ======
+  const submitMaintenance = async () => {
+    if (!currentCompanyId || !user) return;
+    if (!maintDesc.trim()) return toast.error("Descreva o problema observado");
+    const vehicleId = assignedVehicle?.id;
+    if (!vehicleId) return toast.error("Sem veículo vinculado. Procure seu gestor.");
+    setMaintBusy(true);
+    const { error } = await supabase.from("maintenance_records").insert({
+      company_id: currentCompanyId,
+      vehicle_id: vehicleId,
+      driver_id: driver?.id ?? null,
+      type: "corretiva",
+      category: maintCategory,
+      status: "agendada",
+      service_at: new Date().toISOString(),
+      description: `[SOLICITAÇÃO MOTORISTA] ${maintDesc}`,
+      created_by: user.id,
+    });
+    setMaintBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Solicitação de manutenção enviada ao gestor");
+    setMaintDesc(""); setMaintCategory("Outros");
+    load();
   };
 
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
