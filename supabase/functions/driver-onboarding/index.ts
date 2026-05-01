@@ -122,6 +122,17 @@ async function findDriverByUserId(userId: string) {
   return data;
 }
 
+async function getUserRolesForCompany(userId: string, companyId: string) {
+  const { data, error } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("company_id", companyId);
+
+  if (error) throw error;
+  return (data ?? []).map((item: { role: string }) => item.role);
+}
+
 async function ensureDriverAuthUser(
   driver: { id: string; user_id: string | null; full_name: string; company_id: string },
   email: string,
@@ -142,6 +153,12 @@ async function ensureDriverAuthUser(
       if (linkedDriver && linkedDriver.id !== driver.id) {
         throw new Error("Este email já está vinculado a outro motorista. Use outro email ou peça para a empresa corrigir o cadastro.");
       }
+
+      const existingRoles = await getUserRolesForCompany(existingUser.id, driver.company_id);
+      if (existingRoles.some((role) => role !== "motorista")) {
+        throw new Error("Este email já está em uso por outro acesso da empresa. Use um email exclusivo para o motorista.");
+      }
+
       authUserId = existingUser.id;
     }
   }
