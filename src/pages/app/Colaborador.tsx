@@ -351,19 +351,27 @@ export default function Colaborador() {
   }, [stations, stationSearch]);
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-10">
+    <div className="space-y-5 animate-fade-in max-w-md mx-auto pb-24">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-bold flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" /> Abastecimento
+            <ShieldCheck className="h-5 w-5 text-primary" /> Painel do Motorista
           </h1>
           <p className="text-xs text-muted-foreground">{driver?.full_name ?? user?.email}</p>
         </div>
         <Button variant="outline" size="sm" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
       </div>
 
-      {/* Status de autorização */}
-      <div className={`rounded-xl border p-4 ${driver?.auto_fuel_authorized ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"}`}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <TabsList className="grid grid-cols-3 w-full">
+          <TabsTrigger value="abastecimento" className="text-xs gap-1"><FuelIcon className="h-3.5 w-3.5" />Abastec.</TabsTrigger>
+          <TabsTrigger value="checklist" className="text-xs gap-1"><ClipboardList className="h-3.5 w-3.5" />Checklist</TabsTrigger>
+          <TabsTrigger value="manutencao" className="text-xs gap-1"><Wrench className="h-3.5 w-3.5" />Manut.</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="abastecimento" className="space-y-5 mt-4">
+          {/* Status de autorização */}
+          <div className={`rounded-xl border p-4 ${driver?.auto_fuel_authorized ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"}`}>
         <div className="flex items-center gap-3">
           {driver?.auto_fuel_authorized ? (
             <CheckCircle2 className="h-6 w-6 text-success" />
