@@ -346,6 +346,28 @@ export default function Colaborador() {
 
   const latestApproved = useMemo(() => auths.find((a) => a.status === "aprovada"), [auths]);
 
+  // Código fica visível por 20 minutos após a aprovação. Depois disso some da tela
+  // do motorista (mas continua válido no backend até expires_at de 24h, para o gestor).
+  const CODE_VISIBLE_MINUTES = 20;
+  const codeStillVisible = (approvedAt: string | null) => {
+    if (!approvedAt) return false;
+    const ageMs = Date.now() - new Date(approvedAt).getTime();
+    return ageMs <= CODE_VISIBLE_MINUTES * 60 * 1000;
+  };
+
+  // Tick a cada 30s para que o código suma sozinho ao passar dos 20 min
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((n) => n + 1), 30 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Bloqueia nova solicitação se houver alguma aprovada sem cupom enviado
+  const blockingPending = useMemo(
+    () => auths.find((a) => a.status === "aprovada" && !a.confirmed_at) ?? null,
+    [auths],
+  );
+
   // Cidades distintas que possuem postos cadastrados
   const stationCities = useMemo(() => {
     const map = new Map<string, { city: string; state: string | null; count: number }>();
@@ -389,12 +411,12 @@ export default function Colaborador() {
 
         <TabsContent value="abastecimento" className="space-y-5 mt-4">
           {/* Último código aprovado em destaque (sempre visível, é o que importa) */}
-          {latestApproved?.authorization_code && (
+          {latestApproved?.authorization_code && codeStillVisible(latestApproved.approved_at) && (
         <div className="rounded-xl border border-success/40 bg-success/10 p-5 text-center">
           <div className="text-[10px] uppercase tracking-widest text-success/80 mb-1">Código de autorização</div>
           <div className="font-mono text-4xl font-bold text-success tracking-widest">{latestApproved.authorization_code}</div>
           <div className="text-[10px] text-muted-foreground mt-2">
-            Informe ao posto · válido até {latestApproved.expires_at ? new Date(latestApproved.expires_at).toLocaleString("pt-BR") : "—"}
+            Informe ao posto · visível por {CODE_VISIBLE_MINUTES} min após aprovação
           </div>
         </div>
       )}
@@ -407,7 +429,21 @@ export default function Colaborador() {
             </TabsList>
 
             <TabsContent value="novo" className="space-y-3 mt-4">
-              {!showWizard ? (
+              {blockingPending ? (
+                <div className="rounded-xl border border-warning/40 bg-warning/10 p-5 text-center space-y-2">
+                  <AlertTriangle className="h-7 w-7 mx-auto text-warning" />
+                  <div className="font-semibold text-sm">Cupom fiscal pendente</div>
+                  <p className="text-xs text-muted-foreground">
+                    Você precisa enviar a foto do cupom da última autorização aprovada antes de fazer uma nova solicitação.
+                  </p>
+                  <Button
+                    onClick={() => setFuelTab("minhas")}
+                    className="w-full bg-gradient-primary text-primary-foreground"
+                  >
+                    Enviar cupom agora
+                  </Button>
+                </div>
+              ) : !showWizard ? (
                 <Button
                   onClick={() => { reset(); setShowWizard(true); setStep(1); }}
                   className="w-full h-20 text-base bg-gradient-primary text-primary-foreground rounded-xl shadow-glow"
@@ -608,9 +644,14 @@ export default function Colaborador() {
                     <span>Envie a foto do cupom fiscal para concluir este abastecimento.</span>
                   </div>
                 )}
-                {a.status === "aprovada" && a.authorization_code && (
+                {a.status === "aprovada" && a.authorization_code && codeStillVisible(a.approved_at) && (
                   <div className="font-mono text-center text-lg font-bold text-success tracking-widest bg-success/5 rounded-md py-1.5">
                     {a.authorization_code}
+                  </div>
+                )}
+                {a.status === "aprovada" && a.authorization_code && !codeStillVisible(a.approved_at) && !a.confirmed_at && (
+                  <div className="rounded-md bg-muted/40 border border-border p-2 text-[11px] text-center text-muted-foreground">
+                    Código não está mais visível ({CODE_VISIBLE_MINUTES} min). Envie o cupom fiscal para concluir.
                   </div>
                 )}
                 {canConfirm && (
