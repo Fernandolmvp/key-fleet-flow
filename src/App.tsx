@@ -41,6 +41,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
+            <Route path="/motorista" element={<Colaborador />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
