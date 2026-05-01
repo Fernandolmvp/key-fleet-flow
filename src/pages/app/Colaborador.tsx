@@ -644,9 +644,14 @@ export default function Colaborador() {
                     <span>Envie a foto do cupom fiscal para concluir este abastecimento.</span>
                   </div>
                 )}
-                {a.status === "aprovada" && a.authorization_code && (
+                {a.status === "aprovada" && a.authorization_code && codeStillVisible(a.approved_at) && (
                   <div className="font-mono text-center text-lg font-bold text-success tracking-widest bg-success/5 rounded-md py-1.5">
                     {a.authorization_code}
+                  </div>
+                )}
+                {a.status === "aprovada" && a.authorization_code && !codeStillVisible(a.approved_at) && !a.confirmed_at && (
+                  <div className="rounded-md bg-muted/40 border border-border p-2 text-[11px] text-center text-muted-foreground">
+                    Código não está mais visível ({CODE_VISIBLE_MINUTES} min). Envie o cupom fiscal para concluir.
                   </div>
                 )}
                 {canConfirm && (
