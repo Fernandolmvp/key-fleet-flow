@@ -31,7 +31,7 @@ export default function ResetPassword() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwd.length < 8) return toast.error("Senha deve ter ao menos 8 caracteres");
+    if (!/^\d{6}$/.test(pwd)) return toast.error("A senha deve ter exatamente 6 dígitos numéricos");
     if (pwd !== confirm) return toast.error("As senhas não conferem");
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password: pwd });
@@ -59,8 +59,8 @@ export default function ResetPassword() {
           <h2 className="font-display text-2xl font-bold flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-primary" /> Redefinir senha
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {ready ? "Defina sua nova senha (mínimo 8 caracteres)." : "Validando link de redefinição..."}
+            <p className="text-sm text-muted-foreground mt-1">
+            {ready ? "Defina sua nova senha com 6 dígitos numéricos." : "Validando link de redefinição..."}
           </p>
         </div>
 
@@ -73,11 +73,11 @@ export default function ResetPassword() {
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <Label>Nova senha</Label>
-              <Input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} minLength={8} required disabled={!ready} />
+              <Input type="password" inputMode="numeric" value={pwd} onChange={(e) => setPwd(e.target.value.replace(/\D/g, "").slice(0, 6))} minLength={6} maxLength={6} required disabled={!ready} />
             </div>
             <div className="space-y-2">
               <Label>Confirmar nova senha</Label>
-              <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} required disabled={!ready} />
+              <Input type="password" inputMode="numeric" value={confirm} onChange={(e) => setConfirm(e.target.value.replace(/\D/g, "").slice(0, 6))} minLength={6} maxLength={6} required disabled={!ready} />
             </div>
             <Button type="submit" disabled={busy || !ready} className="w-full bg-gradient-primary text-primary-foreground h-11 shadow-glow font-semibold">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Redefinir senha"}
