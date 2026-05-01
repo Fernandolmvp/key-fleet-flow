@@ -41,9 +41,17 @@ export default function Colaborador() {
   const [auths, setAuths] = useState<Auth[]>([]);
   const [driver, setDriver] = useState<any | null>(null);
   const [managerName, setManagerName] = useState<string | null>(null);
+  const [assignedVehicle, setAssignedVehicle] = useState<any | null>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"abastecimento" | "checklist" | "manutencao">("abastecimento");
+  const [maintDesc, setMaintDesc] = useState("");
+  const [maintCategory, setMaintCategory] = useState("Outros");
+  const [maintBusy, setMaintBusy] = useState(false);
+  const [myMaint, setMyMaint] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [myRuns, setMyRuns] = useState<any[]>([]);
 
   // Etapas: 1-foto KM, 2-foto placa (IA valida), 3-posto, 4-revisar/enviar
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
