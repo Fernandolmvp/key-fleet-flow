@@ -35,15 +35,15 @@ function isValidEmail(email: string) {
 }
 
 function isStrongPassword(password: string) {
-  // Aceita qualquer senha com 4+ caracteres (sem checar força/vazamento)
-  return (password || "").length >= 4;
+  // Aceita 6+ dígitos numéricos
+  return /^\d{6,}$/.test(password || "");
 }
 
 function getFriendlyErrorMessage(error: unknown) {
   const authError = error as { code?: string; name?: string; reasons?: string[]; message?: string } | null;
 
   if (authError?.code === "weak_password" || authError?.name === "AuthWeakPasswordError") {
-    return "A senha precisa ter pelo menos 4 dígitos numéricos.";
+    return "A senha precisa ter pelo menos 6 dígitos numéricos.";
   }
 
   return authError?.message || String(error);
@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
         return json({ error: "Email inválido" }, 400);
       }
       if (!isStrongPassword(password)) {
-        return json({ error: "A senha precisa ter pelo menos 4 dígitos numéricos." }, 400);
+        return json({ error: "A senha precisa ter pelo menos 6 dígitos numéricos." }, 400);
       }
 
       const { data: otp } = await admin
