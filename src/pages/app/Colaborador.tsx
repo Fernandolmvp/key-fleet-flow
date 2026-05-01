@@ -214,6 +214,7 @@ export default function Colaborador() {
       ? "Autorizado! Use o código gerado abaixo."
       : `Solicitação enviada para ${managerName || "seu gestor"}.`);
     reset();
+    setFuelTab("minhas");
     load();
   };
 
