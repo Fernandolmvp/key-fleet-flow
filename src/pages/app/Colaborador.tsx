@@ -374,31 +374,8 @@ export default function Colaborador() {
         </TabsList>
 
         <TabsContent value="abastecimento" className="space-y-5 mt-4">
-          {/* Status de autorização */}
-          <div className={`rounded-xl border p-4 ${driver?.auto_fuel_authorized ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"}`}>
-        <div className="flex items-center gap-3">
-          {driver?.auto_fuel_authorized ? (
-            <CheckCircle2 className="h-6 w-6 text-success" />
-          ) : (
-            <UserCheck className="h-6 w-6 text-warning" />
-          )}
-          <div className="flex-1">
-            <p className="text-sm font-semibold">
-              {driver?.auto_fuel_authorized ? "Você está pré-autorizado" : "Solicitação precisa de aprovação"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {driver?.auto_fuel_authorized
-                ? "Suas solicitações geram o código de autorização na hora."
-                : managerName
-                  ? `Seu gestor responsável: ${managerName}`
-                  : "Nenhum gestor vinculado. Procure seu administrador."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Último código aprovado em destaque */}
-      {latestApproved?.authorization_code && (
+          {/* Último código aprovado em destaque (sempre visível, é o que importa) */}
+          {latestApproved?.authorization_code && (
         <div className="rounded-xl border border-success/40 bg-success/10 p-5 text-center">
           <div className="text-[10px] uppercase tracking-widest text-success/80 mb-1">Código de autorização</div>
           <div className="font-mono text-4xl font-bold text-success tracking-widest">{latestApproved.authorization_code}</div>
@@ -408,8 +385,23 @@ export default function Colaborador() {
         </div>
       )}
 
-      {/* Wizard de nova solicitação */}
-      <div className="surface-card rounded-xl p-4 space-y-3">
+          {/* Sub-abas: Nova solicitação | Minhas solicitações */}
+          <Tabs value={fuelTab} onValueChange={(v) => setFuelTab(v as any)}>
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="novo" className="text-xs">Nova</TabsTrigger>
+              <TabsTrigger value="minhas" className="text-xs">Minhas solicitações</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="novo" className="space-y-3 mt-4">
+              {!showWizard ? (
+                <Button
+                  onClick={() => { reset(); setShowWizard(true); setStep(1); }}
+                  className="w-full h-20 text-base bg-gradient-primary text-primary-foreground rounded-xl shadow-glow"
+                >
+                  <Plus className="h-6 w-6 mr-2" /> Nova solicitação
+                </Button>
+              ) : (
+              <div className="surface-card rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-display font-semibold flex items-center gap-2 text-sm">
             <Plus className="h-4 w-4" /> Nova solicitação
@@ -424,17 +416,14 @@ export default function Colaborador() {
         {/* ETAPA 1 — KM */}
         {step === 1 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-              <Gauge className="h-4 w-4" /> 1. Foto do hodômetro (KM)
-            </div>
-            <p className="text-xs text-muted-foreground">Tire uma foto nítida do painel mostrando o KM total do veículo.</p>
             <input ref={kmInputRef} type="file" accept="image/*" capture="environment" hidden
               onChange={(e) => e.target.files?.[0] && handleKmPhoto(e.target.files[0])} />
             <Button onClick={() => kmInputRef.current?.click()} disabled={busy}
-              className="w-full bg-gradient-primary text-primary-foreground h-12">
-              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+              className="w-full bg-gradient-primary text-primary-foreground h-16 text-base">
+              {busy ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Camera className="h-5 w-5 mr-2" />}
               Fotografar KM
             </Button>
+            <Button variant="ghost" size="sm" onClick={reset} className="w-full text-xs">Cancelar</Button>
           </div>
         )}
 
@@ -527,11 +516,11 @@ export default function Colaborador() {
             <Button variant="ghost" size="sm" onClick={reset} className="w-full text-xs">Cancelar</Button>
           </div>
         )}
-      </div>
+              </div>
+              )}
+            </TabsContent>
 
-      {/* Histórico */}
-      <div className="space-y-2">
-        <h3 className="font-display font-semibold text-sm px-1">Minhas solicitações</h3>
+            <TabsContent value="minhas" className="space-y-2 mt-4">
         <input ref={receiptInputRef} type="file" accept="image/*" capture="environment" hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -595,7 +584,8 @@ export default function Colaborador() {
             );
           })
         )}
-      </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         {/* ===== CHECKLIST ===== */}
