@@ -65,7 +65,7 @@ export default function DriverFirstAccess() {
 
       if (!signInError) {
         toast.success("Bem-vindo!");
-        navigate("/app/colaborador", { replace: true });
+        navigate("/motorista", { replace: true });
         return true;
       }
 
