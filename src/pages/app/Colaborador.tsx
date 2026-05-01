@@ -66,12 +66,14 @@ export default function Colaborador() {
   const [matchedVehicle, setMatchedVehicle] = useState<any | null>(null);
   const [stationCity, setStationCity] = useState("");
   const [stationId, setStationId] = useState("");
-  const [estLiters, setEstLiters] = useState("");
-  const [estValue, setEstValue] = useState("");
 
   // Confirmação pós-abastecimento
   const [confirmAuthId, setConfirmAuthId] = useState<string | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
+  // Dados que o motorista informa ao enviar o cupom
+  const [receiptFuelType, setReceiptFuelType] = useState<string>("diesel_s10");
+  const [receiptLiters, setReceiptLiters] = useState<string>("");
+  const [receiptUnitValue, setReceiptUnitValue] = useState<string>("");
 
   const kmInputRef = useRef<HTMLInputElement>(null);
   const plateInputRef = useRef<HTMLInputElement>(null);
@@ -129,7 +131,7 @@ export default function Colaborador() {
   const reset = () => {
     setStep(1); setKmPhoto(null); setKmPhotoUrl(null); setKmRead(null);
     setPlatePhoto(null); setPlatePhotoUrl(null); setPlateRead(null); setMatchedVehicle(null);
-    setStationCity(""); setStationId(""); setEstLiters(""); setEstValue("");
+    setStationCity(""); setStationId("");
     setShowWizard(false);
   };
 
@@ -199,8 +201,8 @@ export default function Colaborador() {
       driver_id: driver?.id ?? null,
       fuel_station_id: stationId,
       station_name: station?.name ?? null,
-      estimated_liters: estLiters ? Number(estLiters) : null,
-      estimated_value: estValue ? Number(estValue) : null,
+      estimated_liters: null,
+      estimated_value: null,
       fuel_type: matchedVehicle.fuel_type || null,
       km_at_request: kmRead,
       km_photo_url: kmPhotoUrl,
@@ -275,12 +277,23 @@ export default function Colaborador() {
       // Cria registro em fuel_records (módulo de Abastecimentos) quando válido
       if (cnpjMatch !== false) {
         const fuelItem = items.find((it: any) => it.is_fuel) || items[0];
-        const liters = Number(fuelItem?.quantity ?? (data as any)?.liters ?? auth.estimated_liters ?? 0);
-        const ppl = Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
-        const total = Number(data?.total_value ?? fuelItem?.total ?? auth.estimated_value ?? 0);
+        // Prioriza o que o motorista informou na hora de enviar o cupom;
+        // a IA valida e a empresa vê tudo no módulo Abastecimentos.
+        const driverLiters = Number(receiptLiters);
+        const driverPpl = Number(receiptUnitValue);
+        const liters = driverLiters > 0
+          ? driverLiters
+          : Number(fuelItem?.quantity ?? (data as any)?.liters ?? 0);
+        const ppl = driverPpl > 0
+          ? driverPpl
+          : Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
+        const aiTotal = Number(data?.total_value ?? fuelItem?.total ?? 0);
+        const total = aiTotal > 0
+          ? aiTotal
+          : (liters > 0 && ppl > 0 ? Number((liters * ppl).toFixed(2)) : 0);
         if (liters > 0 && total > 0) {
           const station = stations.find((x) => x.id === auth.fuel_station_id);
-          const fuelType = (fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
+          const fuelType = (receiptFuelType || fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
           const { data: fr, error: frErr } = await supabase.from("fuel_records").insert({
             company_id: currentCompanyId,
             vehicle_id: auth.vehicle_id,
@@ -311,6 +324,9 @@ export default function Colaborador() {
         toast.success("Abastecimento confirmado e registrado!");
       }
       setConfirmAuthId(null);
+      setReceiptFuelType("diesel_s10");
+      setReceiptLiters("");
+      setReceiptUnitValue("");
       load();
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao processar cupom");
@@ -552,16 +568,6 @@ export default function Colaborador() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Litros est.</Label>
-                <Input type="number" step="0.01" inputMode="decimal" value={estLiters} onChange={(e) => setEstLiters(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Valor R$</Label>
-                <Input type="number" step="0.01" inputMode="decimal" value={estValue} onChange={(e) => setEstValue(e.target.value)} />
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
               <Button onClick={() => setStep(4)} disabled={!stationId} className="bg-gradient-primary text-primary-foreground">
@@ -578,8 +584,6 @@ export default function Colaborador() {
               <div><span className="text-muted-foreground">Veículo:</span> <strong>{matchedVehicle.plate}</strong> · {matchedVehicle.brand} {matchedVehicle.model}</div>
               <div><span className="text-muted-foreground">KM:</span> {kmRead?.toLocaleString("pt-BR")}</div>
               <div><span className="text-muted-foreground">Posto:</span> {stations.find((s) => s.id === stationId)?.name}</div>
-              {estLiters && <div><span className="text-muted-foreground">Litros est.:</span> {estLiters}</div>}
-              {estValue && <div><span className="text-muted-foreground">Valor est.:</span> R$ {estValue}</div>}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setStep(3)}>Voltar</Button>
@@ -654,14 +658,65 @@ export default function Colaborador() {
                     Código não está mais visível ({CODE_VISIBLE_MINUTES} min). Envie o cupom fiscal para concluir.
                   </div>
                 )}
-                {canConfirm && (
+                {canConfirm && confirmAuthId !== a.id && (
                   <Button size="sm" variant="outline" className="w-full"
                     disabled={receiptBusy}
-                    onClick={() => { setConfirmAuthId(a.id); receiptInputRef.current?.click(); }}>
-                    {receiptBusy && confirmAuthId === a.id
-                      ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Lendo cupom...</>
-                      : <><FileCheck className="h-3.5 w-3.5 mr-1.5" />Confirmar com foto do cupom</>}
+                    onClick={() => {
+                      setConfirmAuthId(a.id);
+                      setReceiptFuelType((a.fuel_type as string) || "diesel_s10");
+                      setReceiptLiters(""); setReceiptUnitValue("");
+                    }}>
+                    <FileCheck className="h-3.5 w-3.5 mr-1.5" />Enviar cupom fiscal
                   </Button>
+                )}
+                {canConfirm && confirmAuthId === a.id && (
+                  <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-2">
+                    <div className="text-[11px] font-semibold text-primary">Dados do cupom</div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px]">Combustível</Label>
+                      <Select value={receiptFuelType} onValueChange={setReceiptFuelType}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gasolina">Gasolina</SelectItem>
+                          <SelectItem value="etanol">Etanol</SelectItem>
+                          <SelectItem value="diesel">Diesel</SelectItem>
+                          <SelectItem value="diesel_s10">Diesel S10</SelectItem>
+                          <SelectItem value="flex">Flex</SelectItem>
+                          <SelectItem value="gnv">GNV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px]">Litros</Label>
+                        <Input type="number" step="0.01" inputMode="decimal" className="h-8 text-xs"
+                          value={receiptLiters} onChange={(e) => setReceiptLiters(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px]">Valor unit. R$</Label>
+                        <Input type="number" step="0.001" inputMode="decimal" className="h-8 text-xs"
+                          value={receiptUnitValue} onChange={(e) => setReceiptUnitValue(e.target.value)} />
+                      </div>
+                    </div>
+                    {receiptLiters && receiptUnitValue && (
+                      <div className="text-[10px] text-muted-foreground text-right">
+                        Total: R$ {(Number(receiptLiters) * Number(receiptUnitValue)).toFixed(2)}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button size="sm" variant="ghost" className="text-xs"
+                        onClick={() => { setConfirmAuthId(null); }}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" className="bg-gradient-primary text-primary-foreground text-xs"
+                        disabled={receiptBusy || !receiptLiters || !receiptUnitValue}
+                        onClick={() => receiptInputRef.current?.click()}>
+                        {receiptBusy
+                          ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Lendo...</>
+                          : <><Camera className="h-3.5 w-3.5 mr-1.5" />Foto do cupom</>}
+                      </Button>
+                    </div>
+                  </div>
                 )}
                 {a.confirmed_at && a.cnpj_match === false && (
                   <div className="rounded-md bg-destructive/10 border border-destructive/40 p-2 text-[11px] flex items-start gap-1.5">
