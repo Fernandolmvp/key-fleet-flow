@@ -277,12 +277,23 @@ export default function Colaborador() {
       // Cria registro em fuel_records (módulo de Abastecimentos) quando válido
       if (cnpjMatch !== false) {
         const fuelItem = items.find((it: any) => it.is_fuel) || items[0];
-        const liters = Number(fuelItem?.quantity ?? (data as any)?.liters ?? auth.estimated_liters ?? 0);
-        const ppl = Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
-        const total = Number(data?.total_value ?? fuelItem?.total ?? auth.estimated_value ?? 0);
+        // Prioriza o que o motorista informou na hora de enviar o cupom;
+        // a IA valida e a empresa vê tudo no módulo Abastecimentos.
+        const driverLiters = Number(receiptLiters);
+        const driverPpl = Number(receiptUnitValue);
+        const liters = driverLiters > 0
+          ? driverLiters
+          : Number(fuelItem?.quantity ?? (data as any)?.liters ?? 0);
+        const ppl = driverPpl > 0
+          ? driverPpl
+          : Number(fuelItem?.unit_value ?? (data as any)?.price_per_liter ?? 0);
+        const aiTotal = Number(data?.total_value ?? fuelItem?.total ?? 0);
+        const total = aiTotal > 0
+          ? aiTotal
+          : (liters > 0 && ppl > 0 ? Number((liters * ppl).toFixed(2)) : 0);
         if (liters > 0 && total > 0) {
           const station = stations.find((x) => x.id === auth.fuel_station_id);
-          const fuelType = (fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
+          const fuelType = (receiptFuelType || fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
           const { data: fr, error: frErr } = await supabase.from("fuel_records").insert({
             company_id: currentCompanyId,
             vehicle_id: auth.vehicle_id,
@@ -313,6 +324,9 @@ export default function Colaborador() {
         toast.success("Abastecimento confirmado e registrado!");
       }
       setConfirmAuthId(null);
+      setReceiptFuelType("diesel_s10");
+      setReceiptLiters("");
+      setReceiptUnitValue("");
       load();
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao processar cupom");
