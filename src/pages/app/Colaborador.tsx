@@ -658,14 +658,65 @@ export default function Colaborador() {
                     Código não está mais visível ({CODE_VISIBLE_MINUTES} min). Envie o cupom fiscal para concluir.
                   </div>
                 )}
-                {canConfirm && (
+                {canConfirm && confirmAuthId !== a.id && (
                   <Button size="sm" variant="outline" className="w-full"
                     disabled={receiptBusy}
-                    onClick={() => { setConfirmAuthId(a.id); receiptInputRef.current?.click(); }}>
-                    {receiptBusy && confirmAuthId === a.id
-                      ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Lendo cupom...</>
-                      : <><FileCheck className="h-3.5 w-3.5 mr-1.5" />Confirmar com foto do cupom</>}
+                    onClick={() => {
+                      setConfirmAuthId(a.id);
+                      setReceiptFuelType((a.fuel_type as string) || "diesel_s10");
+                      setReceiptLiters(""); setReceiptUnitValue("");
+                    }}>
+                    <FileCheck className="h-3.5 w-3.5 mr-1.5" />Enviar cupom fiscal
                   </Button>
+                )}
+                {canConfirm && confirmAuthId === a.id && (
+                  <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-2">
+                    <div className="text-[11px] font-semibold text-primary">Dados do cupom</div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px]">Combustível</Label>
+                      <Select value={receiptFuelType} onValueChange={setReceiptFuelType}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gasolina">Gasolina</SelectItem>
+                          <SelectItem value="etanol">Etanol</SelectItem>
+                          <SelectItem value="diesel">Diesel</SelectItem>
+                          <SelectItem value="diesel_s10">Diesel S10</SelectItem>
+                          <SelectItem value="flex">Flex</SelectItem>
+                          <SelectItem value="gnv">GNV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px]">Litros</Label>
+                        <Input type="number" step="0.01" inputMode="decimal" className="h-8 text-xs"
+                          value={receiptLiters} onChange={(e) => setReceiptLiters(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px]">Valor unit. R$</Label>
+                        <Input type="number" step="0.001" inputMode="decimal" className="h-8 text-xs"
+                          value={receiptUnitValue} onChange={(e) => setReceiptUnitValue(e.target.value)} />
+                      </div>
+                    </div>
+                    {receiptLiters && receiptUnitValue && (
+                      <div className="text-[10px] text-muted-foreground text-right">
+                        Total: R$ {(Number(receiptLiters) * Number(receiptUnitValue)).toFixed(2)}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button size="sm" variant="ghost" className="text-xs"
+                        onClick={() => { setConfirmAuthId(null); }}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" className="bg-gradient-primary text-primary-foreground text-xs"
+                        disabled={receiptBusy || !receiptLiters || !receiptUnitValue}
+                        onClick={() => receiptInputRef.current?.click()}>
+                        {receiptBusy
+                          ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Lendo...</>
+                          : <><Camera className="h-3.5 w-3.5 mr-1.5" />Foto do cupom</>}
+                      </Button>
+                    </div>
+                  </div>
                 )}
                 {a.confirmed_at && a.cnpj_match === false && (
                   <div className="rounded-md bg-destructive/10 border border-destructive/40 p-2 text-[11px] flex items-start gap-1.5">
