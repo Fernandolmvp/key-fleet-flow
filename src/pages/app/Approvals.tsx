@@ -167,8 +167,17 @@ export default function Approvals() {
     load();
   };
 
-  // Exclusão controlada por permissão (módulo aprovações + aba atual)
+  // Permissões de exclusão e visualização por aba
   const canDelete = can("approvals", "delete", tab);
+  const canViewTab = (t: string) => can("approvals", "view", t);
+  const visibleTabs = ["pendente", "aprovada", "anomalia", "historico"].filter(canViewTab);
+
+  // Se a aba atual não está visível, troca para a primeira visível
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.includes(tab)) {
+      setTab(visibleTabs[0]);
+    }
+  }, [visibleTabs.join(","), tab]);
 
   if (!isManager) {
     return (
@@ -195,19 +204,25 @@ export default function Approvals() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="pendente" className="gap-2">
-            Pendentes
-            {counts.pendente > 0 && <Badge className="bg-warning/20 text-warning border-warning/40">{counts.pendente}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="aprovada" className="gap-2">
-            Aprovadas
-            {counts.aprovada > 0 && <Badge className="bg-success/20 text-success border-success/40">{counts.aprovada}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="anomalia" className="gap-2">
-            Anomalias
-            {counts.anomalia > 0 && <Badge className="bg-destructive/20 text-destructive border-destructive/40">{counts.anomalia}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="historico">Histórico</TabsTrigger>
+          {canViewTab("pendente") && (
+            <TabsTrigger value="pendente" className="gap-2">
+              Pendentes
+              {counts.pendente > 0 && <Badge className="bg-warning/20 text-warning border-warning/40">{counts.pendente}</Badge>}
+            </TabsTrigger>
+          )}
+          {canViewTab("aprovada") && (
+            <TabsTrigger value="aprovada" className="gap-2">
+              Aprovadas
+              {counts.aprovada > 0 && <Badge className="bg-success/20 text-success border-success/40">{counts.aprovada}</Badge>}
+            </TabsTrigger>
+          )}
+          {canViewTab("anomalia") && (
+            <TabsTrigger value="anomalia" className="gap-2">
+              Anomalias
+              {counts.anomalia > 0 && <Badge className="bg-destructive/20 text-destructive border-destructive/40">{counts.anomalia}</Badge>}
+            </TabsTrigger>
+          )}
+          {canViewTab("historico") && <TabsTrigger value="historico">Histórico</TabsTrigger>}
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
