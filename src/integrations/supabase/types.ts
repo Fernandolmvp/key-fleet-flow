@@ -2253,6 +2253,39 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          action: string
+          allowed: boolean
+          company_id: string
+          created_at: string
+          id: string
+          module: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          allowed?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          module: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          allowed?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          module?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscription_payments: {
         Row: {
           amount: number
@@ -3061,6 +3094,15 @@ export type Database = {
         Args: { _company_id: string }
         Returns: number
       }
+      has_permission: {
+        Args: {
+          _action: string
+          _company_id: string
+          _module: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _company_id: string
@@ -3082,6 +3124,10 @@ export type Database = {
           _stripe_invoice_id: string
           _stripe_payment_intent_id: string
         }
+        Returns: undefined
+      }
+      seed_default_role_permissions: {
+        Args: { _company_id: string }
         Returns: undefined
       }
     }
