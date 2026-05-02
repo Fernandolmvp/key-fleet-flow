@@ -3093,6 +3093,7 @@ export type Database = {
         | "financeiro"
         | "motorista"
         | "auditor"
+        | "visualizador"
       axle_layout:
         | "moto_2"
         | "carro_4"
@@ -3358,6 +3359,7 @@ export const Constants = {
         "financeiro",
         "motorista",
         "auditor",
+        "visualizador",
       ],
       axle_layout: [
         "moto_2",
