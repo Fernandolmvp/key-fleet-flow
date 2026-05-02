@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import ChecklistTemplateBuilder from "@/components/dashboard/ChecklistTemplateBuilder";
 import ChecklistRunDialog from "@/components/dashboard/ChecklistRunDialog";
 import { RUN_STATUS_LABEL, RUN_STATUS_TONE, currentMonthRef, monthRefLabel } from "@/lib/checklists";
+import { useTabPermissions } from "@/lib/permissions";
 
 export default function Checklists() {
   const { currentCompanyId } = useAuth();
@@ -34,6 +35,13 @@ export default function Checklists() {
   const [startTplId, setStartTplId] = useState<string>("");
   const [startVehicleId, setStartVehicleId] = useState<string>("");
   const [startBusy, setStartBusy] = useState(false);
+
+  const { canViewTab, isVisible, fallback } = useTabPermissions(
+    "checklists", ["pendentes", "historico", "modelos"], tab,
+  );
+  useEffect(() => {
+    if (!isVisible && fallback) setTab(fallback as any);
+  }, [isVisible, fallback]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -201,9 +209,9 @@ export default function Checklists() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <TabsList className="grid grid-cols-3 w-full sm:w-auto">
-            <TabsTrigger value="pendentes">Pendentes · {counts.pendentes}</TabsTrigger>
-            <TabsTrigger value="historico">Histórico · {counts.historico}</TabsTrigger>
-            <TabsTrigger value="modelos">Modelos · {counts.modelos}</TabsTrigger>
+            {canViewTab("pendentes") && <TabsTrigger value="pendentes">Pendentes · {counts.pendentes}</TabsTrigger>}
+            {canViewTab("historico") && <TabsTrigger value="historico">Histórico · {counts.historico}</TabsTrigger>}
+            {canViewTab("modelos") && <TabsTrigger value="modelos">Modelos · {counts.modelos}</TabsTrigger>}
           </TabsList>
           {tab !== "modelos" && (
             <div className="relative w-full sm:w-72">

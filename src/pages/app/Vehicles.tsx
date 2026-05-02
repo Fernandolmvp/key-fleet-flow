@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { Badge } from "@/components/ui/badge";
+import { useTabPermissions } from "@/lib/permissions";
 
 interface Vehicle {
   id: string; plate: string; brand: string; model: string; year_model: number | null;
@@ -68,6 +69,13 @@ export default function Vehicles() {
 
   useEffect(() => { localStorage.setItem("vehicles:view", view); }, [view]);
   useEffect(() => { localStorage.setItem("vehicles:tab", tab); }, [tab]);
+
+  const { canViewTab, isVisible, fallback } = useTabPermissions(
+    "vehicles", ["ativos", "vendidos", "inativos", "todos"], tab,
+  );
+  useEffect(() => {
+    if (!isVisible && fallback) setTab(fallback);
+  }, [isVisible, fallback]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -190,10 +198,10 @@ export default function Vehicles() {
       <div className="surface-card rounded-xl p-4">
         <Tabs value={tab} onValueChange={setTab} className="mb-4">
           <TabsList className="grid grid-cols-4 w-full sm:w-auto sm:inline-grid">
-            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
-            <TabsTrigger value="vendidos">Vendidos · {counts.vendidos}</TabsTrigger>
-            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
-            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+            {canViewTab("ativos") && <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>}
+            {canViewTab("vendidos") && <TabsTrigger value="vendidos">Vendidos · {counts.vendidos}</TabsTrigger>}
+            {canViewTab("inativos") && <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>}
+            {canViewTab("todos") && <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>}
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-3">

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTabPermissions } from "@/lib/permissions";
 
 interface Station {
   id: string; name: string; cnpj: string | null; brand: string | null;
@@ -37,6 +38,13 @@ export default function FuelStations() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<string>(() => localStorage.getItem("stations:tab") || "ativos");
   useEffect(() => { localStorage.setItem("stations:tab", tab); }, [tab]);
+
+  const { canViewTab, isVisible, fallback } = useTabPermissions(
+    "fuel_stations", ["ativos", "inativos", "todos"], tab,
+  );
+  useEffect(() => {
+    if (!isVisible && fallback) setTab(fallback);
+  }, [isVisible, fallback]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -126,9 +134,9 @@ export default function FuelStations() {
       <div className="surface-card rounded-xl p-4 space-y-4">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid grid-cols-3 w-full sm:w-auto sm:inline-grid">
-            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
-            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
-            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+            {canViewTab("ativos") && <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>}
+            {canViewTab("inativos") && <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>}
+            {canViewTab("todos") && <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>}
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-3">

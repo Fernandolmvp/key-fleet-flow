@@ -18,6 +18,7 @@ import {
 } from "@/lib/documents";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useTabPermissions } from "@/lib/permissions";
 
 type DocRow = {
   id: string;
@@ -67,6 +68,13 @@ export default function Documents() {
 
   useEffect(() => { load(); }, [currentCompanyId]);
 
+  const { canViewTab, isVisible, fallback } = useTabPermissions(
+    "documents", ["vehicles", "drivers"], tab,
+  );
+  useEffect(() => {
+    if (!isVisible && fallback) setTab(fallback as any);
+  }, [isVisible, fallback]);
+
   function openNewFor(prefillData: Partial<DocFormDoc>) {
     setEditing(null);
     setPrefill(prefillData);
@@ -108,8 +116,8 @@ export default function Documents() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
-          <TabsTrigger value="vehicles" className="gap-2"><Truck className="h-4 w-4" /> Veículos</TabsTrigger>
-          <TabsTrigger value="drivers" className="gap-2"><User className="h-4 w-4" /> Motoristas</TabsTrigger>
+          {canViewTab("vehicles") && <TabsTrigger value="vehicles" className="gap-2"><Truck className="h-4 w-4" /> Veículos</TabsTrigger>}
+          {canViewTab("drivers") && <TabsTrigger value="drivers" className="gap-2"><User className="h-4 w-4" /> Motoristas</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="vehicles" className="mt-4">

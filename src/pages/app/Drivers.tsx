@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import DriverHistoryTab from "@/components/dashboard/DriverHistoryTab";
+import { useTabPermissions } from "@/lib/permissions";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -276,6 +277,13 @@ export default function Drivers() {
   const [tab, setTab] = useState<string>(() => localStorage.getItem("drivers:tab") || "ativos");
   useEffect(() => { localStorage.setItem("drivers:tab", tab); }, [tab]);
 
+  const { canViewTab, isVisible, fallback } = useTabPermissions(
+    "drivers", ["ativos", "inativos", "todos"], tab,
+  );
+  useEffect(() => {
+    if (!isVisible && fallback) setTab(fallback);
+  }, [isVisible, fallback]);
+
   const byTab = items.filter((d) => {
     if (tab === "todos") return true;
     if (tab === "ativos") return d.status === "ativo" || d.status === "ferias";
@@ -319,9 +327,9 @@ export default function Drivers() {
       <div className="surface-card rounded-xl p-4">
         <Tabs value={tab} onValueChange={setTab} className="mb-4">
           <TabsList className="grid grid-cols-3 w-full sm:w-auto sm:inline-grid">
-            <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>
-            <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>
-            <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>
+            {canViewTab("ativos") && <TabsTrigger value="ativos">Ativos · {counts.ativos}</TabsTrigger>}
+            {canViewTab("inativos") && <TabsTrigger value="inativos">Inativos · {counts.inativos}</TabsTrigger>}
+            {canViewTab("todos") && <TabsTrigger value="todos">Todos · {counts.todos}</TabsTrigger>}
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-3">

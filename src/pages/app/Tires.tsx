@@ -21,6 +21,7 @@ import {
   AXLE_LAYOUTS, AxleLayout, STATUS_TONE, KIND_TONE, getLayoutPositions,
   tireAlertLevel, treadHealth, fmtBRL,
 } from "@/lib/tires";
+import { useTabPermissions } from "@/lib/permissions";
 
 export default function Tires() {
   const { currentCompanyId } = useAuth();
@@ -36,6 +37,13 @@ export default function Tires() {
   const [defaultMove, setDefaultMove] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [mapVehicleId, setMapVehicleId] = useState<string>("");
+  const [tab, setTab] = useState<string>("list");
+  const { canViewTab, isVisible, fallback } = useTabPermissions(
+    "tires", ["list", "map", "movements", "alerts"], tab,
+  );
+  useEffect(() => {
+    if (!isVisible && fallback) setTab(fallback);
+  }, [isVisible, fallback]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -140,12 +148,12 @@ export default function Tires() {
         <KpiCard label="Alertas" value={String(alerts)} icon={AlertTriangle} tone="destructive" />
       </div>
 
-      <Tabs defaultValue="list">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="list">Pneus</TabsTrigger>
-          <TabsTrigger value="map">Mapa do veículo</TabsTrigger>
-          <TabsTrigger value="movements">Movimentações</TabsTrigger>
-          <TabsTrigger value="alerts">Alertas {alerts > 0 && <Badge className="ml-2 bg-destructive/30 text-destructive">{alerts}</Badge>}</TabsTrigger>
+          {canViewTab("list") && <TabsTrigger value="list">Pneus</TabsTrigger>}
+          {canViewTab("map") && <TabsTrigger value="map">Mapa do veículo</TabsTrigger>}
+          {canViewTab("movements") && <TabsTrigger value="movements">Movimentações</TabsTrigger>}
+          {canViewTab("alerts") && <TabsTrigger value="alerts">Alertas {alerts > 0 && <Badge className="ml-2 bg-destructive/30 text-destructive">{alerts}</Badge>}</TabsTrigger>}
         </TabsList>
 
         {/* LIST */}
