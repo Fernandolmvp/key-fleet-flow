@@ -346,6 +346,8 @@ export default function Fuel() {
                         vehicle_id: a.vehicle_id,
                         driver_id: a.drivers?.id ?? a.driver_id ?? "",
                         fuel_station_id: a.fuel_station_id ?? "",
+                        authorization_id: a.id,
+                        source_origin: "autorizacao",
                         station_name: stn?.name ?? a.station_name ?? "",
                         station_cnpj: stn?.cnpj ?? a.receipt_cnpj ?? "",
                         city: stn?.city ?? "",
