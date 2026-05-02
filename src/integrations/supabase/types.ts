@@ -519,6 +519,7 @@ export type Database = {
         Row: {
           cnpj: string | null
           created_at: string
+          group_id: string | null
           id: string
           logo_url: string | null
           name: string
@@ -527,6 +528,7 @@ export type Database = {
         Insert: {
           cnpj?: string | null
           created_at?: string
+          group_id?: string | null
           id?: string
           logo_url?: string | null
           name: string
@@ -535,9 +537,45 @@ export type Database = {
         Update: {
           cnpj?: string | null
           created_at?: string
+          group_id?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "company_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_groups: {
+        Row: {
+          created_at: string
+          extra_company_fee: number
+          id: string
+          name: string
+          owner_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          extra_company_fee?: number
+          id?: string
+          name: string
+          owner_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          extra_company_fee?: number
+          id?: string
+          name?: string
+          owner_user_id?: string
           updated_at?: string
         }
         Relationships: []
@@ -2381,11 +2419,12 @@ export type Database = {
         Row: {
           cancel_at_period_end: boolean
           cancelled_at: string | null
-          company_id: string
+          company_id: string | null
           created_at: string
           current_period_end: string
           current_period_start: string
           custom_vehicle_limit: number | null
+          group_id: string | null
           id: string
           last_payment_status: string | null
           monthly_amount: number | null
@@ -2402,11 +2441,12 @@ export type Database = {
         Insert: {
           cancel_at_period_end?: boolean
           cancelled_at?: string | null
-          company_id: string
+          company_id?: string | null
           created_at?: string
           current_period_end?: string
           current_period_start?: string
           custom_vehicle_limit?: number | null
+          group_id?: string | null
           id?: string
           last_payment_status?: string | null
           monthly_amount?: number | null
@@ -2423,11 +2463,12 @@ export type Database = {
         Update: {
           cancel_at_period_end?: boolean
           cancelled_at?: string | null
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           current_period_end?: string
           current_period_start?: string
           custom_vehicle_limit?: number | null
+          group_id?: string | null
           id?: string
           last_payment_status?: string | null
           monthly_amount?: number | null
@@ -2468,6 +2509,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "company_groups"
             referencedColumns: ["id"]
           },
           {
@@ -3085,6 +3133,10 @@ export type Database = {
         Returns: string
       }
       bootstrap_super_admin: { Args: { _email: string }; Returns: string }
+      calculate_group_monthly_amount: {
+        Args: { _group_id: string }
+        Returns: number
+      }
       can_manage_fleet: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
