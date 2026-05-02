@@ -33,7 +33,7 @@ export default function Fuel() {
     setLoading(true);
     const { data, error } = await supabase
       .from("fuel_records")
-      .select("*, vehicles:vehicle_id(plate,brand,model), drivers:driver_id(full_name)")
+      .select("*, vehicles:vehicles!fuel_records_vehicle_id_fkey(plate,brand,model), drivers:drivers!fuel_records_driver_id_fkey(full_name)")
       .eq("company_id", currentCompanyId)
       .order("fueled_at", { ascending: false })
       .limit(500);
