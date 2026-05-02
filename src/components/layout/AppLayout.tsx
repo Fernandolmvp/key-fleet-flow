@@ -2,6 +2,7 @@ import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { usePermissions, type PermModule } from "@/lib/permissions";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
   CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck
@@ -16,7 +17,7 @@ import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { NewCompanyDialog } from "@/components/NewCompanyDialog";
 
-type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean };
+type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean; module?: PermModule };
 type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
 type NavEntry = NavItem | NavGroup;
 
@@ -25,29 +26,29 @@ const nav: NavEntry[] = [
   {
     type: "group", key: "cadastros", label: "Cadastros", icon: Database,
     items: [
-      { to: "/app/vehicles", label: "Veículos", icon: Truck },
-      { to: "/app/drivers", label: "Motoristas", icon: Users },
-      { to: "/app/fuel-stations", label: "Postos", icon: Store },
-      { to: "/app/brokers", label: "Corretores", icon: Briefcase },
+      { to: "/app/vehicles", label: "Veículos", icon: Truck, module: "vehicles" },
+      { to: "/app/drivers", label: "Motoristas", icon: Users, module: "drivers" },
+      { to: "/app/fuel-stations", label: "Postos", icon: Store, module: "fuel_stations" },
+      { to: "/app/brokers", label: "Corretores", icon: Briefcase, module: "brokers" },
     ],
   },
   {
     type: "group", key: "movimentacao", label: "Movimentação", icon: Activity,
     items: [
-      { to: "/app/fuel", label: "Abastecimentos", icon: Fuel },
-      { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals" },
-      { to: "/app/maintenance", label: "Manutenção", icon: Wrench },
-      { to: "/app/checklists", label: "Checklists", icon: ClipboardList },
-      { to: "/app/tires", label: "Pneus", icon: CircleDot },
-      { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents" },
-      { to: "/app/insurance", label: "Seguros", icon: ShieldCheck },
+      { to: "/app/fuel", label: "Abastecimentos", icon: Fuel, module: "fuel" },
+      { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals", module: "approvals" },
+      { to: "/app/maintenance", label: "Manutenção", icon: Wrench, module: "maintenance" },
+      { to: "/app/checklists", label: "Checklists", icon: ClipboardList, module: "checklists" },
+      { to: "/app/tires", label: "Pneus", icon: CircleDot, module: "tires" },
+      { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents", module: "documents" },
+      { to: "/app/insurance", label: "Seguros", icon: ShieldCheck, module: "insurance" },
     ],
   },
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
-  { to: "/app/configuracoes", label: "Configurações da Empresa", icon: Settings },
+  { to: "/app/configuracoes", label: "Configurações da Empresa", icon: Settings, module: "settings" },
   { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
-  { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true },
+  { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true, module: "reports" },
 ];
 
 function isGroup(e: NavEntry): e is NavGroup {
@@ -56,6 +57,7 @@ function isGroup(e: NavEntry): e is NavGroup {
 
 export default function AppLayout() {
   const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin, roles } = useAuth();
+  const { can, isAdmin, loading: permsLoading } = usePermissions();
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
@@ -113,9 +115,27 @@ export default function AppLayout() {
         ? "Carregando empresa…"
         : "Selecionar empresa");
   const hasDriverRole = roles.includes("motorista");
+
+  // Filtra a sidebar por permissão de visualizar do módulo. Itens sem `module`
+  // (Dashboard, Assinatura, "soon") aparecem para todos os perfis de gestão.
+  const filterByPerm = (entries: NavEntry[]): NavEntry[] => {
+    const out: NavEntry[] = [];
+    for (const e of entries) {
+      if (isGroup(e)) {
+        const items = e.items.filter((it) => !it.module || can(it.module, "view"));
+        if (items.length > 0) out.push({ ...e, items });
+      } else if (!e.module || can(e.module, "view")) {
+        out.push(e);
+      }
+    }
+    return out;
+  };
+
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
-    : nav;
+    : permsLoading
+      ? nav
+      : filterByPerm(nav);
 
   const renderItem = (it: NavItem, opts: { indent?: boolean; primary?: boolean } = {}) => {
     const { indent = false, primary = false } = opts;

@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Save, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, Save, RotateCcw, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ALL_ROLES, ALL_MODULES, ALL_ACTIONS, MODULE_TABS, type AppRole, type PermAction, type PermModule } from "@/lib/permissions";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Row = { role: AppRole; module: PermModule; action: PermAction; allowed: boolean; tab: string | null };
 
 export default function PermissionsTab({ companyId }: { companyId: string }) {
+  const { roles } = useAuth();
+  const userIsAdminHere = roles.includes("admin");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -125,6 +128,18 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-4">
+      {userIsAdminHere && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-xs flex items-start gap-3">
+          <Info className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+          <div>
+            <strong>Você é Administrador desta empresa.</strong> Administradores
+            <em> sempre veem tudo</em>, então as restrições configuradas aqui
+            <strong> não se aplicam a você</strong>. Para testar como Gestor de Frota
+            (ou outro perfil), faça login com um usuário que tenha apenas esse perfil
+            (sem o papel "admin"). Você pode criar/editar usuários na aba <strong>Membros</strong>.
+          </div>
+        </div>
+      )}
       <div className="surface-card rounded-xl p-4 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h3 className="font-display font-semibold">Permissões por perfil</h3>
