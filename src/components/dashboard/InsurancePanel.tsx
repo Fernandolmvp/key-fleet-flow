@@ -761,7 +761,51 @@ export default function InsurancePanel() {
               )}
             </div>
 
-            {aiPlates.length > 0 && (
+            {aiVehicles.length > 0 ? (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                <div className="text-xs font-medium mb-2 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Veículos identificados pela IA ({aiVehicles.length})
+                </div>
+                <div className="max-h-56 overflow-y-auto rounded border border-border bg-background/40">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-muted/40 sticky top-0">
+                      <tr>
+                        <th className="text-left p-1.5">Placa</th>
+                        <th className="text-left p-1.5">Veículo</th>
+                        <th className="text-right p-1.5">IS</th>
+                        <th className="text-right p-1.5">Prêmio</th>
+                        <th className="text-center p-1.5">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiVehicles.map((v) => {
+                        const found = vehicles.some((x) => x.plate.toUpperCase() === v.plate);
+                        return (
+                          <tr key={v.plate} className="border-t border-border">
+                            <td className="p-1.5 font-mono font-bold">{v.plate}</td>
+                            <td className="p-1.5 text-muted-foreground">
+                              {[v.brand, v.model, v.year].filter(Boolean).join(" ") || "—"}
+                            </td>
+                            <td className="p-1.5 text-right">{fmtBRL(v.insured_amount ?? null)}</td>
+                            <td className="p-1.5 text-right">{fmtBRL(v.premium ?? null)}</td>
+                            <td className="p-1.5 text-center">
+                              {found ? (
+                                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">cadastrado</Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">novo</Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-2">
+                  Placas em <span className="text-emerald-400">verde</span> serão vinculadas automaticamente. Placas em <span className="text-amber-400">âmbar</span> não estão cadastradas — cadastre o veículo depois para fechar a cobertura.
+                </div>
+              </div>
+            ) : aiPlates.length > 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
                 <div className="text-xs font-medium mb-1 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Placas identificadas pela IA</div>
                 <div className="flex flex-wrap gap-1">
