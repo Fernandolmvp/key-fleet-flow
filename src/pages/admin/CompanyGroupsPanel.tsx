@@ -46,7 +46,7 @@ export default function CompanyGroupsPanel() {
           .from("subscriptions")
           .select("group_id, plan_id, status, plans(monthly_price)")
           .in("group_id", groupIds.length ? groupIds : ["00000000-0000-0000-0000-000000000000"])
-          .in("status", ["ativa", "aguardando_pagamento", "trial"]),
+          .in("status", ["ativa", "aguardando_pagamento"]),
       ]);
 
       const compsByGroup: Record<string, { id: string; name: string }[]> = {};
