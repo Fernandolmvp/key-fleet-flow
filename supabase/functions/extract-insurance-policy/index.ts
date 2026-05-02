@@ -9,7 +9,7 @@ const TOOL = {
   function: {
     name: "extract_insurance_policy",
     description:
-      "Extrai dados de uma apólice de seguro de frota brasileira. Retorne placas cobertas, dados da seguradora e do corretor.",
+      "Extrai dados completos de uma apólice de seguro de frota brasileira. Retorne TODAS as placas cobertas (apólice e endossos/adendos), com dados detalhados por veículo, dados da seguradora, do corretor, vigência, prêmio total, franquia e coberturas.",
     parameters: {
       type: "object",
       properties: {
@@ -17,11 +17,19 @@ const TOOL = {
         insurer_name: { type: ["string", "null"], description: "Nome da seguradora (Porto, Bradesco, Allianz, etc.)" },
         insurer_phone: { type: ["string", "null"], description: "Telefone da seguradora (apenas dígitos)" },
         insurer_email: { type: ["string", "null"] },
+        insurer_document: { type: ["string", "null"], description: "CNPJ da seguradora (apenas dígitos)" },
         start_date: { type: ["string", "null"], description: "Início de vigência YYYY-MM-DD" },
         end_date: { type: ["string", "null"], description: "Fim de vigência YYYY-MM-DD" },
+        emission_date: { type: ["string", "null"], description: "Data de emissão da apólice YYYY-MM-DD" },
         total_value: { type: ["number", "null"], description: "Prêmio total" },
+        net_premium: { type: ["number", "null"], description: "Prêmio líquido se informado" },
+        iof: { type: ["number", "null"], description: "Valor do IOF se informado" },
+        installments_count: { type: ["integer", "null"], description: "Número de parcelas" },
+        installment_value: { type: ["number", "null"], description: "Valor de cada parcela" },
         deductible: { type: ["number", "null"], description: "Franquia padrão" },
-        coverage_summary: { type: ["string", "null"], description: "Resumo curto de coberturas principais" },
+        coverage_summary: { type: ["string", "null"], description: "Resumo das coberturas principais (Casco, RCF-V, APP, assistência etc.) com limites quando possível" },
+        insured_name: { type: ["string", "null"], description: "Razão social/nome do segurado (estipulante da frota)" },
+        insured_document: { type: ["string", "null"], description: "CNPJ/CPF do segurado (apenas dígitos)" },
         broker_name: { type: ["string", "null"], description: "Nome/razão social do corretor de seguros" },
         broker_document: { type: ["string", "null"], description: "CNPJ/CPF do corretor (apenas dígitos)" },
         broker_susep: { type: ["string", "null"], description: "Registro SUSEP do corretor" },
@@ -29,9 +37,32 @@ const TOOL = {
         broker_email: { type: ["string", "null"] },
         plates: {
           type: "array",
-          description: "Placas dos veículos cobertos pela apólice",
+          description: "Lista simples e COMPLETA de TODAS as placas cobertas (incluindo as de endossos/adendos). Em maiúsculas, sem hífen ou espaços.",
           items: { type: "string" },
         },
+        vehicles: {
+          type: "array",
+          description: "Detalhamento por veículo coberto. Inclua TODOS os veículos listados na apólice e nos endossos. Se algum dado não estiver visível, retorne null naquele campo, mas SEMPRE inclua a placa.",
+          items: {
+            type: "object",
+            properties: {
+              plate: { type: "string", description: "Placa em maiúsculas, sem hífen/espaços" },
+              brand: { type: ["string", "null"] },
+              model: { type: ["string", "null"] },
+              year: { type: ["string", "null"], description: "Ano modelo/fabricação como string" },
+              fipe_code: { type: ["string", "null"] },
+              chassis: { type: ["string", "null"] },
+              insured_amount: { type: ["number", "null"], description: "Importância segurada / valor do casco para este veículo" },
+              premium: { type: ["number", "null"], description: "Prêmio individual deste veículo, se discriminado" },
+              deductible: { type: ["number", "null"], description: "Franquia específica deste veículo, se diferente da padrão" },
+              inclusion_type: { type: ["string", "null"], enum: ["apolice", "adendo", null], description: "'adendo' se foi incluído por endosso após emissão; 'apolice' se está na lista original" },
+              endorsement_number: { type: ["string", "null"] },
+              coverage_notes: { type: ["string", "null"], description: "Observação curta sobre coberturas/limites específicos deste veículo" }
+            },
+            required: ["plate"],
+            additionalProperties: false
+          }
+        }
       },
       required: ["insurer_name"],
       additionalProperties: false,
@@ -55,8 +86,22 @@ Deno.serve(async (req) => {
     }
 
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
+    const isPdf = (mimeType || "").toLowerCase().includes("pdf");
     const sys =
-      "Você é especialista em apólices de seguro de frota brasileiras. Leia a apólice e extraia: número, seguradora (com telefone/email de atendimento), vigência (início e fim), prêmio total, franquia padrão, corretor (nome, CNPJ, SUSEP, telefone, email) e a LISTA COMPLETA DE PLACAS de todos os veículos cobertos (incluindo adendos/endossos se aparecerem). Datas em ISO YYYY-MM-DD. Placas em maiúsculas, sem hífen ou espaços.";
+      "Você é especialista em apólices de seguro de frota brasileiras (Porto, Bradesco, Allianz, Tokio, Sompo, HDI, Mapfre, Liberty, Suhai, etc.). Leia a apólice INTEIRA — TODAS as páginas, incluindo a relação de bens segurados, endossos, adendos e cláusulas. Extraia: número da apólice, seguradora (telefone/email/CNPJ), segurado (nome/CNPJ), vigência (início/fim/emissão), prêmio total, prêmio líquido, IOF, parcelas, franquia padrão, corretor (nome, CNPJ, SUSEP, telefone, email), coberturas principais com limites, e a LISTA COMPLETA E DETALHADA de TODOS os veículos cobertos (placa, marca, modelo, ano, FIPE, chassi, importância segurada, prêmio individual quando discriminado). Inclua veículos adicionados por endosso/adendo marcando inclusion_type='adendo'. Placas SEMPRE em maiúsculas, sem hífen/espaços. Datas em ISO YYYY-MM-DD. NUNCA invente placas — se não tiver certeza, omita.";
+
+    // Para PDFs: usar input_file (Gemini lê o documento inteiro). Para imagens: image_url.
+    const userContent: any[] = [
+      { type: "text", text: "Extraia TODOS os dados visíveis do documento e retorne pela function call. Não resuma a lista de veículos — inclua TODOS." },
+    ];
+    if (isPdf) {
+      userContent.push({
+        type: "file",
+        file: { filename: "apolice.pdf", file_data: dataUrl },
+      });
+    } else {
+      userContent.push({ type: "image_url", image_url: { url: dataUrl } });
+    }
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -65,13 +110,7 @@ Deno.serve(async (req) => {
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: sys },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Extraia todos os dados visíveis e retorne pela function call." },
-              { type: "image_url", image_url: { url: dataUrl } },
-            ],
-          },
+          { role: "user", content: userContent },
         ],
         tools: [TOOL],
         tool_choice: { type: "function", function: { name: "extract_insurance_policy" } },

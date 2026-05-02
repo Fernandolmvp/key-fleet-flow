@@ -15,6 +15,20 @@ import { format, differenceInDays } from "date-fns";
 
 type Broker = { id: string; name: string };
 type Vehicle = { id: string; plate: string; brand: string; model: string; status: string };
+type AiVehicle = {
+  plate: string;
+  brand?: string | null;
+  model?: string | null;
+  year?: string | null;
+  fipe_code?: string | null;
+  chassis?: string | null;
+  insured_amount?: number | null;
+  premium?: number | null;
+  deductible?: number | null;
+  inclusion_type?: "apolice" | "adendo" | null;
+  endorsement_number?: string | null;
+  coverage_notes?: string | null;
+};
 type Policy = {
   id: string;
   policy_number: string;
@@ -105,6 +119,8 @@ export default function InsurancePanel() {
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [aiPlates, setAiPlates] = useState<string[]>([]);
+  const [aiVehicles, setAiVehicles] = useState<AiVehicle[]>([]);
+  const [reextracting, setReextracting] = useState(false);
 
   const [vehicleSearch, setVehicleSearch] = useState("");
 
@@ -127,8 +143,14 @@ export default function InsurancePanel() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
 
-  function openNew() { setForm(emptyPolicy); setAiPlates([]); setPolicyDialog(true); }
-  function openEdit(p: Policy) { setForm(p); setAiPlates([]); setPolicyDialog(true); }
+  function openNew() { setForm(emptyPolicy); setAiPlates([]); setAiVehicles([]); setPolicyDialog(true); }
+  function openEdit(p: Policy) {
+    setForm(p);
+    const ex = p.ai_extracted || {};
+    setAiPlates(Array.isArray(ex.plates) ? ex.plates.map((x: string) => String(x).toUpperCase().replace(/[^A-Z0-9]/g, "")) : []);
+    setAiVehicles(Array.isArray(ex.vehicles) ? ex.vehicles : []);
+    setPolicyDialog(true);
+  }
 
   async function handleFile(file: File) {
     if (!currentCompanyId) return;
@@ -198,11 +220,40 @@ export default function InsurancePanel() {
         setAiPlates(norm);
         toast.success(`IA encontrou ${norm.length} placa(s) na apólice`);
       }
+      if (Array.isArray(ex.vehicles)) {
+        const norm = (ex.vehicles as AiVehicle[]).map((v) => ({
+          ...v,
+          plate: String(v.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
+        })).filter((v) => v.plate);
+        setAiVehicles(norm);
+        // Se não veio plates[], deriva de vehicles[]
+        if (!Array.isArray(ex.plates) || ex.plates.length === 0) {
+          setAiPlates(norm.map((v) => v.plate));
+        }
+      }
     } catch (e: any) {
       console.error(e);
       toast.error("IA não conseguiu ler a apólice. Preencha manualmente.");
     } finally {
       setExtracting(false);
+    }
+  }
+
+  /** Reanalisa o PDF já anexado. */
+  async function reextract() {
+    if (!form.file_url) { toast.error("Anexe o PDF primeiro"); return; }
+    setReextracting(true);
+    try {
+      const resp = await fetch(form.file_url);
+      if (!resp.ok) throw new Error("Não foi possível baixar o PDF anexado");
+      const blob = await resp.blob();
+      const file = new File([blob], form.file_name || "apolice.pdf", { type: blob.type || "application/pdf" });
+      // Força reextração: limpa campos preenchidos pela IA antiga (mantém o que o usuário digitou? — mantemos manuais)
+      await extractWithAI(file);
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao reanalisar");
+    } finally {
+      setReextracting(false);
     }
   }
 
@@ -227,7 +278,7 @@ export default function InsurancePanel() {
       file_name: form.file_name || null,
       notes: form.notes || null,
       status: form.status || "ativa",
-      ai_extracted: form.ai_extracted || {},
+      ai_extracted: { ...(form.ai_extracted || {}), plates: aiPlates, vehicles: aiVehicles },
     };
     let policyId = form.id;
     if (form.id) {
@@ -317,11 +368,76 @@ export default function InsurancePanel() {
     [links, selectedPolicyId]
   );
   const linkedVehicleIds = new Set(selectedLinks.map((l) => l.vehicle_id));
+
+  // === VALIDAÇÃO CRUZADA da apólice selecionada ===
+  const validation = useMemo(() => {
+    if (!selectedPolicy) return null;
+    const ex = (selectedPolicy.ai_extracted as any) || {};
+    const aiVeh: AiVehicle[] = Array.isArray(ex.vehicles) ? ex.vehicles : [];
+    const aiPl: string[] = Array.isArray(ex.plates)
+      ? ex.plates.map((p: string) => String(p).toUpperCase().replace(/[^A-Z0-9]/g, ""))
+      : aiVeh.map((v) => String(v.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "")).filter(Boolean);
+    const aiPlSet = new Set(aiPl);
+    const aiVehByPlate: Record<string, AiVehicle> = {};
+    aiVeh.forEach((v) => {
+      const p = String(v.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (p) aiVehByPlate[p] = v;
+    });
+
+    // Cobertos & cadastrados (interseção)
+    const covered = vehicles
+      .filter((v) => aiPlSet.has(v.plate.toUpperCase()))
+      .map((v) => ({ ...v, ai: aiVehByPlate[v.plate.toUpperCase()] }));
+
+    // Na apólice mas NÃO cadastrados
+    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
+    const onlyInPolicy = aiPl
+      .filter((p) => !cadastradas.has(p))
+      .map((p) => ({ plate: p, ai: aiVehByPlate[p] }));
+
+    // Vinculados manualmente mas que NÃO aparecem na apólice (IA)
+    const linkedNotInAi = selectedLinks
+      .map((l) => vehicles.find((v) => v.id === l.vehicle_id))
+      .filter((v): v is Vehicle => !!v)
+      .filter((v) => aiPl.length > 0 && !aiPlSet.has(v.plate.toUpperCase()));
+
+    // Veículos da empresa SEM cobertura nesta apólice
+    const notCovered = vehicles.filter((v) => !aiPlSet.has(v.plate.toUpperCase()) && !linkedVehicleIds.has(v.id));
+
+    // Soma das importâncias seguradas extraídas
+    const sumIS = aiVeh.reduce((s, v) => s + (Number(v.insured_amount) || 0), 0);
+    const sumPremium = aiVeh.reduce((s, v) => s + (Number(v.premium) || 0), 0);
+
+    return { aiPl, aiVehByPlate, covered, onlyInPolicy, linkedNotInAi, notCovered, sumIS, sumPremium, hasAi: aiPl.length > 0 };
+  }, [selectedPolicy, vehicles, selectedLinks, linkedVehicleIds]);
+
+  // Vincula em massa todas as placas da IA que estão cadastradas
+  async function autoLinkAi() {
+    if (!selectedPolicyId || !currentCompanyId || !validation) return;
+    const toLink = validation.covered.filter((v) => !linkedVehicleIds.has(v.id));
+    if (!toLink.length) { toast.info("Todos os veículos cobertos já estão vinculados."); return; }
+    const rows = toLink.map((v) => ({
+      company_id: currentCompanyId,
+      policy_id: selectedPolicyId,
+      vehicle_id: v.id,
+      inclusion_type: (v.ai?.inclusion_type === "adendo" ? "adendo" : "apolice") as "apolice" | "adendo",
+    }));
+    const { error } = await supabase.from("insurance_policy_vehicles")
+      .upsert(rows, { onConflict: "policy_id,vehicle_id", ignoreDuplicates: true });
+    if (error) { toast.error(error.message); return; }
+    await syncVehicleInsuranceFields(currentCompanyId, toLink.map((v) => v.id));
+    toast.success(`${toLink.length} veículo(s) vinculado(s) automaticamente`);
+    load();
+  }
+
   const filteredVehicles = vehicles.filter((v) => {
     if (!vehicleSearch) return true;
     const q = vehicleSearch.toLowerCase();
     return [v.plate, v.brand, v.model].join(" ").toLowerCase().includes(q);
   });
+
+  const fmtBRL = (n: number | null | undefined) =>
+    n == null ? "—" : n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   function policyStatus(p: Policy) {
     if (!p.end_date) return { label: "Sem vigência", cls: "bg-muted/30 text-muted-foreground border-border" };
@@ -410,6 +526,126 @@ export default function InsurancePanel() {
 
         {selectedPolicy && (
           <>
+            {/* ====== PAINEL DE VALIDAÇÃO ====== */}
+            {validation && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-3">
+                {/* Vigência e valores */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                  <div className="rounded-md bg-background/40 p-2 border border-border">
+                    <div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
+                    <div className="text-xs font-medium">
+                      {selectedPolicy.start_date ? format(new Date(selectedPolicy.start_date + "T00:00:00"), "dd/MM/yy") : "—"} →{" "}
+                      {selectedPolicy.end_date ? format(new Date(selectedPolicy.end_date + "T00:00:00"), "dd/MM/yy") : "—"}
+                    </div>
+                    <Badge variant="outline" className={policyStatus(selectedPolicy).cls + " mt-1 text-[10px]"}>
+                      {policyStatus(selectedPolicy).label}
+                    </Badge>
+                  </div>
+                  <div className="rounded-md bg-background/40 p-2 border border-border">
+                    <div className="text-[10px] uppercase text-muted-foreground">Prêmio total</div>
+                    <div className="text-sm font-bold text-primary">{fmtBRL(selectedPolicy.total_value)}</div>
+                    {validation.sumPremium > 0 && (
+                      <div className="text-[10px] text-muted-foreground">Soma p/ veíc.: {fmtBRL(validation.sumPremium)}</div>
+                    )}
+                  </div>
+                  <div className="rounded-md bg-background/40 p-2 border border-border">
+                    <div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
+                    <div className="text-sm font-bold">{fmtBRL(selectedPolicy.deductible)}</div>
+                  </div>
+                  <div className="rounded-md bg-background/40 p-2 border border-border">
+                    <div className="text-[10px] uppercase text-muted-foreground">IS Total</div>
+                    <div className="text-sm font-bold">{validation.sumIS > 0 ? fmtBRL(validation.sumIS) : "—"}</div>
+                  </div>
+                </div>
+
+                {/* Diagnóstico */}
+                {validation.hasAi ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
+                        <div className="text-lg font-bold text-emerald-400">{validation.covered.length}</div>
+                        <div className="text-[10px] uppercase text-emerald-400/80">Cobertos & cadastrados</div>
+                      </div>
+                      <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
+                        <div className="text-lg font-bold text-amber-400">{validation.onlyInPolicy.length}</div>
+                        <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
+                      </div>
+                      <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
+                        <div className="text-lg font-bold text-destructive">{validation.linkedNotInAi.length}</div>
+                        <div className="text-[10px] uppercase text-destructive/80">Vinculados s/ cobertura</div>
+                      </div>
+                    </div>
+
+                    {validation.covered.length > 0 && (
+                      <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
+                        <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
+                      </Button>
+                    )}
+
+                    {validation.onlyInPolicy.length > 0 && (
+                      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+                        <div className="text-xs font-medium text-amber-400 flex items-center gap-1 mb-1">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Placas na apólice mas NÃO cadastradas ({validation.onlyInPolicy.length})
+                        </div>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {validation.onlyInPolicy.map((x) => (
+                            <div key={x.plate} className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="font-mono font-bold text-amber-400">{x.plate}</span>
+                              <span className="text-muted-foreground truncate">
+                                {[x.ai?.brand, x.ai?.model, x.ai?.year].filter(Boolean).join(" ") || "—"}
+                              </span>
+                              <span className="text-muted-foreground whitespace-nowrap">{fmtBRL(x.ai?.insured_amount ?? null)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1">Cadastre esses veículos para garantir cobertura completa.</div>
+                      </div>
+                    )}
+
+                    {validation.linkedNotInAi.length > 0 && (
+                      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
+                        <div className="text-xs font-medium text-destructive flex items-center gap-1 mb-1">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Vinculados manualmente mas NÃO encontrados na apólice ({validation.linkedNotInAi.length})
+                        </div>
+                        <div className="space-y-1 max-h-24 overflow-y-auto">
+                          {validation.linkedNotInAi.map((v) => (
+                            <div key={v.id} className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="font-mono font-bold text-destructive">{v.plate}</span>
+                              <span className="text-muted-foreground truncate">{v.brand} {v.model}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1">Verifique a apólice — podem estar como adendo ou fora de cobertura.</div>
+                      </div>
+                    )}
+
+                    {validation.notCovered.length > 0 && (
+                      <details className="rounded-md border border-border bg-background/30 p-2">
+                        <summary className="text-xs font-medium cursor-pointer text-muted-foreground">
+                          {validation.notCovered.length} veículo(s) da empresa SEM cobertura nesta apólice
+                        </summary>
+                        <div className="space-y-1 max-h-40 overflow-y-auto mt-2">
+                          {validation.notCovered.map((v) => (
+                            <div key={v.id} className="flex items-center justify-between gap-2 text-[11px] py-0.5">
+                              <span className="font-mono">{v.plate}</span>
+                              <span className="text-muted-foreground truncate">{v.brand} {v.model}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-xs text-muted-foreground rounded-md border border-dashed border-border p-3 text-center">
+                    Nenhuma análise de IA disponível para esta apólice.
+                    {selectedPolicy.file_url && " Abra a edição e clique em 'Reanalisar com IA'."}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <div className="text-xs uppercase text-muted-foreground mb-2">Já vinculados ({selectedLinks.length})</div>
               <div className="space-y-1 max-h-60 overflow-y-auto">
@@ -481,13 +717,23 @@ export default function InsurancePanel() {
           <div className="space-y-4">
             <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
               {form.file_url ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-primary" /> {form.file_name || "PDF anexado"}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm min-w-0">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{form.file_name || "PDF anexado"}</span>
                   </div>
-                  <Button asChild variant="outline" size="sm">
-                    <a href={form.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /> Ver</a>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={reextract} disabled={reextracting || extracting}>
+                      {reextracting || extracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      Reanalisar com IA
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <a href={form.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /> Ver</a>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setForm((f) => ({ ...f, file_url: null, file_name: null }))}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <label className="cursor-pointer block">
@@ -515,7 +761,51 @@ export default function InsurancePanel() {
               )}
             </div>
 
-            {aiPlates.length > 0 && (
+            {aiVehicles.length > 0 ? (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                <div className="text-xs font-medium mb-2 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Veículos identificados pela IA ({aiVehicles.length})
+                </div>
+                <div className="max-h-56 overflow-y-auto rounded border border-border bg-background/40">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-muted/40 sticky top-0">
+                      <tr>
+                        <th className="text-left p-1.5">Placa</th>
+                        <th className="text-left p-1.5">Veículo</th>
+                        <th className="text-right p-1.5">IS</th>
+                        <th className="text-right p-1.5">Prêmio</th>
+                        <th className="text-center p-1.5">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiVehicles.map((v) => {
+                        const found = vehicles.some((x) => x.plate.toUpperCase() === v.plate);
+                        return (
+                          <tr key={v.plate} className="border-t border-border">
+                            <td className="p-1.5 font-mono font-bold">{v.plate}</td>
+                            <td className="p-1.5 text-muted-foreground">
+                              {[v.brand, v.model, v.year].filter(Boolean).join(" ") || "—"}
+                            </td>
+                            <td className="p-1.5 text-right">{fmtBRL(v.insured_amount ?? null)}</td>
+                            <td className="p-1.5 text-right">{fmtBRL(v.premium ?? null)}</td>
+                            <td className="p-1.5 text-center">
+                              {found ? (
+                                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">cadastrado</Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">novo</Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-2">
+                  Placas em <span className="text-emerald-400">verde</span> serão vinculadas automaticamente. Placas em <span className="text-amber-400">âmbar</span> não estão cadastradas — cadastre o veículo depois para fechar a cobertura.
+                </div>
+              </div>
+            ) : aiPlates.length > 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
                 <div className="text-xs font-medium mb-1 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Placas identificadas pela IA</div>
                 <div className="flex flex-wrap gap-1">
