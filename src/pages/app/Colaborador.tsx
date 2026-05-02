@@ -21,6 +21,7 @@ interface Auth {
   km_photo_url: string | null; plate_photo_url: string | null; receipt_photo_url: string | null;
   receipt_cnpj: string | null; receipt_total: number | null; cnpj_match: boolean | null;
   confirmed_at: string | null;
+  driver_id: string | null;
 }
 
 const STATUS_TONE: Record<string, string> = {
