@@ -3199,6 +3199,10 @@ export type Database = {
         Args: { _company_id: string }
         Returns: undefined
       }
+      sync_vehicle_insurance_fields: {
+        Args: { _vehicle_ids: string[] }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:
