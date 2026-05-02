@@ -27,8 +27,6 @@ export default function Fuel() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [auths, setAuths] = useState<any[]>([]);
-  const [authBusy, setAuthBusy] = useState<string | null>(null);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -46,33 +44,8 @@ export default function Fuel() {
 
   useEffect(() => { load(); }, [currentCompanyId]);
 
-  const loadAuths = async () => {
-    if (!currentCompanyId) return;
-    const { data } = await supabase
-      .from("fuel_authorizations")
-      .select("*, vehicles:vehicle_id(plate,brand,model,current_km,fuel_type), drivers:driver_id(id,full_name), fuel_stations:fuel_station_id(id,name,cnpj,city,state)")
-      .eq("company_id", currentCompanyId)
-      .order("requested_at", { ascending: false })
-      .limit(100);
-    setAuths(data ?? []);
-  };
-  useEffect(() => { loadAuths(); }, [currentCompanyId]);
-
-  const updateAuth = async (id: string, status: "aprovada" | "recusada" | "cancelada") => {
-    setAuthBusy(id);
-    const { error } = await supabase.from("fuel_authorizations").update({
-      status, approved_by: user?.id ?? null,
-    }).eq("id", id);
-    setAuthBusy(null);
-    if (error) return toast.error(error.message);
-    toast.success(status === "aprovada" ? "Autorização aprovada com código gerado" : "Solicitação atualizada");
-    loadAuths();
-  };
-
-  const pendingAuths = useMemo(() => auths.filter((a) => a.status === "pendente"), [auths]);
-
   const remove = async (id: string) => {
-    if (!confirm("Excluir este abastecimento?")) return;
+    if (!confirm("Excluir este abastecimento? Esta ação será registrada no histórico de auditoria.")) return;
     const { error } = await supabase.from("fuel_records").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Removido"); load();
@@ -161,16 +134,6 @@ export default function Fuel() {
         <KpiCard label="Anomalias detectadas" value={stats.anomalies} icon={AlertTriangle} tone={stats.anomalies > 0 ? "warning" : "success"} hint="lançamentos com alerta" />
       </div>
 
-      <Tabs defaultValue="records">
-        <TabsList>
-          <TabsTrigger value="records">Histórico</TabsTrigger>
-          <TabsTrigger value="auths">
-            Autorizações
-            {pendingAuths.length > 0 && <Badge className="ml-2 bg-warning/30 text-warning">{pendingAuths.length}</Badge>}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="records" className="space-y-6 mt-4">
       {monthly.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="surface-card rounded-xl p-6 lg:col-span-2">
