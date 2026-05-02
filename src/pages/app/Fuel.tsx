@@ -10,8 +10,6 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import { Badge } from "@/components/ui/badge";
 import { ANOMALY_LABEL, SEVERITY_TONE, fmtMoney, fmtNum } from "@/lib/fuel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, X, ShieldCheck, Clock, FileWarning } from "lucide-react";
 
 interface Row {
   id: string; fueled_at: string; station_name: string | null; city: string | null;
