@@ -15,6 +15,20 @@ import { format, differenceInDays } from "date-fns";
 
 type Broker = { id: string; name: string };
 type Vehicle = { id: string; plate: string; brand: string; model: string; status: string };
+type AiVehicle = {
+  plate: string;
+  brand?: string | null;
+  model?: string | null;
+  year?: string | null;
+  fipe_code?: string | null;
+  chassis?: string | null;
+  insured_amount?: number | null;
+  premium?: number | null;
+  deductible?: number | null;
+  inclusion_type?: "apolice" | "adendo" | null;
+  endorsement_number?: string | null;
+  coverage_notes?: string | null;
+};
 type Policy = {
   id: string;
   policy_number: string;
@@ -105,6 +119,8 @@ export default function InsurancePanel() {
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [aiPlates, setAiPlates] = useState<string[]>([]);
+  const [aiVehicles, setAiVehicles] = useState<AiVehicle[]>([]);
+  const [reextracting, setReextracting] = useState(false);
 
   const [vehicleSearch, setVehicleSearch] = useState("");
 
@@ -127,8 +143,14 @@ export default function InsurancePanel() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
 
-  function openNew() { setForm(emptyPolicy); setAiPlates([]); setPolicyDialog(true); }
-  function openEdit(p: Policy) { setForm(p); setAiPlates([]); setPolicyDialog(true); }
+  function openNew() { setForm(emptyPolicy); setAiPlates([]); setAiVehicles([]); setPolicyDialog(true); }
+  function openEdit(p: Policy) {
+    setForm(p);
+    const ex = p.ai_extracted || {};
+    setAiPlates(Array.isArray(ex.plates) ? ex.plates.map((x: string) => String(x).toUpperCase().replace(/[^A-Z0-9]/g, "")) : []);
+    setAiVehicles(Array.isArray(ex.vehicles) ? ex.vehicles : []);
+    setPolicyDialog(true);
+  }
 
   async function handleFile(file: File) {
     if (!currentCompanyId) return;
@@ -198,11 +220,40 @@ export default function InsurancePanel() {
         setAiPlates(norm);
         toast.success(`IA encontrou ${norm.length} placa(s) na apólice`);
       }
+      if (Array.isArray(ex.vehicles)) {
+        const norm = (ex.vehicles as AiVehicle[]).map((v) => ({
+          ...v,
+          plate: String(v.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
+        })).filter((v) => v.plate);
+        setAiVehicles(norm);
+        // Se não veio plates[], deriva de vehicles[]
+        if (!Array.isArray(ex.plates) || ex.plates.length === 0) {
+          setAiPlates(norm.map((v) => v.plate));
+        }
+      }
     } catch (e: any) {
       console.error(e);
       toast.error("IA não conseguiu ler a apólice. Preencha manualmente.");
     } finally {
       setExtracting(false);
+    }
+  }
+
+  /** Reanalisa o PDF já anexado. */
+  async function reextract() {
+    if (!form.file_url) { toast.error("Anexe o PDF primeiro"); return; }
+    setReextracting(true);
+    try {
+      const resp = await fetch(form.file_url);
+      if (!resp.ok) throw new Error("Não foi possível baixar o PDF anexado");
+      const blob = await resp.blob();
+      const file = new File([blob], form.file_name || "apolice.pdf", { type: blob.type || "application/pdf" });
+      // Força reextração: limpa campos preenchidos pela IA antiga (mantém o que o usuário digitou? — mantemos manuais)
+      await extractWithAI(file);
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao reanalisar");
+    } finally {
+      setReextracting(false);
     }
   }
 
@@ -227,7 +278,7 @@ export default function InsurancePanel() {
       file_name: form.file_name || null,
       notes: form.notes || null,
       status: form.status || "ativa",
-      ai_extracted: form.ai_extracted || {},
+      ai_extracted: { ...(form.ai_extracted || {}), plates: aiPlates, vehicles: aiVehicles },
     };
     let policyId = form.id;
     if (form.id) {
