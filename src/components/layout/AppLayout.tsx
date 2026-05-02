@@ -42,10 +42,10 @@ const nav: NavEntry[] = [
     ],
   },
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
+  { to: "/app/configuracoes", label: "Configurações da Empresa", icon: Settings },
   { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
   { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true },
-  { to: "/app/settings", label: "Configurações", icon: Settings, soon: true },
 ];
 
 function isGroup(e: NavEntry): e is NavGroup {
