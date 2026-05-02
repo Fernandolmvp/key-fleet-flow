@@ -10,9 +10,10 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ShieldCheck, Truck, Clock, User, MapPin, Fuel, CheckCircle2, XCircle,
-  AlertTriangle, Loader2, FileCheck, Image as ImageIcon, Receipt, Gauge,
+  AlertTriangle, Loader2, FileCheck, Image as ImageIcon, Receipt, Gauge, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/lib/permissions";
 
 interface AuthRow {
   id: string;
@@ -52,6 +53,7 @@ const STATUS_TONE: Record<string, string> = {
 
 export default function Approvals() {
   const { currentCompanyId, user, isManager } = useAuth();
+  const { can } = usePermissions();
   const [auths, setAuths] = useState<AuthRow[]>([]);
   const [vehicles, setVehicles] = useState<Record<string, any>>({});
   const [drivers, setDrivers] = useState<Record<string, any>>({});
@@ -65,6 +67,7 @@ export default function Approvals() {
   const [detail, setDetail] = useState<AuthRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -152,6 +155,20 @@ export default function Approvals() {
     setDetail(null);
     load();
   };
+
+  const removeAuth = async (id: string) => {
+    setBusy(id);
+    const { error } = await supabase.from("fuel_authorizations").delete().eq("id", id);
+    setBusy(null);
+    setConfirmDeleteId(null);
+    if (error) return toast.error(error.message);
+    toast.success("Solicitação excluída.");
+    setDetail(null);
+    load();
+  };
+
+  // Exclusão controlada por permissão (módulo aprovações + aba atual)
+  const canDelete = can("approvals", "delete", tab);
 
   if (!isManager) {
     return (
@@ -264,6 +281,18 @@ export default function Approvals() {
                     {a.status === "aprovada" && a.authorization_code && (
                       <div className="font-mono text-center text-base font-bold text-success tracking-widest bg-success/5 rounded-md py-1.5 border border-success/20">
                         {a.authorization_code}
+                      </div>
+                    )}
+
+                    {canDelete && (
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(a.id); }}
+                          className="text-[11px] text-destructive hover:underline inline-flex items-center gap-1"
+                        >
+                          <Trash2 className="h-3 w-3" /> Excluir
+                        </button>
                       </div>
                     )}
                   </button>
@@ -396,6 +425,16 @@ export default function Approvals() {
                   {detail.status !== "pendente" && (
                     <Button variant="outline" onClick={() => setDetail(null)}>Fechar</Button>
                   )}
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                      onClick={() => setConfirmDeleteId(detail.id)}
+                      disabled={busy === detail.id}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                    </Button>
+                  )}
                 </DialogFooter>
               </>
             );
@@ -414,6 +453,24 @@ export default function Approvals() {
             <Button variant="destructive" onClick={reject} disabled={busy === detail?.id}>
               {busy === detail?.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Confirmar recusa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de exclusão */}
+      <Dialog open={!!confirmDeleteId} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Excluir solicitação</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta ação remove permanentemente a solicitação de abastecimento e seus itens.
+            Não é possível desfazer.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmDeleteId && removeAuth(confirmDeleteId)} disabled={busy === confirmDeleteId}>
+              {busy === confirmDeleteId && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirmar exclusão
             </Button>
           </DialogFooter>
         </DialogContent>
