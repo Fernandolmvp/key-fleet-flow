@@ -21,7 +21,7 @@ interface Row {
 }
 
 export default function Fuel() {
-  const { currentCompanyId, user } = useAuth();
+  const { currentCompanyId } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
