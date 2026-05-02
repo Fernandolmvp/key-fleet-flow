@@ -2300,6 +2300,7 @@ export type Database = {
           id: string
           module: string
           role: Database["public"]["Enums"]["app_role"]
+          tab: string | null
           updated_at: string
         }
         Insert: {
@@ -2310,6 +2311,7 @@ export type Database = {
           id?: string
           module: string
           role: Database["public"]["Enums"]["app_role"]
+          tab?: string | null
           updated_at?: string
         }
         Update: {
@@ -2320,6 +2322,7 @@ export type Database = {
           id?: string
           module?: string
           role?: Database["public"]["Enums"]["app_role"]
+          tab?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3146,15 +3149,26 @@ export type Database = {
         Args: { _company_id: string }
         Returns: number
       }
-      has_permission: {
-        Args: {
-          _action: string
-          _company_id: string
-          _module: string
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_permission:
+        | {
+            Args: {
+              _action: string
+              _company_id: string
+              _module: string
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _action: string
+              _company_id: string
+              _module: string
+              _tab?: string
+              _user_id: string
+            }
+            Returns: boolean
+          }
       has_role: {
         Args: {
           _company_id: string
