@@ -101,7 +101,10 @@ export default function AppLayout() {
     return <Navigate to="/motorista" replace />;
   }
 
-  const currentCompany = companies.find((c) => c.id === currentCompanyId);
+  const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
+  const headerCompanyLabel =
+    currentCompany?.name ??
+    (currentCompanyId ? "Carregando empresa…" : "Selecionar empresa");
   const hasDriverRole = roles.includes("motorista");
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
@@ -222,7 +225,7 @@ export default function AppLayout() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2 -ml-2">
                 <Building2 className="h-4 w-4 text-primary" />
-                <span className="font-medium">{currentCompany?.name ?? "Selecionar empresa"}</span>
+                <span className="font-medium">{headerCompanyLabel}</span>
                 <ChevronDown className="h-4 w-4 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
