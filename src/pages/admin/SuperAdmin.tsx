@@ -15,10 +15,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ShieldCheck, Building2, Search, DollarSign, Users, Truck, AlertTriangle,
-  CheckCircle2, XCircle, Pencil, Receipt, Loader2, ArrowLeft
+  CheckCircle2, XCircle, Pencil, Receipt, Loader2, ArrowLeft, Layers
 } from "lucide-react";
 import { toast } from "sonner";
 import CompanyMembersDialog from "./CompanyMembersDialog";
+import CompanyGroupsPanel from "./CompanyGroupsPanel";
 
 type Plan = {
   id: string; slug: string; name: string;
@@ -142,6 +143,15 @@ export default function SuperAdmin() {
           <KPI icon={Building2} label="Clientes" value={`${activeCount}/${totalCompanies}`} hint="ativos / total" />
           <KPI icon={AlertTriangle} label="Atrasados/Suspensos" value={String(overdueCount)} accent={overdueCount ? "text-destructive" : ""} />
           <KPI icon={Truck} label="Veículos na plataforma" value={totalVehicles.toLocaleString("pt-BR")} />
+        </div>
+
+        {/* Seção: Grupos econômicos (faturamento consolidado) */}
+        <div className="surface-card rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Layers className="h-5 w-5 text-primary" />
+            <h2 className="font-display font-semibold">Grupos econômicos · Faturamento consolidado</h2>
+          </div>
+          <CompanyGroupsPanel />
         </div>
 
         {/* Filtros */}
