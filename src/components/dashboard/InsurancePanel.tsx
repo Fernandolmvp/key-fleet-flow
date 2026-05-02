@@ -717,13 +717,23 @@ export default function InsurancePanel() {
           <div className="space-y-4">
             <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
               {form.file_url ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-primary" /> {form.file_name || "PDF anexado"}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm min-w-0">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{form.file_name || "PDF anexado"}</span>
                   </div>
-                  <Button asChild variant="outline" size="sm">
-                    <a href={form.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /> Ver</a>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={reextract} disabled={reextracting || extracting}>
+                      {reextracting || extracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      Reanalisar com IA
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <a href={form.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /> Ver</a>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setForm((f) => ({ ...f, file_url: null, file_name: null }))}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <label className="cursor-pointer block">
