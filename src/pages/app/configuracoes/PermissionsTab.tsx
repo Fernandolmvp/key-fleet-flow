@@ -1,27 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Save, RotateCcw } from "lucide-react";
+import { Loader2, Save, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ALL_ROLES, ALL_MODULES, ALL_ACTIONS, type AppRole, type PermAction, type PermModule } from "@/lib/permissions";
+import { ALL_ROLES, ALL_MODULES, ALL_ACTIONS, MODULE_TABS, type AppRole, type PermAction, type PermModule } from "@/lib/permissions";
 
-type Row = { role: AppRole; module: PermModule; action: PermAction; allowed: boolean };
+type Row = { role: AppRole; module: PermModule; action: PermAction; allowed: boolean; tab: string | null };
 
 export default function PermissionsTab({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeRole, setActiveRole] = useState<AppRole>("gestor_frota");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
     const { data } = await supabase
       .from("role_permissions")
-      .select("role, module, action, allowed")
+      .select("role, module, action, allowed, tab")
       .eq("company_id", companyId);
-    setRows((data ?? []) as Row[]);
+    setRows(((data ?? []) as any[]).map((r) => ({ ...r, tab: r.tab ?? null })) as Row[]);
     setLoading(false);
   };
 
@@ -29,15 +30,15 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
 
   const map = useMemo(() => {
     const m = new Map<string, boolean>();
-    rows.forEach((r) => m.set(`${r.role}:${r.module}:${r.action}`, r.allowed));
+    rows.forEach((r) => m.set(`${r.role}:${r.module}:${r.action}:${r.tab ?? "_"}`, r.allowed));
     return m;
   }, [rows]);
 
-  const toggle = (role: AppRole, module: PermModule, action: PermAction) => {
-    const key = `${role}:${module}:${action}`;
+  const toggle = (role: AppRole, module: PermModule, action: PermAction, tab: string | null = null) => {
+    const key = `${role}:${module}:${action}:${tab ?? "_"}`;
     const cur = map.get(key) ?? false;
-    const idx = rows.findIndex((r) => r.role === role && r.module === module && r.action === action);
-    const next: Row = { role, module, action, allowed: !cur };
+    const idx = rows.findIndex((r) => r.role === role && r.module === module && r.action === action && (r.tab ?? null) === tab);
+    const next: Row = { role, module, action, allowed: !cur, tab };
     if (idx >= 0) {
       const copy = [...rows]; copy[idx] = next; setRows(copy);
     } else {
@@ -48,14 +49,35 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
   const save = async () => {
     setSaving(true);
     try {
-      const payload = rows.map((r) => ({
-        company_id: companyId, role: r.role, module: r.module, action: r.action, allowed: r.allowed,
+      // Separa regras de módulo (tab=null) e de aba para tratar com índices únicos parciais.
+      const moduleRows = rows.filter((r) => r.tab == null).map((r) => ({
+        company_id: companyId, role: r.role, module: r.module, action: r.action, allowed: r.allowed, tab: null,
       }));
-      const { error } = await supabase
+      const tabRows = rows.filter((r) => r.tab != null).map((r) => ({
+        company_id: companyId, role: r.role, module: r.module, action: r.action, allowed: r.allowed, tab: r.tab,
+      }));
+
+      // Limpa regras de aba existentes para esta empresa e regrava (mais simples
+      // que upsert composto, dado o índice único parcial).
+      const { error: delErr } = await supabase
         .from("role_permissions")
-        .upsert(payload as any, { onConflict: "company_id,role,module,action" });
-      if (error) throw error;
+        .delete()
+        .eq("company_id", companyId)
+        .not("tab", "is", null);
+      if (delErr) throw delErr;
+
+      if (moduleRows.length) {
+        const { error } = await supabase
+          .from("role_permissions")
+          .upsert(moduleRows as any, { onConflict: "company_id,role,module,action" });
+        if (error) throw error;
+      }
+      if (tabRows.length) {
+        const { error } = await supabase.from("role_permissions").insert(tabRows as any);
+        if (error) throw error;
+      }
       toast.success("Permissões salvas");
+      await load();
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao salvar");
     } finally {
@@ -67,10 +89,7 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
     if (!confirm("Restaurar as permissões padrão para todos os perfis desta empresa?")) return;
     setSaving(true);
     try {
-      // chamada à função SQL via RPC requer expor; como alternativa, deletamos e recriamos via INSERT default no client
-      // mais simples: deletar e chamar função via RPC se exposta. Aqui usamos SQL via .rpc não disponível; então deletamos e recarregamos do servidor (a função seed_default só popula o que falta).
       await supabase.from("role_permissions").delete().eq("company_id", companyId);
-      // Re-seed via re-insert dos defaults conhecidos no client
       const { error } = await supabase.rpc("seed_default_role_permissions" as any, { _company_id: companyId });
       if (error) throw error;
       toast.success("Permissões padrão restauradas");
@@ -93,7 +112,8 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
           <h3 className="font-display font-semibold">Permissões por perfil</h3>
           <p className="text-xs text-muted-foreground max-w-2xl">
             <strong>Administrador</strong> sempre tem acesso total e não pode ser editado.{" "}
-            <strong>Motorista</strong> usa apenas o app do motorista e também não é editável aqui.
+            <strong>Motorista</strong> usa apenas o app do motorista e também não é editável aqui.{" "}
+            Clique no <ChevronRight className="inline h-3 w-3" /> ao lado de um módulo para definir permissões em cada aba.
           </p>
         </div>
         <div className="flex gap-2">
@@ -126,22 +146,24 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {ALL_MODULES.map((m) => (
-                    <tr key={m.value} className="border-b border-border/60">
-                      <td className="p-3 font-medium">{m.label}</td>
-                      {ALL_ACTIONS.map((a) => {
-                        const checked = map.get(`${r.value}:${m.value}:${a.value}`) ?? false;
-                        return (
-                          <td key={a.value} className="p-3 text-center">
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={() => toggle(r.value, m.value, a.value)}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                  {ALL_MODULES.map((m) => {
+                    const tabs = MODULE_TABS[m.value] ?? [];
+                    const expKey = `${r.value}:${m.value}`;
+                    const isExp = !!expanded[expKey];
+                    return (
+                      <FragmentRow
+                        key={m.value}
+                        moduleLabel={m.label}
+                        moduleValue={m.value}
+                        role={r.value}
+                        tabs={tabs}
+                        expanded={isExp}
+                        onToggleExpand={() => setExpanded((p) => ({ ...p, [expKey]: !isExp }))}
+                        map={map}
+                        onToggle={toggle}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -149,5 +171,72 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
         ))}
       </Tabs>
     </div>
+  );
+}
+
+function FragmentRow({
+  moduleLabel, moduleValue, role, tabs, expanded, onToggleExpand, map, onToggle,
+}: {
+  moduleLabel: string;
+  moduleValue: PermModule;
+  role: AppRole;
+  tabs: { value: string; label: string }[];
+  expanded: boolean;
+  onToggleExpand: () => void;
+  map: Map<string, boolean>;
+  onToggle: (role: AppRole, module: PermModule, action: PermAction, tab?: string | null) => void;
+}) {
+  const hasTabs = tabs.length > 0;
+  return (
+    <>
+      <tr className="border-b border-border/60 hover:bg-muted/10">
+        <td className="p-3 font-medium">
+          <div className="flex items-center gap-2">
+            {hasTabs ? (
+              <button type="button" onClick={onToggleExpand} className="text-muted-foreground hover:text-foreground">
+                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            ) : (
+              <span className="inline-block w-4" />
+            )}
+            <span>{moduleLabel}</span>
+            {hasTabs && <span className="text-[10px] text-muted-foreground">({tabs.length} abas)</span>}
+          </div>
+        </td>
+        {ALL_ACTIONS.map((a) => {
+          const checked = map.get(`${role}:${moduleValue}:${a.value}:_`) ?? false;
+          return (
+            <td key={a.value} className="p-3 text-center">
+              <Checkbox
+                checked={checked}
+                onCheckedChange={() => onToggle(role, moduleValue, a.value, null)}
+              />
+            </td>
+          );
+        })}
+      </tr>
+      {expanded && hasTabs && tabs.map((t) => (
+        <tr key={t.value} className="border-b border-border/40 bg-muted/5">
+          <td className="p-2 pl-12 text-xs text-muted-foreground">
+            ↳ {t.label}
+          </td>
+          {ALL_ACTIONS.map((a) => {
+            const moduleChecked = map.get(`${role}:${moduleValue}:${a.value}:_`) ?? false;
+            const tabChecked = map.get(`${role}:${moduleValue}:${a.value}:${t.value}`) ?? false;
+            // Se o módulo já libera, a aba é considerada liberada (informativo)
+            const effective = moduleChecked || tabChecked;
+            return (
+              <td key={a.value} className="p-2 text-center">
+                <Checkbox
+                  checked={effective}
+                  disabled={moduleChecked}
+                  onCheckedChange={() => onToggle(role, moduleValue, a.value, t.value)}
+                />
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </>
   );
 }
