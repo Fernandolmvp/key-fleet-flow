@@ -1093,6 +1093,27 @@ export type Database = {
             referencedColumns: ["company_id"]
           },
           {
+            foreignKeyName: "fk_fuel_auth_items_auth"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_items_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_items_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "fuel_authorization_items_authorization_id_fkey"
             columns: ["authorization_id"]
             isOneToOne: false
@@ -1244,6 +1265,48 @@ export type Database = {
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_fuel_auth_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_driver"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_record"
+            columns: ["fuel_record_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_station"
+            columns: ["fuel_station_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_auth_vehicle"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       fuel_records: {
@@ -1251,6 +1314,7 @@ export type Database = {
           anomalies: Database["public"]["Enums"]["fuel_anomaly"][]
           anomaly_notes: string | null
           anomaly_severity: string | null
+          authorization_id: string | null
           card_number: string | null
           city: string | null
           company_id: string
@@ -1277,6 +1341,7 @@ export type Database = {
           price_per_liter: number
           pump_photo_url: string | null
           receipt_url: string | null
+          source_origin: string
           state: string | null
           station_cnpj: string | null
           station_name: string | null
@@ -1288,6 +1353,7 @@ export type Database = {
           anomalies?: Database["public"]["Enums"]["fuel_anomaly"][]
           anomaly_notes?: string | null
           anomaly_severity?: string | null
+          authorization_id?: string | null
           card_number?: string | null
           city?: string | null
           company_id: string
@@ -1314,6 +1380,7 @@ export type Database = {
           price_per_liter: number
           pump_photo_url?: string | null
           receipt_url?: string | null
+          source_origin?: string
           state?: string | null
           station_cnpj?: string | null
           station_name?: string | null
@@ -1325,6 +1392,7 @@ export type Database = {
           anomalies?: Database["public"]["Enums"]["fuel_anomaly"][]
           anomaly_notes?: string | null
           anomaly_severity?: string | null
+          authorization_id?: string | null
           card_number?: string | null
           city?: string | null
           company_id?: string
@@ -1351,6 +1419,7 @@ export type Database = {
           price_per_liter?: number
           pump_photo_url?: string | null
           receipt_url?: string | null
+          source_origin?: string
           state?: string | null
           station_cnpj?: string | null
           station_name?: string | null
@@ -1359,6 +1428,41 @@ export type Database = {
           vehicle_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_fuel_records_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_records_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_records_driver"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_records_station"
+            columns: ["fuel_station_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fuel_records_vehicle"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fr_company_fk"
             columns: ["company_id"]
@@ -1399,6 +1503,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_records_authorization_id_fkey"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_authorizations"
             referencedColumns: ["id"]
           },
           {
