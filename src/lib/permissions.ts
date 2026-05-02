@@ -145,3 +145,22 @@ export function usePermissions() {
 
   return { can, loading, isAdmin };
 }
+
+/**
+ * Helper para filtrar e auto-selecionar abas com base nas permissões do
+ * usuário corrente. Recebe a lista de abas do módulo e devolve apenas as
+ * abas visíveis. Caso a aba atual não esteja visível, devolve também a
+ * primeira aba liberada para que a página possa redirecionar.
+ */
+export function useTabPermissions(
+  module: PermModule,
+  allTabs: string[],
+  currentTab: string,
+) {
+  const { can } = usePermissions();
+  const visible = allTabs.filter((t) => can(module, "view", t));
+  const isVisible = visible.includes(currentTab);
+  const fallback = visible[0] ?? null;
+  const canViewTab = (t: string) => can(module, "view", t);
+  return { visible, isVisible, fallback, canViewTab };
+}
