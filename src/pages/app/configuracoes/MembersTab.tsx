@@ -32,13 +32,13 @@ export default function MembersTab({ companyId }: { companyId: string }) {
       setMembers([]); setLoading(false); return;
     }
     const [{ data: profiles }, { data: roles }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name").in("id", userIds),
+      supabase.from("profiles").select("id, full_name, email").in("id", userIds),
       supabase.from("user_roles").select("user_id, role").eq("company_id", companyId).in("user_id", userIds),
     ]);
     const byUser: Record<string, Member> = {};
     userIds.forEach((uid) => {
       const p = profiles?.find((x: any) => x.id === uid);
-      byUser[uid] = { user_id: uid, email: null, full_name: p?.full_name ?? null, roles: [] };
+      byUser[uid] = { user_id: uid, email: (p as any)?.email ?? null, full_name: p?.full_name ?? null, roles: [] };
     });
     (roles ?? []).forEach((r: any) => {
       if (byUser[r.user_id]) byUser[r.user_id].roles.push(r.role as AppRole);
@@ -116,7 +116,7 @@ export default function MembersTab({ companyId }: { companyId: string }) {
                   {m.full_name ?? "(sem nome)"}
                   {isSelf && <Badge variant="secondary" className="text-[10px]">você</Badge>}
                 </div>
-                <div className="text-xs text-muted-foreground font-mono truncate">{m.user_id}</div>
+                <div className="text-xs text-muted-foreground truncate">{m.email ?? m.user_id}</div>
               </div>
               <div className="w-56">
                 <Select
