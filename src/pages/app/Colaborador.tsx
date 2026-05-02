@@ -253,81 +253,105 @@ export default function Colaborador() {
         ? aiTotal
         : (liters > 0 && ppl > 0 ? Number((liters * ppl).toFixed(2)) : 0);
 
-      const updateData: any = {
-        receipt_photo_url: archivedUrl,
-        receipt_cnpj: cupomCnpj || null,
-        receipt_total: total > 0 ? total : (data?.total_value ?? null),
-        receipt_extracted: data,
-        cnpj_match: cnpjMatch,
-        confirmed_at: new Date().toISOString(),
-      };
-      // Bloqueia: se CNPJ não bate, marca como anomalia (status fica pendente revisão pelo gestor)
+      // Caso CNPJ divergente: marca anomalia (pendente para gestor) e NÃO cria fuel_record.
+      // A transição aprovada -> pendente não é bloqueada pelo trigger.
       if (cnpjMatch === false) {
-        updateData.status = "pendente";
-        updateData.notes = `[ANOMALIA] CNPJ do cupom (${cupomCnpj}) não confere com o posto selecionado (${stationCnpj}).`;
-      } else {
-        updateData.status = "utilizada";
-      }
+        const { error: upErr } = await supabase
+          .from("fuel_authorizations")
+          .update({
+            receipt_photo_url: archivedUrl,
+            receipt_cnpj: cupomCnpj || null,
+            receipt_total: total > 0 ? total : (data?.total_value ?? null),
+            receipt_extracted: data,
+            cnpj_match: false,
+            confirmed_at: new Date().toISOString(),
+            status: "pendente",
+            notes: `[ANOMALIA] CNPJ do cupom (${cupomCnpj}) não confere com o posto selecionado (${stationCnpj}).`,
+          })
+          .eq("id", auth.id);
+        if (upErr) throw upErr;
 
-      const { error: upErr } = await supabase
-        .from("fuel_authorizations")
-        .update(updateData)
-        .eq("id", auth.id);
-      if (upErr) throw upErr;
-
-      // Insere itens do cupom (motorista não pode editar/excluir depois)
-      if (items.length) {
-        const rows = items.map((it: any) => ({
-          company_id: currentCompanyId,
-          authorization_id: auth.id,
-          description: String(it.description ?? "Item"),
-          quantity: Number(it.quantity ?? 1),
-          unit_value: Number(it.unit_value ?? 0),
-          total_value: Number(it.total ?? 0),
-          is_fuel: !!it.is_fuel,
-          fuel_type: it.fuel_type ?? null,
-        }));
-        await supabase.from("fuel_authorization_items").insert(rows);
-      }
-
-      // Cria registro em fuel_records (módulo de Abastecimentos) quando válido
-      if (cnpjMatch !== false) {
-        if (liters > 0 && total > 0) {
-          const station = stations.find((x) => x.id === auth.fuel_station_id);
-          const fuelType = (receiptFuelType || fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
-          const { data: fr, error: frErr } = await supabase.from("fuel_records").insert({
+        if (items.length) {
+          const rows = items.map((it: any) => ({
             company_id: currentCompanyId,
-            vehicle_id: auth.vehicle_id,
-            driver_id: driver?.id ?? null,
-            fuel_station_id: auth.fuel_station_id,
             authorization_id: auth.id,
-            source_origin: "autorizacao",
-            station_name: station?.name ?? auth.station_name,
-            station_cnpj: station?.cnpj ?? cupomCnpj ?? null,
-            city: station?.city ?? null,
-            state: station?.state ?? null,
-            fuel_type: fuelType,
-            liters,
-            price_per_liter: ppl > 0 ? ppl : Number((total / liters).toFixed(3)),
-            total_value: total,
-            km_at_fueling: auth.km_at_request ?? 0,
-            payment_method: "cartao_frota",
-            receipt_url: archivedUrl,
-            created_by: user?.id,
-          }).select("id").maybeSingle();
-          if (frErr) {
-            console.error("Erro ao gravar em fuel_records:", frErr);
-            toast.error("Cupom salvo, mas falhou registrar em Abastecimentos: " + frErr.message);
-          }
-          // a trigger trg_fuel_record_sync_auth faz o vínculo na autorização
-        } else {
-          toast.warning("Abastecimento não foi lançado em Abastecimentos: informe litros e valor unitário.");
+            description: String(it.description ?? "Item"),
+            quantity: Number(it.quantity ?? 1),
+            unit_value: Number(it.unit_value ?? 0),
+            total_value: Number(it.total ?? 0),
+            is_fuel: !!it.is_fuel,
+            fuel_type: it.fuel_type ?? null,
+          }));
+          await supabase.from("fuel_authorization_items").insert(rows);
         }
-      }
 
-      if (cnpjMatch === false) {
         toast.error("CNPJ do cupom não confere com o posto. Solicitação enviada para revisão do gestor.");
       } else {
+        // Caso normal: exige litros e valor para criar o fuel_record.
+        // O trigger trg_fuel_record_sync_auth marca a autorização como 'utilizada'
+        // e vincula o fuel_record_id automaticamente.
+        if (!(liters > 0) || !(total > 0)) {
+          toast.error("Informe litros e valor unitário do combustível para finalizar.");
+          return;
+        }
+
+        // 1) Atualiza só os dados do cupom na autorização (sem mexer no status ainda).
+        const { error: upErr } = await supabase
+          .from("fuel_authorizations")
+          .update({
+            receipt_photo_url: archivedUrl,
+            receipt_cnpj: cupomCnpj || null,
+            receipt_total: total,
+            receipt_extracted: data,
+            cnpj_match: cnpjMatch,
+          })
+          .eq("id", auth.id);
+        if (upErr) throw upErr;
+
+        // 2) Cria o fuel_record. O trigger sincroniza a autorização (status=utilizada + vínculo).
+        const station = stations.find((x) => x.id === auth.fuel_station_id);
+        const fuelType = (receiptFuelType || fuelItem?.fuel_type || auth.fuel_type || "diesel_s10") as any;
+        const { error: frErr } = await supabase.from("fuel_records").insert({
+          company_id: currentCompanyId,
+          vehicle_id: auth.vehicle_id,
+          driver_id: driver?.id ?? null,
+          fuel_station_id: auth.fuel_station_id,
+          authorization_id: auth.id,
+          source_origin: "autorizacao",
+          station_name: station?.name ?? auth.station_name,
+          station_cnpj: station?.cnpj ?? cupomCnpj ?? null,
+          city: station?.city ?? null,
+          state: station?.state ?? null,
+          fuel_type: fuelType,
+          liters,
+          price_per_liter: ppl > 0 ? ppl : Number((total / liters).toFixed(3)),
+          total_value: total,
+          km_at_fueling: auth.km_at_request ?? 0,
+          payment_method: "cartao_frota",
+          receipt_url: archivedUrl,
+          created_by: user?.id,
+        });
+        if (frErr) {
+          console.error("Erro ao gravar em fuel_records:", frErr);
+          toast.error("Falha ao registrar abastecimento: " + frErr.message);
+          return;
+        }
+
+        // 3) Insere os itens do cupom para auditoria (após o sync da autorização).
+        if (items.length) {
+          const rows = items.map((it: any) => ({
+            company_id: currentCompanyId,
+            authorization_id: auth.id,
+            description: String(it.description ?? "Item"),
+            quantity: Number(it.quantity ?? 1),
+            unit_value: Number(it.unit_value ?? 0),
+            total_value: Number(it.total ?? 0),
+            is_fuel: !!it.is_fuel,
+            fuel_type: it.fuel_type ?? null,
+          }));
+          await supabase.from("fuel_authorization_items").insert(rows);
+        }
+
         toast.success("Abastecimento confirmado e registrado!");
       }
       setConfirmAuthId(null);
