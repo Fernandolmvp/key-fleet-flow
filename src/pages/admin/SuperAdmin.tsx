@@ -18,6 +18,7 @@ import {
   CheckCircle2, XCircle, Pencil, Receipt, Loader2, ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
+import CompanyMembersDialog from "./CompanyMembersDialog";
 
 type Plan = {
   id: string; slug: string; name: string;
@@ -64,6 +65,7 @@ export default function SuperAdmin() {
   const [tab, setTab] = useState("todas");
   const [editing, setEditing] = useState<Usage | null>(null);
   const [paying, setPaying] = useState<Usage | null>(null);
+  const [membersOf, setMembersOf] = useState<Usage | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -217,6 +219,9 @@ export default function SuperAdmin() {
                         <td className="px-4 py-3 text-xs">{fmtDate(i.last_payment_at)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => setMembersOf(i)} title="Membros e perfis">
+                              <Users className="h-3.5 w-3.5" />
+                            </Button>
                             <Button size="sm" variant="ghost" onClick={() => setPaying(i)} title="Registrar pagamento">
                               <Receipt className="h-3.5 w-3.5" />
                             </Button>
@@ -236,6 +241,11 @@ export default function SuperAdmin() {
 
         <EditSubscriptionDialog sub={editing} plans={plans} onClose={() => setEditing(null)} onSaved={load} />
         <PaymentDialog sub={paying} onClose={() => setPaying(null)} onSaved={load} />
+        <CompanyMembersDialog
+          companyId={membersOf?.company_id ?? null}
+          companyName={membersOf?.company_name ?? ""}
+          onClose={() => setMembersOf(null)}
+        />
       </main>
     </div>
   );
