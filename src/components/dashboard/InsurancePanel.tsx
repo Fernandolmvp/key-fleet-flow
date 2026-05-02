@@ -268,8 +268,9 @@ export default function InsurancePanel() {
           policy_id: policyId!,
           vehicle_id: m.id,
           inclusion_type: "apolice" as const,
+          removed_at: null,
         }));
-        await supabase.from("insurance_policy_vehicles").upsert(rows, { onConflict: "policy_id,vehicle_id", ignoreDuplicates: true });
+        await supabase.from("insurance_policy_vehicles").upsert(rows, { onConflict: "policy_id,vehicle_id" });
         await syncVehicleInsuranceFields(currentCompanyId, matches.map((m) => m.id));
         toast.success(`${matches.length} veículo(s) vinculado(s) à apólice`);
       }
@@ -308,12 +309,13 @@ export default function InsurancePanel() {
 
   async function linkVehicle(vehicleId: string, type: "apolice" | "adendo") {
     if (!selectedPolicyId || !currentCompanyId) return;
-    const r = await supabase.from("insurance_policy_vehicles").insert({
+    const r = await supabase.from("insurance_policy_vehicles").upsert({
       company_id: currentCompanyId,
       policy_id: selectedPolicyId,
       vehicle_id: vehicleId,
       inclusion_type: type,
-    });
+      removed_at: null,
+    }, { onConflict: "policy_id,vehicle_id" });
     if (r.error) { toast.error(r.error.message); return; }
     await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
     toast.success(type === "adendo" ? "Adendo registrado" : "Veículo incluído");
@@ -391,9 +393,10 @@ export default function InsurancePanel() {
       policy_id: selectedPolicyId,
       vehicle_id: v.id,
       inclusion_type: (v.ai?.inclusion_type === "adendo" ? "adendo" : "apolice") as "apolice" | "adendo",
+      removed_at: null,
     }));
     const { error } = await supabase.from("insurance_policy_vehicles")
-      .upsert(rows, { onConflict: "policy_id,vehicle_id", ignoreDuplicates: true });
+      .upsert(rows, { onConflict: "policy_id,vehicle_id" });
     if (error) { toast.error(error.message); return; }
     await syncVehicleInsuranceFields(currentCompanyId, toLink.map((v) => v.id));
     toast.success(`${toLink.length} veículo(s) vinculado(s) automaticamente`);
