@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ANOMALY_LABEL, SEVERITY_TONE, fmtMoney, fmtNum } from "@/lib/fuel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, X, ShieldCheck, Clock } from "lucide-react";
+import { Check, X, ShieldCheck, Clock, FileWarning } from "lucide-react";
 
 interface Row {
   id: string; fueled_at: string; station_name: string | null; city: string | null;
@@ -52,7 +52,7 @@ export default function Fuel() {
     if (!currentCompanyId) return;
     const { data } = await supabase
       .from("fuel_authorizations")
-      .select("*, vehicles:vehicle_id(plate,brand,model)")
+      .select("*, vehicles:vehicle_id(plate,brand,model,current_km,fuel_type), drivers:driver_id(id,full_name), fuel_stations:fuel_station_id(id,name,cnpj,city,state)")
       .eq("company_id", currentCompanyId)
       .order("requested_at", { ascending: false })
       .limit(100);
@@ -337,13 +337,41 @@ export default function Fuel() {
                     </Button>
                   </div>
                 )}
+                {a.status === "utilizada" && !a.fuel_record_id && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const stn = a.fuel_stations;
+                      setEditing({
+                        vehicle_id: a.vehicle_id,
+                        driver_id: a.drivers?.id ?? a.driver_id ?? "",
+                        fuel_station_id: a.fuel_station_id ?? "",
+                        station_name: stn?.name ?? a.station_name ?? "",
+                        station_cnpj: stn?.cnpj ?? a.receipt_cnpj ?? "",
+                        city: stn?.city ?? "",
+                        state: stn?.state ?? "",
+                        fuel_type: a.fuel_type ?? a.vehicles?.fuel_type ?? "flex",
+                        km_at_fueling: a.km_at_request ?? a.vehicles?.current_km ?? "",
+                        total_value: a.receipt_total ? String(a.receipt_total) : "",
+                        receipt_url: a.receipt_photo_url ?? "",
+                        dashboard_photo_url: a.km_photo_url ?? "",
+                        fueled_at: (a.confirmed_at ?? a.used_at ?? new Date().toISOString()).slice(0, 16),
+                        notes: `Lançamento manual a partir da autorização ${a.authorization_code ?? a.id.slice(0, 8)}`,
+                      });
+                      setOpen(true);
+                    }}
+                    className="bg-warning/20 text-warning hover:bg-warning/30 border border-warning/30"
+                  >
+                    <FileWarning className="h-4 w-4 mr-1" /> Lançar em Abastecimentos
+                  </Button>
+                )}
               </div>
             ))
           )}
         </TabsContent>
       </Tabs>
 
-      <FuelDialog open={open} onOpenChange={setOpen} record={editing} onSaved={load} />
+      <FuelDialog open={open} onOpenChange={setOpen} record={editing} onSaved={() => { load(); loadAuths(); }} />
     </div>
   );
 }
