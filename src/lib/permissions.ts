@@ -49,6 +49,57 @@ export const ALL_ACTIONS: { value: PermAction; label: string }[] = [
 ];
 
 /**
+ * Mapa de abas (sub-seções) por módulo. Quando definido, a tela de permissões
+ * permite refinar quem acessa cada aba. A ausência aqui significa que o módulo
+ * não tem abas controláveis.
+ */
+export const MODULE_TABS: Partial<Record<PermModule, { value: string; label: string }[]>> = {
+  vehicles: [
+    { value: "ativos", label: "Ativos" },
+    { value: "vendidos", label: "Vendidos" },
+    { value: "inativos", label: "Inativos" },
+    { value: "todos", label: "Todos" },
+  ],
+  drivers: [
+    { value: "ativos", label: "Ativos" },
+    { value: "inativos", label: "Inativos" },
+    { value: "todos", label: "Todos" },
+  ],
+  approvals: [
+    { value: "pendente", label: "Pendentes" },
+    { value: "aprovada", label: "Aprovadas" },
+    { value: "anomalia", label: "Anomalias" },
+    { value: "historico", label: "Histórico" },
+  ],
+  maintenance: [
+    { value: "records", label: "Histórico" },
+    { value: "schedules", label: "Agendamentos" },
+    { value: "calendar", label: "Calendário Preventivo" },
+    { value: "costs", label: "Custos por veículo" },
+  ],
+  tires: [
+    { value: "list", label: "Pneus" },
+    { value: "map", label: "Mapa do veículo" },
+    { value: "movements", label: "Movimentações" },
+    { value: "alerts", label: "Alertas" },
+  ],
+  checklists: [
+    { value: "pendentes", label: "Pendentes" },
+    { value: "historico", label: "Histórico" },
+    { value: "modelos", label: "Modelos" },
+  ],
+  documents: [
+    { value: "vehicles", label: "Veículos" },
+    { value: "drivers", label: "Motoristas" },
+  ],
+  fuel_stations: [
+    { value: "ativos", label: "Ativos" },
+    { value: "inativos", label: "Inativos" },
+    { value: "todos", label: "Todos" },
+  ],
+};
+
+/**
  * Hook de permissões granulares para a empresa atual.
  * Admin sempre retorna true. Demais perfis são checados na tabela role_permissions.
  */
@@ -68,19 +119,27 @@ export function usePermissions() {
       setLoading(true);
       const { data } = await supabase
         .from("role_permissions")
-        .select("module, action, allowed, role")
+        .select("module, action, allowed, role, tab")
         .eq("company_id", currentCompanyId)
         .in("role", roles as any)
         .eq("allowed", true);
       const set = new Set<string>();
-      (data ?? []).forEach((p: any) => set.add(`${p.module}:${p.action}`));
+      (data ?? []).forEach((p: any) => {
+        // Regra a nível de módulo
+        if (!p.tab) set.add(`${p.module}:${p.action}`);
+        // Regra a nível de aba específica
+        else set.add(`${p.module}:${p.action}:${p.tab}`);
+      });
       setPerms(set);
       setLoading(false);
     })();
   }, [currentCompanyId, roles.join(",")]);
 
-  const can = (module: PermModule, action: PermAction): boolean => {
+  const can = (module: PermModule, action: PermAction, tab?: string): boolean => {
     if (isAdmin) return true;
+    // Se uma aba foi pedida e existe regra específica, ela prevalece;
+    // caso contrário, cai no nível de módulo.
+    if (tab && perms.has(`${module}:${action}:${tab}`)) return true;
     return perms.has(`${module}:${action}`);
   };
 
