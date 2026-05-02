@@ -24,6 +24,7 @@ import Subscription from "./pages/app/Subscription";
 import Brokers from "./pages/app/Brokers";
 import Checklists from "./pages/app/Checklists";
 import Insurance from "./pages/app/Insurance";
+import Configuracoes from "./pages/app/Configuracoes";
 import SuperAdmin from "./pages/admin/SuperAdmin";
 import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import NotFound from "./pages/NotFound";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="insurance" element={<Insurance />} />
               <Route path="brokers" element={<Brokers />} />
               <Route path="assinatura" element={<Subscription />} />
+              <Route path="configuracoes" element={<Configuracoes />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
