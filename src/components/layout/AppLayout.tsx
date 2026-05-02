@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { NewCompanyDialog } from "@/components/NewCompanyDialog";
-import { useState as useStateReact } from "react";
 
 type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean };
 type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
