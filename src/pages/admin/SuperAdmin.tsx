@@ -234,8 +234,8 @@ export default function SuperAdmin() {
                     const children = groupId ? (childrenByGroup[groupId] ?? []) : [];
                     const expanded = groupId ? !!expandedGroups[groupId] : false;
                     return (
-                      <>
-                      <tr key={i.subscription_id} className="border-t border-border hover:bg-muted/20">
+                      <Fragment key={i.subscription_id}>
+                      <tr className="border-t border-border hover:bg-muted/20">
                         <td className="px-4 py-3">
                           <div className="font-medium flex items-center gap-2">
                             {isPrimary && groupId && children.length > 0 && (
@@ -346,7 +346,7 @@ export default function SuperAdmin() {
                           </tr>
                         );
                       })}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
