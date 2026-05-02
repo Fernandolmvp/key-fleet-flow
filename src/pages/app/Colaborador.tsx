@@ -21,6 +21,7 @@ interface Auth {
   km_photo_url: string | null; plate_photo_url: string | null; receipt_photo_url: string | null;
   receipt_cnpj: string | null; receipt_total: number | null; cnpj_match: boolean | null;
   confirmed_at: string | null;
+  driver_id: string | null;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -314,7 +315,7 @@ export default function Colaborador() {
         const { error: frErr } = await supabase.from("fuel_records").insert({
           company_id: currentCompanyId,
           vehicle_id: auth.vehicle_id,
-          driver_id: driver?.id ?? null,
+          driver_id: auth.driver_id ?? driver?.id ?? null,
           fuel_station_id: auth.fuel_station_id,
           authorization_id: auth.id,
           source_origin: "autorizacao",
