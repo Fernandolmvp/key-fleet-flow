@@ -300,6 +300,8 @@ export default function Colaborador() {
             vehicle_id: auth.vehicle_id,
             driver_id: driver?.id ?? null,
             fuel_station_id: auth.fuel_station_id,
+            authorization_id: auth.id,
+            source_origin: "autorizacao",
             station_name: station?.name ?? auth.station_name,
             station_cnpj: station?.cnpj ?? cupomCnpj ?? null,
             city: station?.city ?? null,
@@ -316,9 +318,8 @@ export default function Colaborador() {
           if (frErr) {
             console.error("Erro ao gravar em fuel_records:", frErr);
             toast.error("Cupom salvo, mas falhou registrar em Abastecimentos: " + frErr.message);
-          } else if (fr?.id) {
-            await supabase.from("fuel_authorizations").update({ fuel_record_id: fr.id }).eq("id", auth.id);
           }
+          // a trigger trg_fuel_record_sync_auth faz o vínculo na autorização
         } else {
           toast.warning("Abastecimento não foi lançado em Abastecimentos: informe litros e valor unitário.");
         }
