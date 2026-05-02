@@ -39,15 +39,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from("company_members")
       .select("company_id, companies:company_id(id,name,cnpj,logo_url)")
       .eq("user_id", uid);
-    const list: CompanyMembership[] = (members ?? [])
+    let list: CompanyMembership[] = (members ?? [])
       .map((m: any) => m.companies)
       .filter(Boolean);
+
+    // Fallback: se a join não trouxe nada mas há company_ids, busca direto
+    const memberIds = (members ?? []).map((m: any) => m.company_id).filter(Boolean);
+    const missingIds = memberIds.filter((id: string) => !list.some((c) => c.id === id));
+    if (missingIds.length) {
+      const { data: extra } = await supabase
+        .from("companies")
+        .select("id,name,cnpj,logo_url")
+        .in("id", missingIds);
+      if (extra?.length) list = [...list, ...(extra as any)];
+    }
     setCompanies(list);
 
     const { data: profile } = await supabase
       .from("profiles").select("current_company_id").eq("id", uid).maybeSingle();
     let current = profile?.current_company_id ?? null;
     if (!current && list.length) current = list[0].id;
+    // Garante que a empresa atual existe na lista (caso o usuário tenha sido removido de outra)
+    if (current && !list.some((c) => c.id === current) && list.length) {
+      current = list[0].id;
+    }
     if (current && current !== profile?.current_company_id) {
       await supabase.from("profiles").update({ current_company_id: current }).eq("id", uid);
     }

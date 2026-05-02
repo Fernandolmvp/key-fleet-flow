@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
   CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck
 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator
@@ -13,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { NewCompanyDialog } from "@/components/NewCompanyDialog";
 
 type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean };
 type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
@@ -58,6 +60,7 @@ export default function AppLayout() {
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ cadastros: true, movimentacao: true });
+  const [showNewCompany, setShowNewCompany] = useState(false);
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -101,7 +104,10 @@ export default function AppLayout() {
     return <Navigate to="/motorista" replace />;
   }
 
-  const currentCompany = companies.find((c) => c.id === currentCompanyId);
+  const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
+  const headerCompanyLabel =
+    currentCompany?.name ??
+    (currentCompanyId ? "Carregando empresa…" : "Selecionar empresa");
   const hasDriverRole = roles.includes("motorista");
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
@@ -222,7 +228,7 @@ export default function AppLayout() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2 -ml-2">
                 <Building2 className="h-4 w-4 text-primary" />
-                <span className="font-medium">{currentCompany?.name ?? "Selecionar empresa"}</span>
+                <span className="font-medium">{headerCompanyLabel}</span>
                 <ChevronDown className="h-4 w-4 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
@@ -235,6 +241,10 @@ export default function AppLayout() {
                 </DropdownMenuItem>
               ))}
               {!companies.length && <DropdownMenuItem disabled>Nenhuma empresa</DropdownMenuItem>}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowNewCompany(true)} className="text-primary">
+                <Plus className="h-4 w-4 mr-2" /> Nova empresa
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -273,6 +283,11 @@ export default function AppLayout() {
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
         </main>
+        <NewCompanyDialog
+          open={showNewCompany}
+          onClose={() => setShowNewCompany(false)}
+          alreadyHasCompany={companies.length > 0}
+        />
       </div>
     </div>
   );
