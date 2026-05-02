@@ -78,23 +78,18 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
         company_id: companyId, role: r.role, module: r.module, action: r.action, allowed: r.allowed, tab: r.tab,
       }));
 
-      // Limpa regras de aba existentes para esta empresa e regrava (mais simples
-      // que upsert composto, dado o índice único parcial).
+      // Os índices únicos são parciais (WHERE tab IS NULL / IS NOT NULL),
+      // o que impede usar upsert com onConflict pelo PostgREST. Por isso
+      // limpamos e regravamos todas as regras desta empresa.
       const { error: delErr } = await supabase
         .from("role_permissions")
         .delete()
-        .eq("company_id", companyId)
-        .not("tab", "is", null);
+        .eq("company_id", companyId);
       if (delErr) throw delErr;
 
-      if (moduleRows.length) {
-        const { error } = await supabase
-          .from("role_permissions")
-          .upsert(moduleRows as any, { onConflict: "company_id,role,module,action" });
-        if (error) throw error;
-      }
-      if (tabRows.length) {
-        const { error } = await supabase.from("role_permissions").insert(tabRows as any);
+      const allRows = [...moduleRows, ...tabRows];
+      if (allRows.length) {
+        const { error } = await supabase.from("role_permissions").insert(allRows as any);
         if (error) throw error;
       }
       toast.success("Permissões salvas");
