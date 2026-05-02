@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ShieldCheck, Building2, Search, DollarSign, Users, Truck, AlertTriangle,
-  CheckCircle2, XCircle, Pencil, Receipt, Loader2, ArrowLeft, Layers
+  CheckCircle2, XCircle, Pencil, Receipt, Loader2, ArrowLeft, Layers, ChevronDown, ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 import CompanyMembersDialog from "./CompanyMembersDialog";
@@ -69,6 +69,7 @@ export default function SuperAdmin() {
   const [membersOf, setMembersOf] = useState<Usage | null>(null);
   const [groupInfo, setGroupInfo] = useState<string | null>(null);
   const [companyMeta, setCompanyMeta] = useState<Record<string, { group_id: string | null; is_primary: boolean }>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
@@ -121,6 +122,21 @@ export default function SuperAdmin() {
     if (!q.trim()) return true;
     const hay = `${i.company_name} ${i.cnpj ?? ""} ${i.plan_name}`.toLowerCase();
     return hay.includes(q.toLowerCase());
+  });
+
+  // Filhas indexadas por group_id
+  const childrenByGroup: Record<string, Usage[]> = {};
+  for (const i of filtered) {
+    const cm = companyMeta[i.company_id];
+    if (cm?.group_id && !cm.is_primary) {
+      (childrenByGroup[cm.group_id] ??= []).push(i);
+    }
+  }
+  // Lista principal: matrizes + empresas sem grupo
+  // (busca também respeita filhas — se houver match em filha sem matriz visível, ainda assim mostra a matriz)
+  const visibleParents = filtered.filter((i) => {
+    const cm = companyMeta[i.company_id];
+    return !cm?.group_id || cm.is_primary;
   });
 
   const mrr = items
@@ -208,20 +224,35 @@ export default function SuperAdmin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((i) => {
+                  {visibleParents.map((i) => {
                     const limit = i.vehicle_limit;
                     const overLimit = limit != null && i.vehicles_used > limit;
                     const overdue = new Date(i.current_period_end) < new Date() && i.subscription_status !== "cancelada";
                     const cm = companyMeta[i.company_id];
                     const isPrimary = !!cm?.is_primary;
+                    const groupId = cm?.group_id ?? null;
+                    const children = groupId ? (childrenByGroup[groupId] ?? []) : [];
+                    const expanded = groupId ? !!expandedGroups[groupId] : false;
                     return (
+                      <>
                       <tr key={i.subscription_id} className="border-t border-border hover:bg-muted/20">
                         <td className="px-4 py-3">
                           <div className="font-medium flex items-center gap-2">
+                            {isPrimary && groupId && children.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedGroups((p) => ({ ...p, [groupId]: !p[groupId] }))}
+                                className="h-5 w-5 grid place-items-center rounded hover:bg-muted text-muted-foreground"
+                                title={expanded ? "Recolher grupo" : "Expandir grupo"}
+                              >
+                                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                              </button>
+                            )}
                             {i.company_name}
                             {isPrimary && (
                               <Badge variant="outline" className="text-[9px] uppercase tracking-wider border-primary/40 text-primary">
                                 <Layers className="h-2.5 w-2.5 mr-1" /> Principal
+                                {children.length > 0 && <span className="ml-1">+{children.length}</span>}
                               </Badge>
                             )}
                           </div>
@@ -267,6 +298,55 @@ export default function SuperAdmin() {
                           </div>
                         </td>
                       </tr>
+                      {expanded && children.map((ch) => {
+                        const chOverdue = new Date(ch.current_period_end) < new Date() && ch.subscription_status !== "cancelada";
+                        const chLimit = ch.vehicle_limit;
+                        const chOver = chLimit != null && ch.vehicles_used > chLimit;
+                        return (
+                          <tr key={ch.subscription_id} className="border-t border-border bg-muted/10 hover:bg-muted/20">
+                            <td className="px-4 py-2.5 pl-12">
+                              <div className="font-medium text-sm flex items-center gap-2">
+                                <span className="text-muted-foreground">↳</span>
+                                {ch.company_name}
+                                <Badge variant="secondary" className="text-[9px] uppercase tracking-wider">Filha</Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">{ch.cnpj || "Sem CNPJ"}</div>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs">{ch.plan_name}</td>
+                            <td className="px-4 py-2.5">
+                              <Badge className={`border ${statusTone[ch.subscription_status] ?? ""}`}>
+                                {statusLabel[ch.subscription_status] ?? ch.subscription_status}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs">
+                              <div className={chOver ? "text-destructive font-medium" : ""}>
+                                <Truck className="h-3 w-3 inline mr-1" />
+                                {ch.vehicles_used}/{chLimit ?? "∞"}
+                              </div>
+                              <div className="text-muted-foreground">
+                                <Users className="h-3 w-3 inline mr-1" />
+                                {ch.drivers_count} mot. · {ch.members_count} usu.
+                              </div>
+                            </td>
+                            <td className={`px-4 py-2.5 text-xs ${chOverdue ? "text-destructive font-medium" : ""}`}>
+                              {fmtDate(ch.current_period_end)}
+                            </td>
+                            <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground" title="Faturamento consolidado na principal">—</td>
+                            <td className="px-4 py-2.5 text-xs">{fmtDate(ch.last_payment_at)}</td>
+                            <td className="px-4 py-2.5 text-right">
+                              <div className="inline-flex gap-1">
+                                <Button size="sm" variant="ghost" onClick={() => setMembersOf(ch)} title="Membros e perfis">
+                                  <Users className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditing(ch)} title="Editar">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      </>
                     );
                   })}
                 </tbody>
