@@ -34,16 +34,34 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
     return m;
   }, [rows]);
 
+  const upsertRow = (list: Row[], next: Row): Row[] => {
+    const idx = list.findIndex(
+      (r) => r.role === next.role && r.module === next.module && r.action === next.action && (r.tab ?? null) === (next.tab ?? null)
+    );
+    if (idx >= 0) {
+      const copy = [...list]; copy[idx] = next; return copy;
+    }
+    return [...list, next];
+  };
+
   const toggle = (role: AppRole, module: PermModule, action: PermAction, tab: string | null = null) => {
     const key = `${role}:${module}:${action}:${tab ?? "_"}`;
     const cur = map.get(key) ?? false;
-    const idx = rows.findIndex((r) => r.role === role && r.module === module && r.action === action && (r.tab ?? null) === tab);
-    const next: Row = { role, module, action, allowed: !cur, tab };
-    if (idx >= 0) {
-      const copy = [...rows]; copy[idx] = next; setRows(copy);
-    } else {
-      setRows([...rows, next]);
+    const newValue = !cur;
+
+    let next = upsertRow(rows, { role, module, action, allowed: newValue, tab });
+
+    // Quando alternar a permissão a nível de MÓDULO (tab == null), propaga
+    // o mesmo valor para todas as abas desse módulo: marcar libera todas,
+    // desmarcar bloqueia todas. Depois o usuário pode ajustar individualmente.
+    if (tab === null) {
+      const tabs = MODULE_TABS[module] ?? [];
+      tabs.forEach((t) => {
+        next = upsertRow(next, { role, module, action, allowed: newValue, tab: t.value });
+      });
     }
+
+    setRows(next);
   };
 
   const save = async () => {
