@@ -221,15 +221,11 @@ function FragmentRow({
             ↳ {t.label}
           </td>
           {ALL_ACTIONS.map((a) => {
-            const moduleChecked = map.get(`${role}:${moduleValue}:${a.value}:_`) ?? false;
             const tabChecked = map.get(`${role}:${moduleValue}:${a.value}:${t.value}`) ?? false;
-            // Se o módulo já libera, a aba é considerada liberada (informativo)
-            const effective = moduleChecked || tabChecked;
             return (
               <td key={a.value} className="p-2 text-center">
                 <Checkbox
-                  checked={effective}
-                  disabled={moduleChecked}
+                  checked={tabChecked}
                   onCheckedChange={() => onToggle(role, moduleValue, a.value, t.value)}
                 />
               </td>
