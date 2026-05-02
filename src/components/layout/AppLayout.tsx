@@ -119,15 +119,16 @@ export default function AppLayout() {
   // Filtra a sidebar por permissão de visualizar do módulo. Itens sem `module`
   // (Dashboard, Assinatura, "soon") aparecem para todos os perfis de gestão.
   const filterByPerm = (entries: NavEntry[]): NavEntry[] => {
-    return entries.flatMap((e) => {
+    const out: NavEntry[] = [];
+    for (const e of entries) {
       if (isGroup(e)) {
         const items = e.items.filter((it) => !it.module || can(it.module, "view"));
-        if (items.length === 0) return [];
-        return [{ ...e, items }];
+        if (items.length > 0) out.push({ ...e, items });
+      } else if (!e.module || can(e.module, "view")) {
+        out.push(e);
       }
-      if (!e.module || can(e.module, "view")) return [e];
-      return [];
-    });
+    }
+    return out;
   };
 
   const visibleNav: NavEntry[] = isDriverOnly
