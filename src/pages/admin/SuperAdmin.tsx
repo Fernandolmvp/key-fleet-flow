@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import CompanyMembersDialog from "./CompanyMembersDialog";
-import CompanyGroupsPanel from "./CompanyGroupsPanel";
+import GroupInfoDialog from "./GroupInfoDialog";
 
 type Plan = {
   id: string; slug: string; name: string;
@@ -67,6 +67,8 @@ export default function SuperAdmin() {
   const [editing, setEditing] = useState<Usage | null>(null);
   const [paying, setPaying] = useState<Usage | null>(null);
   const [membersOf, setMembersOf] = useState<Usage | null>(null);
+  const [groupInfo, setGroupInfo] = useState<string | null>(null);
+  const [companyMeta, setCompanyMeta] = useState<Record<string, { group_id: string | null; is_primary: boolean }>>({});
 
   const load = async () => {
     setLoading(true);
@@ -78,6 +80,25 @@ export default function SuperAdmin() {
     if (ep) toast.error(ep.message);
     setItems((u ?? []) as any);
     setPlans((p ?? []) as any);
+
+    // Mapeia cada empresa -> group_id + se é a principal (mais antiga do grupo)
+    const { data: comps } = await supabase
+      .from("companies")
+      .select("id, group_id, created_at")
+      .order("created_at", { ascending: true });
+    const firstByGroup: Record<string, string> = {};
+    (comps ?? []).forEach((c: any) => {
+      if (c.group_id && !firstByGroup[c.group_id]) firstByGroup[c.group_id] = c.id;
+    });
+    const meta: Record<string, { group_id: string | null; is_primary: boolean }> = {};
+    (comps ?? []).forEach((c: any) => {
+      meta[c.id] = {
+        group_id: c.group_id ?? null,
+        is_primary: !!c.group_id && firstByGroup[c.group_id] === c.id,
+      };
+    });
+    setCompanyMeta(meta);
+
     setLoading(false);
   };
 
@@ -145,15 +166,6 @@ export default function SuperAdmin() {
           <KPI icon={Truck} label="Veículos na plataforma" value={totalVehicles.toLocaleString("pt-BR")} />
         </div>
 
-        {/* Seção: Grupos econômicos (faturamento consolidado) */}
-        <div className="surface-card rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Layers className="h-5 w-5 text-primary" />
-            <h2 className="font-display font-semibold">Grupos econômicos · Faturamento consolidado</h2>
-          </div>
-          <CompanyGroupsPanel />
-        </div>
-
         {/* Filtros */}
         <div className="surface-card rounded-xl p-4">
           <Tabs value={tab} onValueChange={setTab} className="mb-4">
@@ -200,10 +212,19 @@ export default function SuperAdmin() {
                     const limit = i.vehicle_limit;
                     const overLimit = limit != null && i.vehicles_used > limit;
                     const overdue = new Date(i.current_period_end) < new Date() && i.subscription_status !== "cancelada";
+                    const cm = companyMeta[i.company_id];
+                    const isPrimary = !!cm?.is_primary;
                     return (
                       <tr key={i.subscription_id} className="border-t border-border hover:bg-muted/20">
                         <td className="px-4 py-3">
-                          <div className="font-medium">{i.company_name}</div>
+                          <div className="font-medium flex items-center gap-2">
+                            {i.company_name}
+                            {isPrimary && (
+                              <Badge variant="outline" className="text-[9px] uppercase tracking-wider border-primary/40 text-primary">
+                                <Layers className="h-2.5 w-2.5 mr-1" /> Principal
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">{i.cnpj || "Sem CNPJ"} · desde {fmtDate(i.company_created_at)}</div>
                         </td>
                         <td className="px-4 py-3 text-xs">{i.plan_name}</td>
@@ -229,6 +250,11 @@ export default function SuperAdmin() {
                         <td className="px-4 py-3 text-xs">{fmtDate(i.last_payment_at)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex gap-1">
+                            {isPrimary && cm?.group_id && (
+                              <Button size="sm" variant="ghost" onClick={() => setGroupInfo(cm.group_id!)} title="Grupo econômico">
+                                <Layers className="h-3.5 w-3.5 text-primary" />
+                              </Button>
+                            )}
                             <Button size="sm" variant="ghost" onClick={() => setMembersOf(i)} title="Membros e perfis">
                               <Users className="h-3.5 w-3.5" />
                             </Button>
@@ -256,6 +282,7 @@ export default function SuperAdmin() {
           companyName={membersOf?.company_name ?? ""}
           onClose={() => setMembersOf(null)}
         />
+        <GroupInfoDialog groupId={groupInfo} onClose={() => setGroupInfo(null)} />
       </main>
     </div>
   );
