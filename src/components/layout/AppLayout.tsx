@@ -107,7 +107,11 @@ export default function AppLayout() {
   const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
   const headerCompanyLabel =
     currentCompany?.name ??
-    (currentCompanyId ? "Carregando empresa…" : "Selecionar empresa");
+    (companies.length === 0
+      ? "Nenhuma empresa"
+      : currentCompanyId
+        ? "Carregando empresa…"
+        : "Selecionar empresa");
   const hasDriverRole = roles.includes("motorista");
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
@@ -233,14 +237,26 @@ export default function AppLayout() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
-              <DropdownMenuLabel>Empresas</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                Empresas {companies.length > 0 && `(${companies.length})`}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {companies.map((c) => (
-                <DropdownMenuItem key={c.id} onClick={() => setCurrentCompany(c.id)}>
-                  <Building2 className="h-4 w-4 mr-2" />{c.name}
+                <DropdownMenuItem
+                  key={c.id}
+                  onClick={() => setCurrentCompany(c.id)}
+                  className={c.id === currentCompanyId ? "bg-primary/10 text-primary" : ""}
+                >
+                  <Building2 className="h-4 w-4 mr-2" />
+                  <span className="flex-1 truncate">{c.name}</span>
+                  {c.id === currentCompanyId && (
+                    <span className="text-[10px] uppercase tracking-wider text-primary">atual</span>
+                  )}
                 </DropdownMenuItem>
               ))}
-              {!companies.length && <DropdownMenuItem disabled>Nenhuma empresa</DropdownMenuItem>}
+              {!companies.length && (
+                <DropdownMenuItem disabled>Nenhuma empresa cadastrada</DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowNewCompany(true)} className="text-primary">
                 <Plus className="h-4 w-4 mr-2" /> Nova empresa

@@ -31,52 +31,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const loadCompanies = async (uid: string) => {
-    const { data: sa } = await supabase
-      .from("super_admins").select("user_id").eq("user_id", uid).maybeSingle();
-    setIsSuperAdmin(!!sa);
+    try {
+      const { data: sa } = await supabase
+        .from("super_admins").select("user_id").eq("user_id", uid).maybeSingle();
+      setIsSuperAdmin(!!sa);
 
-    const { data: members } = await supabase
-      .from("company_members")
-      .select("company_id, companies:company_id(id,name,cnpj,logo_url)")
-      .eq("user_id", uid);
-    let list: CompanyMembership[] = (members ?? [])
-      .map((m: any) => m.companies)
-      .filter(Boolean);
+      // 1) IDs de empresas onde o usuário é membro (sem join — mais robusto)
+      const { data: members, error: memErr } = await supabase
+        .from("company_members")
+        .select("company_id")
+        .eq("user_id", uid);
+      if (memErr) console.error("[auth] company_members error", memErr);
 
-    // Fallback: se a join não trouxe nada mas há company_ids, busca direto
-    const memberIds = (members ?? []).map((m: any) => m.company_id).filter(Boolean);
-    const missingIds = memberIds.filter((id: string) => !list.some((c) => c.id === id));
-    if (missingIds.length) {
-      const { data: extra } = await supabase
-        .from("companies")
-        .select("id,name,cnpj,logo_url")
-        .in("id", missingIds);
-      if (extra?.length) list = [...list, ...(extra as any)];
-    }
-    setCompanies(list);
+      const memberIds = Array.from(
+        new Set((members ?? []).map((m: any) => m.company_id).filter(Boolean))
+      );
 
-    const { data: profile } = await supabase
-      .from("profiles").select("current_company_id").eq("id", uid).maybeSingle();
-    let current = profile?.current_company_id ?? null;
-    if (!current && list.length) current = list[0].id;
-    // Garante que a empresa atual existe na lista (caso o usuário tenha sido removido de outra)
-    if (current && !list.some((c) => c.id === current) && list.length) {
-      current = list[0].id;
-    }
-    if (current && current !== profile?.current_company_id) {
-      await supabase.from("profiles").update({ current_company_id: current }).eq("id", uid);
-    }
-    setCurrentCompanyId(current);
+      let list: CompanyMembership[] = [];
+      if (memberIds.length) {
+        const { data: comps, error: cErr } = await supabase
+          .from("companies")
+          .select("id,name,cnpj,logo_url")
+          .in("id", memberIds);
+        if (cErr) console.error("[auth] companies error", cErr);
+        list = (comps ?? []) as CompanyMembership[];
+      }
+      setCompanies(list);
 
-    if (current) {
-      const { data: rs } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", uid)
-        .eq("company_id", current);
-      setRoles((rs ?? []).map((r: any) => r.role));
-    } else {
-      setRoles([]);
+      // 2) Empresa atual
+      const { data: profile } = await supabase
+        .from("profiles").select("current_company_id").eq("id", uid).maybeSingle();
+      let current = profile?.current_company_id ?? null;
+      if (current && !list.some((c) => c.id === current)) current = null;
+      if (!current && list.length) current = list[0].id;
+
+      if (current && current !== profile?.current_company_id) {
+        await supabase.from("profiles").update({ current_company_id: current }).eq("id", uid);
+      }
+      setCurrentCompanyId(current);
+
+      // 3) Roles na empresa atual
+      if (current) {
+        const { data: rs } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", uid)
+          .eq("company_id", current);
+        setRoles((rs ?? []).map((r: any) => r.role));
+      } else {
+        setRoles([]);
+      }
+    } catch (err) {
+      console.error("[auth] loadCompanies failed", err);
     }
   };
 
@@ -85,9 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        setTimeout(() => loadCompanies(sess.user.id), 0);
+        setTimeout(() => {
+          loadCompanies(sess.user.id).finally(() => setLoading(false));
+        }, 0);
       } else {
         setCompanies([]); setCurrentCompanyId(null); setIsSuperAdmin(false);
+        setLoading(false);
       }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
