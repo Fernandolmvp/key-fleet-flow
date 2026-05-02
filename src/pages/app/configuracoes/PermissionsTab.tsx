@@ -111,9 +111,9 @@ export default function PermissionsTab({ companyId }: { companyId: string }) {
         <div>
           <h3 className="font-display font-semibold">Permissões por perfil</h3>
           <p className="text-xs text-muted-foreground max-w-2xl">
-            <strong>Administrador</strong> sempre tem acesso total e não pode ser editado.{" "}
-            <strong>Motorista</strong> usa apenas o app do motorista e também não é editável aqui.{" "}
-            Clique no <ChevronRight className="inline h-3 w-3" /> ao lado de um módulo para definir permissões em cada aba.
+            A coluna <strong>Visualizar</strong> controla se o perfil enxerga o módulo (e o ícone na barra lateral).{" "}
+            Clique no <ChevronRight className="inline h-3 w-3" /> ao lado de um módulo para liberar/bloquear cada <strong>aba</strong> de forma independente.{" "}
+            <strong>Administrador</strong> sempre tem acesso total. <strong>Motorista</strong> usa apenas o app do motorista.
           </p>
         </div>
         <div className="flex gap-2">
@@ -221,15 +221,11 @@ function FragmentRow({
             ↳ {t.label}
           </td>
           {ALL_ACTIONS.map((a) => {
-            const moduleChecked = map.get(`${role}:${moduleValue}:${a.value}:_`) ?? false;
             const tabChecked = map.get(`${role}:${moduleValue}:${a.value}:${t.value}`) ?? false;
-            // Se o módulo já libera, a aba é considerada liberada (informativo)
-            const effective = moduleChecked || tabChecked;
             return (
               <td key={a.value} className="p-2 text-center">
                 <Checkbox
-                  checked={effective}
-                  disabled={moduleChecked}
+                  checked={tabChecked}
                   onCheckedChange={() => onToggle(role, moduleValue, a.value, t.value)}
                 />
               </td>
