@@ -36,12 +36,13 @@ export function NewCompanyDialog({ open, onClose, alreadyHasCompany }: Props) {
       const newId = data as unknown as string;
 
       // Salva campos opcionais informados
-      const extra: Record<string, any> = {};
-      if (cnpj.trim()) extra.cnpj = cnpj.trim();
-      if (email.trim()) extra.email = email.trim();
-      if (phone.trim()) extra.phone = phone.trim();
-      if (contactName.trim()) extra.contact_name = contactName.trim();
-      if (Object.keys(extra).length) {
+      const extra = {
+        cnpj: cnpj.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        contact_name: contactName.trim() || null,
+      };
+      if (cnpj.trim() || email.trim() || phone.trim() || contactName.trim()) {
         await supabase.from("companies").update(extra).eq("id", newId);
       }
 
