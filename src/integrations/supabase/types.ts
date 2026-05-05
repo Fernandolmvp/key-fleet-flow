@@ -517,30 +517,51 @@ export type Database = {
       }
       companies: {
         Row: {
+          address: string | null
+          city: string | null
           cnpj: string | null
+          contact_name: string | null
           created_at: string
+          email: string | null
           group_id: string | null
           id: string
           logo_url: string | null
           name: string
+          phone: string | null
+          state: string | null
+          status: string
           updated_at: string
         }
         Insert: {
+          address?: string | null
+          city?: string | null
           cnpj?: string | null
+          contact_name?: string | null
           created_at?: string
+          email?: string | null
           group_id?: string | null
           id?: string
           logo_url?: string | null
           name: string
+          phone?: string | null
+          state?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
+          address?: string | null
+          city?: string | null
           cnpj?: string | null
+          contact_name?: string | null
           created_at?: string
+          email?: string | null
           group_id?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          phone?: string | null
+          state?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: [
@@ -3100,8 +3121,10 @@ export type Database = {
           company_created_at: string | null
           company_id: string | null
           company_name: string | null
+          contact_name: string | null
           current_period_end: string | null
           drivers_count: number | null
+          email: string | null
           last_payment_at: string | null
           members_count: number | null
           monthly_amount: number | null
