@@ -36,14 +36,24 @@ export default function Login() {
 
   if (!loading && user) return <Navigate to="/app" replace />;
 
+  const routeAfterLogin = async () => {
+    const { data } = await supabase.rpc("get_my_acquisition_state" as any);
+    const row: any = Array.isArray(data) ? data[0] : data;
+    if (row?.has_company && !row?.is_active) {
+      nav("/planos");
+    } else {
+      nav("/app");
+    }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Bem-vindo de volta");
-    nav("/app");
+    await routeAfterLogin();
+    setBusy(false);
   };
 
   const submitDriver = async (e: React.FormEvent) => {
