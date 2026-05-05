@@ -3161,6 +3161,17 @@ export type Database = {
         Args: { _company_name: string; _full_name: string }
         Returns: string
       }
+      bootstrap_company_v2: {
+        Args: {
+          _cnpj?: string
+          _company_name: string
+          _contact_name?: string
+          _email?: string
+          _full_name: string
+          _phone?: string
+        }
+        Returns: string
+      }
       bootstrap_super_admin: { Args: { _email: string }; Returns: string }
       calculate_group_monthly_amount: {
         Args: { _group_id: string }
@@ -3174,6 +3185,15 @@ export type Database = {
       get_company_vehicle_limit: {
         Args: { _company_id: string }
         Returns: number
+      }
+      get_my_acquisition_state: {
+        Args: never
+        Returns: {
+          company_id: string
+          has_company: boolean
+          is_active: boolean
+          subscription_status: string
+        }[]
       }
       has_permission:
         | {

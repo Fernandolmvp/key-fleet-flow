@@ -28,6 +28,11 @@ import Configuracoes from "./pages/app/Configuracoes";
 import SuperAdmin from "./pages/admin/SuperAdmin";
 import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import NotFound from "./pages/NotFound";
+import PlanSelection from "./pages/auth/PlanSelection";
+import Welcome from "./pages/auth/Welcome";
+import RequireAuth from "./components/auth/RequireAuth";
+import RequireActiveSubscription from "./components/auth/RequireActiveSubscription";
+import RequireJustPaid from "./components/auth/RequireJustPaid";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +52,15 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
-            <Route path="/app" element={<AppLayout />}>
+            <Route element={<RequireAuth />}>
+              <Route path="/planos" element={<PlanSelection />} />
+              <Route element={<RequireJustPaid />}>
+                <Route path="/boas-vindas" element={<Welcome />} />
+              </Route>
+            </Route>
+            <Route element={<RequireAuth />}>
+              <Route element={<RequireActiveSubscription />}>
+                <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="vehicles" element={<Vehicles />} />
               <Route path="drivers" element={<Drivers />} />
@@ -61,7 +74,9 @@ const App = () => (
               <Route path="insurance" element={<Insurance />} />
               <Route path="brokers" element={<Brokers />} />
               <Route path="assinatura" element={<Subscription />} />
-              <Route path="configuracoes" element={<Configuracoes />} />
+                  <Route path="configuracoes" element={<Configuracoes />} />
+                </Route>
+              </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
