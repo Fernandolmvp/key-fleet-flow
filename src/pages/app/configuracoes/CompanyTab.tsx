@@ -4,6 +4,7 @@ import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -14,15 +15,30 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   const [name, setName] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [status, setStatus] = useState<"ativa" | "suspensa" | "cancelada">("ativa");
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase.from("companies")
-        .select("name, cnpj, logo_url").eq("id", companyId).maybeSingle();
+        .select("name, cnpj, logo_url, email, phone, contact_name, address, city, state, status")
+        .eq("id", companyId).maybeSingle();
       setName(data?.name ?? "");
       setCnpj(data?.cnpj ?? "");
       setLogoUrl(data?.logo_url ?? "");
+      setEmail((data as any)?.email ?? "");
+      setPhone((data as any)?.phone ?? "");
+      setContactName((data as any)?.contact_name ?? "");
+      setAddress((data as any)?.address ?? "");
+      setCity((data as any)?.city ?? "");
+      setState((data as any)?.state ?? "");
+      setStatus(((data as any)?.status as any) ?? "ativa");
       setLoading(false);
     })();
   }, [companyId]);
@@ -34,6 +50,13 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         name: name.trim(),
         cnpj: cnpj.trim() || null,
         logo_url: logoUrl.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        contact_name: contactName.trim() || null,
+        address: address.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        status,
       }).eq("id", companyId);
       if (error) throw error;
       toast.success("Empresa atualizada");
@@ -62,6 +85,47 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         <div className="space-y-2">
           <Label>URL do logo</Label>
           <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contato@empresa.com" />
+        </div>
+        <div className="space-y-2">
+          <Label>Telefone</Label>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 90000-0000" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Responsável</Label>
+          <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome do contato" />
+        </div>
+        <div className="space-y-2">
+          <Label>Status</Label>
+          <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ativa">Ativa</SelectItem>
+              <SelectItem value="suspensa">Suspensa</SelectItem>
+              <SelectItem value="cancelada">Cancelada</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Endereço</Label>
+        <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número, bairro" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Cidade</Label>
+          <Input value={city} onChange={(e) => setCity(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Estado (UF)</Label>
+          <Input value={state} onChange={(e) => setState(e.target.value.toUpperCase())} maxLength={2} placeholder="SP" />
         </div>
       </div>
       <div className="pt-2">
