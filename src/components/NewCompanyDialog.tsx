@@ -16,9 +16,12 @@ export function NewCompanyDialog({ open, onClose, alreadyHasCompany }: Props) {
   const nav = useNavigate();
   const [name, setName] = useState("");
   const [cnpj, setCnpj] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [contactName, setContactName] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const reset = () => { setName(""); setCnpj(""); };
+  const reset = () => { setName(""); setCnpj(""); setEmail(""); setPhone(""); setContactName(""); };
 
   const submit = async () => {
     if (!name.trim()) return;
@@ -32,9 +35,14 @@ export function NewCompanyDialog({ open, onClose, alreadyHasCompany }: Props) {
       if (error) throw error;
       const newId = data as unknown as string;
 
-      // Salva CNPJ se fornecido
-      if (cnpj.trim()) {
-        await supabase.from("companies").update({ cnpj: cnpj.trim() }).eq("id", newId);
+      // Salva campos opcionais informados
+      const extra: Record<string, any> = {};
+      if (cnpj.trim()) extra.cnpj = cnpj.trim();
+      if (email.trim()) extra.email = email.trim();
+      if (phone.trim()) extra.phone = phone.trim();
+      if (contactName.trim()) extra.contact_name = contactName.trim();
+      if (Object.keys(extra).length) {
+        await supabase.from("companies").update(extra).eq("id", newId);
       }
 
       await refreshCompanies();
@@ -97,6 +105,20 @@ export function NewCompanyDialog({ open, onClose, alreadyHasCompany }: Props) {
               onChange={(e) => setCnpj(e.target.value)}
               placeholder="00.000.000/0000-00"
             />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Email <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contato@empresa.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Telefone <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 90000-0000" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Responsável <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+            <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome do contato" />
           </div>
         </div>
 
