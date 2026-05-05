@@ -6,11 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
-import { CheckCircle2, Loader2, Truck, LogOut, ArrowUpCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Truck, LogOut, ArrowUpCircle, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 const fmtBRL = (v: number | null | undefined) =>
   v == null ? "a combinar" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const SALES_WHATSAPP = "5517999999999";
+const SALES_EMAIL = "contato@frotaops.com";
+const WHATSAPP_URL = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(
+  "Olá! Tenho interesse no plano Enterprise do FrotaOps."
+)}`;
 
 export default function PlanSelection() {
   const { user, signOut, companies, currentCompanyId, loading: authLoading } = useAuth();
@@ -83,8 +89,20 @@ export default function PlanSelection() {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((p) => {
             const priceId = p.stripe_price_id as string | null;
+            const isEnterprise = !!p.is_custom;
+            const isPopular = p.slug === "pro";
             return (
-              <div key={p.id} className="surface-card rounded-xl p-6 flex flex-col">
+              <div
+                key={p.id}
+                className={`surface-card rounded-xl p-6 flex flex-col relative ${
+                  isPopular ? "border-2 border-primary shadow-glow lg:scale-[1.03] z-10" : ""
+                }`}
+              >
+                {isPopular && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-primary text-primary-foreground border-0 shadow-glow">
+                    <Sparkles className="h-3 w-3" /> Mais popular
+                  </Badge>
+                )}
                 <div className="font-display font-bold text-lg">{p.name}</div>
                 <div className="mt-2 text-3xl font-bold">
                   {p.monthly_price ? fmtBRL(Number(p.monthly_price)) : <span className="text-base">a combinar</span>}
@@ -102,13 +120,30 @@ export default function PlanSelection() {
                   ))}
                 </ul>
                 <div className="mt-6">
-                  {priceId ? (
-                    <Button className="w-full bg-gradient-primary text-primary-foreground shadow-glow font-semibold" onClick={() => handlePick(priceId)}>
-                      <ArrowUpCircle className="h-4 w-4" /> Assinar este plano
-                    </Button>
+                  {isEnterprise ? (
+                    <div className="space-y-2">
+                      <Button className="w-full bg-success text-white hover:bg-success/90 font-semibold" asChild>
+                        <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">
+                          <MessageCircle className="h-4 w-4" /> Fale conosco
+                        </a>
+                      </Button>
+                      <a
+                        href={`mailto:${SALES_EMAIL}?subject=Plano%20Enterprise%20-%20FrotaOps`}
+                        className="block text-center text-[11px] text-muted-foreground hover:text-foreground underline"
+                      >
+                        ou {SALES_EMAIL}
+                      </a>
+                    </div>
                   ) : (
-                    <Button variant="outline" className="w-full" asChild>
-                      <a href="mailto:contato@suporte.com?subject=Plano Enterprise">Falar com vendas</a>
+                    <Button
+                      className={`w-full font-semibold ${
+                        isPopular
+                          ? "bg-gradient-primary text-primary-foreground shadow-glow"
+                          : "bg-primary text-primary-foreground"
+                      }`}
+                      onClick={() => handlePick(priceId)}
+                    >
+                      <ArrowUpCircle className="h-4 w-4" /> Assinar agora
                     </Button>
                   )}
                 </div>
