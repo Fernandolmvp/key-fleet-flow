@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ const statusLabel: Record<string, string> = {
 export default function Subscription() {
   const { user, currentCompanyId } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const nav = useNavigate();
   const [data, setData] = useState<any>(null);
   const [plans, setPlans] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -57,14 +58,18 @@ export default function Subscription() {
   // Volta do checkout
   useEffect(() => {
     if (searchParams.get("checkout") === "success") {
+      // Se foi a primeira ativação (estava aguardando_pagamento), manda pra tela de boas-vindas
+      if (data?.subscription_status === "aguardando_pagamento") {
+        nav("/boas-vindas?checkout=success", { replace: true });
+        return;
+      }
       toast.success("Pagamento confirmado! Sua assinatura está sendo ativada.");
-      // pequeno delay pro webhook processar
       setTimeout(() => { reload(); }, 1500);
       searchParams.delete("checkout");
       searchParams.delete("session_id");
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, data?.subscription_status]);
 
   const handleUpgrade = (priceId: string) => {
     if (!currentCompanyId) return;
