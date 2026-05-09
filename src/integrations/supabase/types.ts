@@ -1761,6 +1761,7 @@ export type Database = {
           broker_id: string | null
           company_id: string
           coverage_summary: string | null
+          coverage_type: string | null
           created_at: string
           created_by: string | null
           deductible: number | null
@@ -1783,6 +1784,7 @@ export type Database = {
           broker_id?: string | null
           company_id: string
           coverage_summary?: string | null
+          coverage_type?: string | null
           created_at?: string
           created_by?: string | null
           deductible?: number | null
@@ -1805,6 +1807,7 @@ export type Database = {
           broker_id?: string | null
           company_id?: string
           coverage_summary?: string | null
+          coverage_type?: string | null
           created_at?: string
           created_by?: string | null
           deductible?: number | null
