@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2 } from "lucide-react";
+import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
-type Broker = { id: string; name: string };
+type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
 type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null };
 type AiVehicle = {
   plate: string;
@@ -141,6 +141,25 @@ async function syncVehicleInsuranceFields(_companyId: string, vehicleIds: string
   return true;
 }
 
+/** Audit log helper para o módulo de seguros. */
+async function logAudit(params: {
+  companyId: string;
+  table: "insurance_policies" | "insurance_policy_vehicles";
+  recordId: string;
+  action: string;
+  changes?: Record<string, unknown>;
+}) {
+  const { data: u } = await supabase.auth.getUser();
+  await supabase.from("audit_logs").insert({
+    company_id: params.companyId,
+    table_name: params.table,
+    record_id: params.recordId,
+    action: params.action,
+    user_id: u?.user?.id || null,
+    changes: (params.changes as any) || {},
+  });
+}
+
 export default function InsurancePanel() {
   const { currentCompanyId } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -159,15 +178,16 @@ export default function InsurancePanel() {
   const [reextracting, setReextracting] = useState(false);
 
   const [vehicleSearch, setVehicleSearch] = useState("");
+  const [globalSearch, setGlobalSearch] = useState("");
 
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
     const [p, b, v, l] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
-      supabase.from("insurance_brokers").select("id,name").eq("company_id", currentCompanyId).eq("active", true).order("name"),
+      supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
       supabase.from("vehicles").select("id,plate,brand,model,status,chassis").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
-      supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId),
+      supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
     ]);
     if (p.error) toast.error(p.error.message);
     setPolicies((p.data as any[]) || []);
@@ -388,6 +408,15 @@ export default function InsurancePanel() {
     const r = await supabase.from("insurance_policies").delete().eq("id", id);
     if (r.error) { toast.error(r.error.message); return; }
     if (currentCompanyId && vIds.length) await syncVehicleInsuranceFields(currentCompanyId, vIds);
+    if (currentCompanyId) {
+      await logAudit({
+        companyId: currentCompanyId,
+        table: "insurance_policies",
+        recordId: id,
+        action: "delete",
+        changes: { affected_vehicles: vIds.length },
+      });
+    }
     toast.success("Excluída");
     if (selectedPolicyId === id) setSelectedPolicyId(null);
     load();
@@ -413,9 +442,22 @@ export default function InsurancePanel() {
     const { data: link } = await supabase
       .from("insurance_policy_vehicles").select("vehicle_id").eq("id", linkId).maybeSingle();
     const vehicleId = (link as any)?.vehicle_id;
-    const r = await supabase.from("insurance_policy_vehicles").delete().eq("id", linkId);
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await supabase
+      .from("insurance_policy_vehicles")
+      .update({ removed_at: today })
+      .eq("id", linkId);
     if (r.error) { toast.error(r.error.message); return; }
     if (currentCompanyId && vehicleId) await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
+    if (currentCompanyId) {
+      await logAudit({
+        companyId: currentCompanyId,
+        table: "insurance_policy_vehicles",
+        recordId: linkId,
+        action: "soft_delete",
+        changes: { vehicle_id: vehicleId, removed_at: today },
+      });
+    }
     toast.success("Vínculo removido");
     load();
   }
@@ -495,6 +537,29 @@ export default function InsurancePanel() {
     return [v.plate, v.brand, v.model].join(" ").toLowerCase().includes(q);
   });
 
+  // === Busca global por placa ou chassi ===
+  const globalSearchResult = useMemo(() => {
+    const q = normId(globalSearch);
+    if (!q || q.length < 3) return null;
+    const matches = vehicles.filter(
+      (v) => normId(v.plate).includes(q) || normId(v.chassis).includes(q)
+    );
+    return matches.slice(0, 10);
+  }, [globalSearch, vehicles]);
+
+  function activePoliciesForVehicle(vehicleId: string) {
+    const today = new Date();
+    const ids = links
+      .filter((l) => l.vehicle_id === vehicleId)
+      .map((l) => l.policy_id);
+    return policies.filter((p) => {
+      if (!ids.includes(p.id)) return false;
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    });
+  }
+
   const fmtBRL = (n: number | null | undefined) =>
     n == null ? "—" : n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -507,7 +572,69 @@ export default function InsurancePanel() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      {/* BUSCA GLOBAL POR VEÍCULO */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-primary" />
+          <div className="font-display font-bold">Consultar seguro de um veículo</div>
+        </div>
+        <Input
+          placeholder="Digite placa ou chassi (ignora traços, pontos e espaços)..."
+          value={globalSearch}
+          onChange={(e) => setGlobalSearch(e.target.value)}
+        />
+        {globalSearch && globalSearch.length < 3 && (
+          <div className="text-xs text-muted-foreground">Digite ao menos 3 caracteres.</div>
+        )}
+        {globalSearchResult && globalSearchResult.length === 0 && (
+          <div className="text-xs text-muted-foreground">Nenhum veículo encontrado.</div>
+        )}
+        {globalSearchResult && globalSearchResult.map((v) => {
+          const active = activePoliciesForVehicle(v.id);
+          return (
+            <div key={v.id} className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-primary" />
+                  <span className="font-mono font-bold text-primary text-base">{v.plate}</span>
+                  <span className="text-sm text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                </div>
+                {v.chassis && <span className="text-[11px] font-mono text-muted-foreground">Chassi: {v.chassis}</span>}
+              </div>
+              {active.length === 0 ? (
+                <div className="text-sm text-amber-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" /> Veículo sem apólice ativa
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {active.map((p) => {
+                    const broker = brokers.find((b) => b.id === p.broker_id);
+                    const st = policyStatus(p);
+                    return (
+                      <div key={p.id} className="rounded-md border border-border bg-background/40 p-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-muted-foreground">Seguradora:</span> <strong>{p.insurer_name}</strong></div>
+                        <div><span className="text-muted-foreground">Apólice:</span> <span className="font-mono">#{p.policy_number}</span></div>
+                        <div><span className="text-muted-foreground">Vigência:</span> {p.start_date ? format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy") : "—"} → {p.end_date ? format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy") : "—"}</div>
+                        <div><Badge variant="outline" className={st.cls}>{st.label}</Badge></div>
+                        <div><span className="text-muted-foreground">Corretor:</span> {broker?.name || "—"}</div>
+                        <div className="flex items-center gap-3">
+                          {broker?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{broker.phone}</span>}
+                          {broker?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{broker.email}</span>}
+                        </div>
+                        <div><span className="text-muted-foreground">Franquia:</span> {fmtBRL(p.deductible)}</div>
+                        <div className="md:col-span-2"><span className="text-muted-foreground">Cobertura:</span> {p.coverage_summary || "—"}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -767,6 +894,7 @@ export default function InsurancePanel() {
           </>
         )}
       </Card>
+      </div>
 
       {/* DIALOG DE APÓLICE */}
       <Dialog open={policyDialog} onOpenChange={setPolicyDialog}>
@@ -820,57 +948,77 @@ export default function InsurancePanel() {
               )}
             </div>
 
-            {aiVehicles.length > 0 ? (
-              <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
-                <div className="text-xs font-medium mb-2 flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" /> Revisão da apólice ({aiVehicles.length} veículo(s))
+            {aiVehicles.length > 0 ? (() => {
+              const matches = aiVehicles.map((v) => matchAiVehicle(v, vehicles));
+              const linkedM = matches.filter((m) => m.status === "linked");
+              const mismatchM = matches.filter((m) => m.status === "mismatch");
+              const notFoundM = matches.filter((m) => m.status === "not_found");
+              return (
+                <div className="space-y-3">
+                  <div className="text-xs font-medium flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-primary" /> Resultado da importação ({aiVehicles.length} veículo(s))
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* QUADRANTE 1 — VINCULADOS */}
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <div className="text-xs font-bold text-emerald-400 mb-2 flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Vinculados ({linkedM.length})
+                      </div>
+                      {linkedM.length === 0 ? (
+                        <div className="text-[11px] text-muted-foreground">Nenhum veículo da apólice foi encontrado no cadastro.</div>
+                      ) : (
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {linkedM.map((m) => (
+                            <div key={m.ai.plate} className="flex items-center justify-between gap-2 text-[11px] p-1.5 rounded bg-background/40">
+                              <span className="font-mono font-bold text-emerald-400">{m.vehicle!.plate}</span>
+                              <span className="text-muted-foreground truncate">{[m.vehicle!.brand, m.vehicle!.model].filter(Boolean).join(" ") || "—"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-muted-foreground mt-2">Serão vinculados automaticamente ao salvar.</div>
+                    </div>
+                    {/* QUADRANTE 2 — NÃO ENCONTRADOS */}
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                      <div className="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Não encontrados ({notFoundM.length})
+                      </div>
+                      {notFoundM.length === 0 ? (
+                        <div className="text-[11px] text-muted-foreground">Todos os veículos da apólice estão cadastrados.</div>
+                      ) : (
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {notFoundM.map((m) => (
+                            <div key={m.ai.plate} className="text-[11px] p-1.5 rounded bg-background/40">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono font-bold text-amber-400">{m.ai.plate || "—"}</span>
+                                <span className="text-muted-foreground truncate">{[m.ai.brand, m.ai.model, m.ai.year].filter(Boolean).join(" ") || "—"}</span>
+                              </div>
+                              {m.ai.chassis && <div className="font-mono text-[10px] text-muted-foreground">Chassi: {m.ai.chassis}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-amber-400/80 mt-2">Esses veículos vieram na apólice mas não existem no cadastro. Cadastre-os manualmente para vinculá-los.</div>
+                    </div>
+                  </div>
+                  {mismatchM.length > 0 && (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                      <div className="text-xs font-bold text-destructive mb-2 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Inconsistência placa × chassi ({mismatchM.length})
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {mismatchM.map((m) => (
+                          <div key={m.ai.plate} className="text-[11px] p-1.5 rounded bg-background/40">
+                            <div className="font-mono font-bold text-destructive">{m.ai.plate}</div>
+                            <div className="text-muted-foreground">{m.reason}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="max-h-56 overflow-y-auto rounded border border-border bg-background/40">
-                  <table className="w-full text-[11px]">
-                    <thead className="bg-muted/40 sticky top-0">
-                      <tr>
-                        <th className="text-left p-1.5">Placa</th>
-                        <th className="text-left p-1.5">Chassi</th>
-                        <th className="text-left p-1.5">Veículo</th>
-                        <th className="text-center p-1.5">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {aiVehicles.map((v) => {
-                        const m = matchAiVehicle(v, vehicles);
-                        return (
-                          <tr key={v.plate} className="border-t border-border">
-                            <td className="p-1.5 font-mono font-bold">{v.plate}</td>
-                            <td className="p-1.5 font-mono text-muted-foreground truncate max-w-[120px]" title={v.chassis || ""}>
-                              {v.chassis || "—"}
-                            </td>
-                            <td className="p-1.5 text-muted-foreground">
-                              {[v.brand, v.model, v.year].filter(Boolean).join(" ") || "—"}
-                            </td>
-                            <td className="p-1.5 text-center">
-                              {m.status === "linked" && (
-                                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">VINCULADO</Badge>
-                              )}
-                              {m.status === "not_found" && (
-                                <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">NÃO ENCONTRADO</Badge>
-                              )}
-                              {m.status === "mismatch" && (
-                                <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]" title={m.reason}>INCONSISTÊNCIA</Badge>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-2">
-                  <span className="text-emerald-400">VINCULADO</span> será criado em <code>insurance_policy_vehicles</code> ao salvar.{" "}
-                  <span className="text-amber-400">NÃO ENCONTRADO</span> = placa/chassi da apólice não existe no cadastro — cadastre o veículo depois.{" "}
-                  <span className="text-destructive">INCONSISTÊNCIA</span> = placa e chassi divergem entre apólice e cadastro — revise manualmente antes de salvar.
-                </div>
-              </div>
-            ) : aiPlates.length > 0 && (
+              );
+            })() : aiPlates.length > 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
                 <div className="text-xs font-medium mb-1 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Placas identificadas pela IA</div>
                 <div className="flex flex-wrap gap-1">
@@ -887,38 +1035,50 @@ export default function InsurancePanel() {
               </div>
             )}
 
+            {(() => {
+              const aiLocked = !!form.ai_extracted && Object.keys(form.ai_extracted || {}).length > 0;
+              const lockedCls = aiLocked ? "bg-muted/40 cursor-not-allowed" : "";
+              const LockLabel = ({ children }: { children: React.ReactNode }) => (
+                <Label className="flex items-center gap-1">{children}{aiLocked && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
+              );
+              return (
             <div className="grid grid-cols-2 gap-3">
+              {aiLocked && (
+                <div className="col-span-2 text-[11px] text-muted-foreground bg-muted/20 border border-border rounded p-2 flex items-center gap-2">
+                  <Lock className="h-3 w-3" /> Os dados desta apólice foram extraídos do PDF pela IA e são somente leitura. Para alterá-los, importe uma nova apólice.
+                </div>
+              )}
               <div>
-                <Label>Número da apólice *</Label>
-                <Input value={form.policy_number || ""} onChange={(e) => setForm({ ...form, policy_number: e.target.value })} />
+                <LockLabel>Número da apólice *</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.policy_number || ""} onChange={(e) => setForm({ ...form, policy_number: e.target.value })} />
               </div>
               <div>
-                <Label>Seguradora *</Label>
-                <Input value={form.insurer_name || ""} onChange={(e) => setForm({ ...form, insurer_name: e.target.value })} />
+                <LockLabel>Seguradora *</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.insurer_name || ""} onChange={(e) => setForm({ ...form, insurer_name: e.target.value })} />
               </div>
               <div>
-                <Label>Telefone seguradora</Label>
-                <Input value={form.insurer_phone || ""} onChange={(e) => setForm({ ...form, insurer_phone: e.target.value })} />
+                <LockLabel>Telefone seguradora</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.insurer_phone || ""} onChange={(e) => setForm({ ...form, insurer_phone: e.target.value })} />
               </div>
               <div>
-                <Label>Email seguradora</Label>
-                <Input value={form.insurer_email || ""} onChange={(e) => setForm({ ...form, insurer_email: e.target.value })} />
+                <LockLabel>Email seguradora</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.insurer_email || ""} onChange={(e) => setForm({ ...form, insurer_email: e.target.value })} />
               </div>
               <div>
-                <Label>Início vigência</Label>
-                <Input type="date" value={form.start_date || ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+                <LockLabel>Início vigência</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="date" value={form.start_date || ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
               </div>
               <div>
-                <Label>Fim vigência</Label>
-                <Input type="date" value={form.end_date || ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+                <LockLabel>Fim vigência</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="date" value={form.end_date || ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
               </div>
               <div>
-                <Label>Prêmio total (R$)</Label>
-                <Input type="number" step="0.01" value={form.total_value ?? ""} onChange={(e) => setForm({ ...form, total_value: e.target.value ? parseFloat(e.target.value) : null })} />
+                <LockLabel>Prêmio total (R$)</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="number" step="0.01" value={form.total_value ?? ""} onChange={(e) => setForm({ ...form, total_value: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div>
-                <Label>Franquia (R$)</Label>
-                <Input type="number" step="0.01" value={form.deductible ?? ""} onChange={(e) => setForm({ ...form, deductible: e.target.value ? parseFloat(e.target.value) : null })} />
+                <LockLabel>Franquia (R$)</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="number" step="0.01" value={form.deductible ?? ""} onChange={(e) => setForm({ ...form, deductible: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div className="col-span-2">
                 <Label>Corretor</Label>
@@ -931,14 +1091,16 @@ export default function InsurancePanel() {
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label>Coberturas</Label>
-                <Textarea value={form.coverage_summary || ""} onChange={(e) => setForm({ ...form, coverage_summary: e.target.value })} />
+                <LockLabel>Coberturas</LockLabel>
+                <Textarea className={lockedCls} readOnly={aiLocked} value={form.coverage_summary || ""} onChange={(e) => setForm({ ...form, coverage_summary: e.target.value })} />
               </div>
               <div className="col-span-2">
                 <Label>Observações</Label>
                 <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
+              );
+            })()}
           </div>
 
           <DialogFooter>
