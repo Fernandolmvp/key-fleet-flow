@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
 type Broker = { id: string; name: string };
-type Vehicle = { id: string; plate: string; brand: string; model: string; status: string };
+type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null };
 type AiVehicle = {
   plate: string;
   brand?: string | null;
@@ -58,6 +58,53 @@ type Link = {
 
 const emptyPolicy: Partial<Policy> = { status: "ativa" };
 
+/** Normaliza placa/chassi: maiúsculas e somente A-Z/0-9. */
+function normId(s?: string | null): string {
+  return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/** Converte ArrayBuffer -> base64 sem estourar a stack em PDFs grandes. */
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  const CHUNK = 0x8000; // 32KB
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)) as any);
+  }
+  return btoa(binary);
+}
+
+type MatchStatus = "linked" | "not_found" | "mismatch";
+type MatchResult = {
+  ai: AiVehicle;
+  vehicle: Vehicle | null;
+  status: MatchStatus;
+  reason?: string;
+};
+
+/** Busca o veículo cadastrado correspondente: 1) por placa, 2) fallback por chassi. Detecta inconsistência. */
+function matchAiVehicle(ai: AiVehicle, vehicles: Vehicle[]): MatchResult {
+  const aiPlate = normId(ai.plate);
+  const aiChassis = normId(ai.chassis);
+
+  let v: Vehicle | undefined;
+  if (aiPlate) v = vehicles.find((x) => normId(x.plate) === aiPlate);
+  if (!v && aiChassis) v = vehicles.find((x) => normId(x.chassis) === aiChassis);
+
+  if (!v) return { ai, vehicle: null, status: "not_found" };
+
+  // Inconsistência: ambos os lados têm placa+chassi e algum não confere
+  const dbPlate = normId(v.plate);
+  const dbChassis = normId(v.chassis);
+  if (aiPlate && dbPlate && aiPlate !== dbPlate) {
+    return { ai, vehicle: v, status: "mismatch", reason: `Placa do banco (${v.plate}) ≠ placa da apólice (${ai.plate})` };
+  }
+  if (aiChassis && dbChassis && aiChassis !== dbChassis) {
+    return { ai, vehicle: v, status: "mismatch", reason: `Chassi do banco (${v.chassis}) ≠ chassi da apólice (${ai.chassis})` };
+  }
+  return { ai, vehicle: v, status: "linked" };
+}
+
 async function syncVehicleInsuranceFields(_companyId: string, vehicleIds: string[]) {
   const ids = Array.from(new Set(vehicleIds.filter(Boolean)));
   if (!ids.length) return true;
@@ -100,7 +147,7 @@ export default function InsurancePanel() {
     const [p, b, v, l] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name").eq("company_id", currentCompanyId).eq("active", true).order("name"),
-      supabase.from("vehicles").select("id,plate,brand,model,status").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,status,chassis").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId),
     ]);
     if (p.error) toast.error(p.error.message);
@@ -145,11 +192,22 @@ export default function InsurancePanel() {
     setExtracting(true);
     try {
       const buf = await file.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const b64 = arrayBufferToBase64(buf);
       const { data, error } = await supabase.functions.invoke("extract-insurance-policy", {
         body: { fileBase64: b64, mimeType: file.type || "application/pdf" },
       });
-      if (error) throw error;
+      if (error) {
+        let msg = error.message || "Falha ao processar a apólice";
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx?.json) { const body = await ctx.json(); if (body?.error) msg = body.error; }
+          else if (ctx?.text) {
+            const txt = await ctx.text();
+            try { const j = JSON.parse(txt); if (j?.error) msg = j.error; } catch { /* keep */ }
+          }
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
       const ex = (data as any)?.data || {};
       setForm((f) => ({
         ...f,
@@ -203,7 +261,7 @@ export default function InsurancePanel() {
       }
     } catch (e: any) {
       console.error(e);
-      toast.error("IA não conseguiu ler a apólice. Preencha manualmente.");
+      toast.error(e?.message ? `IA: ${e.message}` : "IA não conseguiu ler a apólice. Preencha manualmente.");
     } finally {
       setExtracting(false);
     }
@@ -259,24 +317,32 @@ export default function InsurancePanel() {
       if (r.error) { toast.error(r.error.message); return; }
       policyId = (r.data as any).id;
     }
-    // vincula placas extraídas pela IA (apólice original)
-    if (policyId && aiPlates.length) {
-      const matches = vehicles.filter((v) => aiPlates.includes(v.plate.toUpperCase()));
-      if (matches.length) {
-        const rows = matches.map((m) => ({
+    // vincula veículos extraídos pela IA (placa OU chassi), com classificação
+    if (policyId) {
+      const aiList: AiVehicle[] = aiVehicles.length
+        ? aiVehicles
+        : aiPlates.map((p) => ({ plate: p } as AiVehicle));
+      const results = aiList.map((a) => matchAiVehicle(a, vehicles));
+      const linked = results.filter((r) => r.status === "linked" && r.vehicle);
+      const notFound = results.filter((r) => r.status === "not_found");
+      const mismatch = results.filter((r) => r.status === "mismatch" && r.vehicle);
+      if (linked.length) {
+        const rows = linked.map((r) => ({
           company_id: currentCompanyId,
           policy_id: policyId!,
-          vehicle_id: m.id,
-          inclusion_type: "apolice" as const,
+          vehicle_id: r.vehicle!.id,
+          inclusion_type: (r.ai.inclusion_type === "adendo" ? "adendo" : "apolice") as "apolice" | "adendo",
           removed_at: null,
         }));
         await supabase.from("insurance_policy_vehicles").upsert(rows, { onConflict: "policy_id,vehicle_id" });
-        await syncVehicleInsuranceFields(currentCompanyId, matches.map((m) => m.id));
-        toast.success(`${matches.length} veículo(s) vinculado(s) à apólice`);
+        await syncVehicleInsuranceFields(currentCompanyId, linked.map((r) => r.vehicle!.id));
+        toast.success(`${linked.length} veículo(s) vinculado(s) à apólice`);
       }
-      const notFound = aiPlates.filter((p) => !vehicles.some((v) => v.plate.toUpperCase() === p));
       if (notFound.length) {
-        toast.warning(`${notFound.length} placa(s) da apólice não estão cadastradas: ${notFound.join(", ")}`);
+        toast.warning(`${notFound.length} veículo(s) da apólice não foram encontrados (placa/chassi não cadastrados).`);
+      }
+      if (mismatch.length) {
+        toast.warning(`${mismatch.length} veículo(s) com inconsistência entre placa e chassi — revise manualmente.`);
       }
     }
     // Se a apólice já existia (edição), ressincroniza todos os veículos vinculados
