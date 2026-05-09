@@ -41,7 +41,7 @@ const nav: NavEntry[] = [
       { to: "/app/checklists", label: "Checklists", icon: ClipboardList, module: "checklists" },
       { to: "/app/tires", label: "Pneus", icon: CircleDot, module: "tires" },
       { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents", module: "documents" },
-      { to: "/app/insurance", label: "Seguros", icon: ShieldCheck, module: "insurance" },
+      { to: "/app/insurance", label: "Seguros", icon: ShieldCheck, badgeKey: "insurance", module: "insurance" },
     ],
   },
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
@@ -61,6 +61,7 @@ export default function AppLayout() {
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
+  const [insurancePending, setInsurancePending] = useState(0);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ cadastros: true, movimentacao: true });
   const [showNewCompany, setShowNewCompany] = useState(false);
 
@@ -81,6 +82,27 @@ export default function AppLayout() {
         .eq("company_id", currentCompanyId)
         .eq("status", "pendente");
       setApprovalPending(count || 0);
+    })();
+    (async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+      const [expiring, expired, vehiclesRes, linksRes, policiesRes] = await Promise.all([
+        supabase.from("insurance_policies").select("id", { count: "exact", head: true })
+          .eq("company_id", currentCompanyId).eq("status", "ativa")
+          .gte("end_date", today).lte("end_date", in30),
+        supabase.from("insurance_policies").select("id", { count: "exact", head: true })
+          .eq("company_id", currentCompanyId).eq("status", "ativa").lt("end_date", today),
+        supabase.from("vehicles").select("id").eq("company_id", currentCompanyId).eq("status", "ativo"),
+        supabase.from("insurance_policy_vehicles").select("vehicle_id,policy_id")
+          .eq("company_id", currentCompanyId).is("removed_at", null),
+        supabase.from("insurance_policies").select("id").eq("company_id", currentCompanyId).eq("status", "ativa"),
+      ]);
+      const activePolicyIds = new Set(((policiesRes.data as any[]) || []).map((p) => p.id));
+      const coveredIds = new Set(
+        ((linksRes.data as any[]) || []).filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
+      );
+      const uncovered = ((vehiclesRes.data as any[]) || []).filter((v) => !coveredIds.has(v.id)).length;
+      setInsurancePending((expiring.count || 0) + (expired.count || 0) + uncovered);
     })();
   }, [currentCompanyId, loc.pathname]);
 
@@ -171,6 +193,11 @@ export default function AppLayout() {
             {docPending}
           </span>
         )}
+        {it.badgeKey === "insurance" && insurancePending > 0 && (
+          <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
+            {insurancePending > 99 ? "99+" : insurancePending}
+          </span>
+        )}
         {it.badgeKey === "approvals" && approvalPending > 0 && (
           <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
             {approvalPending}
@@ -201,7 +228,8 @@ export default function AppLayout() {
             const Icon = entry.icon;
             const pendingCount =
               (entry.items.some((i) => i.badgeKey === "approvals") ? approvalPending : 0) +
-              (entry.items.some((i) => i.badgeKey === "documents") ? docPending : 0);
+              (entry.items.some((i) => i.badgeKey === "documents") ? docPending : 0) +
+              (entry.items.some((i) => i.badgeKey === "insurance") ? insurancePending : 0);
             const groupActive = entry.items.some((it) => loc.pathname.startsWith(it.to));
             return (
               <div key={entry.key} className="space-y-0.5">
