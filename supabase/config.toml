@@ -3,6 +3,9 @@ project_id = "qvhgivhlgumcxaneizzb"
 [functions.extract-document]
 verify_jwt = false
 
+[functions.extract-insurance-policy]
+verify_jwt = false
+
 [functions.driver-onboarding]
 verify_jwt = false
 
