@@ -565,7 +565,13 @@ export default function InsurancePanel() {
 
   // Veículos da empresa SEM cobertura em NENHUMA apólice ativa
   const companyUncovered = useMemo(() => {
-    const activePolicyIds = new Set(policies.filter((p) => p.status === "ativa").map((p) => p.id));
+    const today = new Date();
+    const isVigente = (p: Policy) => {
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    };
+    const activePolicyIds = new Set(policies.filter(isVigente).map((p) => p.id));
     const coveredIds = new Set(
       links.filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
     );
@@ -1108,7 +1114,17 @@ export default function InsurancePanel() {
                 <Input className="pl-9 h-9" placeholder="Placa, marca ou modelo..." value={vehicleSearch} onChange={(e) => setVehicleSearch(e.target.value)} />
               </div>
               <div className="space-y-1 max-h-72 overflow-y-auto">
-                {filteredVehicles.filter((v) => !linkedVehicleIds.has(v.id)).map((v) => (
+                {(() => {
+                  const uncoveredIds = new Set(companyUncovered.map((x) => x.id));
+                  const list = filteredVehicles.filter(
+                    (v) => !linkedVehicleIds.has(v.id) && !uncoveredIds.has(v.id),
+                  );
+                  if (list.length === 0) {
+                    return (
+                      <div className="text-xs text-muted-foreground py-2 text-center">Nenhum veículo disponível.</div>
+                    );
+                  }
+                  return list.map((v) => (
                   <div key={v.id} className="flex items-center justify-between gap-2 p-2 rounded border border-border hover:bg-muted/30">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-mono font-bold text-primary">{v.plate}</span>
@@ -1120,10 +1136,8 @@ export default function InsurancePanel() {
                       </Button>
                     </div>
                   </div>
-                ))}
-                {filteredVehicles.filter((v) => !linkedVehicleIds.has(v.id)).length === 0 && (
-                  <div className="text-xs text-muted-foreground py-2 text-center">Nenhum veículo disponível.</div>
-                )}
+                  ));
+                })()}
               </div>
               <div className="text-[11px] text-muted-foreground mt-2 flex items-start gap-1">
                 <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
