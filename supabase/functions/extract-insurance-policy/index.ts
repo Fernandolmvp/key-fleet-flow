@@ -28,6 +28,11 @@ const TOOL = {
         installment_value: { type: ["number", "null"], description: "Valor de cada parcela" },
         deductible: { type: ["number", "null"], description: "Franquia padrão" },
         coverage_summary: { type: ["string", "null"], description: "Resumo das coberturas principais (Casco, RCF-V, APP, assistência etc.) com limites quando possível" },
+        coverage_type: {
+          type: ["string", "null"],
+          enum: ["compreensivo", "terceiros", "casco_total", "casco_parcial", "frota", "outro", null],
+          description: "Tipo principal da cobertura. 'compreensivo' = casco + RCF + APP completo; 'terceiros' = apenas RCF (responsabilidade civil); 'casco_total' = casco completo; 'casco_parcial' = casco com restrições; 'frota' = apólice coletiva de frota; 'outro' = não se encaixa.",
+        },
         insured_name: { type: ["string", "null"], description: "Razão social/nome do segurado (estipulante da frota)" },
         insured_document: { type: ["string", "null"], description: "CNPJ/CPF do segurado (apenas dígitos)" },
         broker_name: { type: ["string", "null"], description: "Nome/razão social do corretor de seguros" },
