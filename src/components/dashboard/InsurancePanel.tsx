@@ -75,6 +75,21 @@ function normId(s?: string | null): string {
   return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+/** Detecta se uma apólice veio de importação por IA.
+ *  ai_extracted vazio, ou só com plates/vehicles vazios, NÃO conta como IA. */
+function isAiPolicy(p: { ai_extracted?: any } | null | undefined): boolean {
+  const ex = p?.ai_extracted;
+  if (!ex || typeof ex !== "object") return false;
+  const platesLen = Array.isArray(ex.plates) ? ex.plates.length : 0;
+  const vehLen = Array.isArray(ex.vehicles) ? ex.vehicles.length : 0;
+  if (platesLen > 0 || vehLen > 0) return true;
+  const meaningful =
+    ex.policy_number || ex.insurer_name || ex.broker_name ||
+    ex.start_date || ex.end_date || ex.coverage_summary ||
+    ex.total_value != null || ex.deductible != null;
+  return !!meaningful;
+}
+
 /** Converte ArrayBuffer -> base64 sem estourar a stack em PDFs grandes. */
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
