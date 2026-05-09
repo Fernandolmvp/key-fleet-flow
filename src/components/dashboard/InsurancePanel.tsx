@@ -572,6 +572,69 @@ export default function InsurancePanel() {
     return vehicles.filter((v) => !coveredIds.has(v.id));
   }, [vehicles, links, policies]);
 
+  // === RESUMO GERAL (todas as apólices) ===
+  const fleetSummary = useMemo(() => {
+    const today = new Date();
+    const isVigente = (p: Policy) => {
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    };
+    const activePolicies = policies.filter(isVigente);
+    const activeIds = new Set(activePolicies.map((p) => p.id));
+    const coveredVehicleIds = new Set(
+      links.filter((l) => activeIds.has(l.policy_id)).map((l) => l.vehicle_id)
+    );
+    // Placas presentes em ai_extracted das apólices ativas mas não cadastradas
+    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
+    const onlyInPolicy = new Set<string>();
+    activePolicies.forEach((p) => {
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((v: any) => v?.plate).filter(Boolean) : [];
+      plates.forEach((pl) => {
+        const norm = String(pl).toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (norm && !cadastradas.has(norm)) onlyInPolicy.add(norm);
+      });
+    });
+    let vencidas = 0, vencendo30 = 0, vigentes = 0;
+    policies.forEach((p) => {
+      if (p.status !== "ativa") return;
+      if (!p.end_date) { vigentes++; return; }
+      const d = differenceInDays(new Date(p.end_date + "T00:00:00"), today);
+      if (d < 0) vencidas++;
+      else if (d <= 30) { vencendo30++; vigentes++; }
+      else vigentes++;
+    });
+    return {
+      coveredCount: coveredVehicleIds.size,
+      onlyInPolicyCount: onlyInPolicy.size,
+      uncoveredCount: vehicles.filter((v) => !coveredVehicleIds.has(v.id)).length,
+      vigentes,
+      vencendo30,
+      vencidas,
+    };
+  }, [policies, links, vehicles]);
+
+  // === Estatísticas por apólice (para os cards) ===
+  const policyStats = useMemo(() => {
+    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
+    const map: Record<string, { covered: number; onlyInPolicy: number }> = {};
+    policies.forEach((p) => {
+      const linkedHere = links.filter((l) => l.policy_id === p.id);
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((v: any) => v?.plate).filter(Boolean) : [];
+      const onlyInPolicy = plates
+        .map((pl) => String(pl).toUpperCase().replace(/[^A-Z0-9]/g, ""))
+        .filter((pl) => pl && !cadastradas.has(pl)).length;
+      map[p.id] = { covered: linkedHere.length, onlyInPolicy };
+    });
+    return map;
+  }, [policies, links, vehicles]);
+
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
