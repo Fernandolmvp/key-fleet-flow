@@ -1161,7 +1161,7 @@ export default function InsurancePanel() {
             )}
 
             {(() => {
-              const aiLocked = !!form.ai_extracted && Object.keys(form.ai_extracted || {}).length > 0;
+              const aiLocked = isAiPolicy(form as any);
               const lockedCls = aiLocked ? "bg-muted/40 cursor-not-allowed" : "";
               const LockLabel = ({ children }: { children: React.ReactNode }) => (
                 <Label className="flex items-center gap-1">{children}{aiLocked && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
