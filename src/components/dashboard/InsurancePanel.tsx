@@ -52,7 +52,7 @@ type Link = {
   id: string;
   policy_id: string;
   vehicle_id: string;
-  inclusion_type: "apolice" | "adendo";
+  inclusion_type: "apolice" | "adendo" | "manual";
   included_at: string;
   endorsement_number: string | null;
 };
@@ -436,7 +436,7 @@ export default function InsurancePanel() {
     load();
   }
 
-  async function linkVehicle(vehicleId: string, type: "apolice" | "adendo") {
+  async function linkVehicle(vehicleId: string, type: "apolice" | "adendo" | "manual") {
     if (!selectedPolicyId || !currentCompanyId) return;
     const r = await supabase.from("insurance_policy_vehicles").upsert({
       company_id: currentCompanyId,
@@ -447,7 +447,7 @@ export default function InsurancePanel() {
     }, { onConflict: "policy_id,vehicle_id" });
     if (r.error) { toast.error(r.error.message); return; }
     await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
-    toast.success(type === "adendo" ? "Adendo registrado" : "Veículo incluído");
+    toast.success(type === "adendo" ? "Adendo registrado" : type === "manual" ? "Veículo vinculado manualmente" : "Veículo incluído");
     load();
   }
 
@@ -862,13 +862,23 @@ export default function InsurancePanel() {
                         <span className="text-xs text-muted-foreground truncate">{v?.brand} {v?.model}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={l.inclusion_type === "adendo" ? "bg-amber-500/15 text-amber-400 border-amber-500/30" : "bg-primary/15 text-primary border-primary/30"}>
-                          {l.inclusion_type === "adendo" ? "Adendo" : "Apólice"}
-                        </Badge>
+                        {l.inclusion_type === "manual" ? (
+                          <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Manual</Badge>
+                        ) : l.inclusion_type === "adendo" ? (
+                          <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 flex items-center gap-1">
+                            <Lock className="h-2.5 w-2.5" /> Adendo
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 flex items-center gap-1">
+                            <Lock className="h-2.5 w-2.5" /> Via apólice
+                          </Badge>
+                        )}
                         <span className="text-[11px] text-muted-foreground">{format(new Date(l.included_at + "T00:00:00"), "dd/MM/yy")}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => unlinkVehicle(l.id)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
+                        {l.inclusion_type === "manual" && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => unlinkVehicle(l.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -890,11 +900,8 @@ export default function InsurancePanel() {
                       <span className="text-xs text-muted-foreground truncate">{v.brand} {v.model}</span>
                     </div>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="outline" className="h-7" onClick={() => linkVehicle(v.id, "apolice")}>
-                        Apólice
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7" onClick={() => linkVehicle(v.id, "adendo")}>
-                        Adendo
+                      <Button size="sm" variant="outline" className="h-7" onClick={() => linkVehicle(v.id, "manual")}>
+                        Vincular
                       </Button>
                     </div>
                   </div>
