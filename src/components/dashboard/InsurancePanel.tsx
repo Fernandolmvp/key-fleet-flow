@@ -572,7 +572,69 @@ export default function InsurancePanel() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      {/* BUSCA GLOBAL POR VEÍCULO */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-primary" />
+          <div className="font-display font-bold">Consultar seguro de um veículo</div>
+        </div>
+        <Input
+          placeholder="Digite placa ou chassi (ignora traços, pontos e espaços)..."
+          value={globalSearch}
+          onChange={(e) => setGlobalSearch(e.target.value)}
+        />
+        {globalSearch && globalSearch.length < 3 && (
+          <div className="text-xs text-muted-foreground">Digite ao menos 3 caracteres.</div>
+        )}
+        {globalSearchResult && globalSearchResult.length === 0 && (
+          <div className="text-xs text-muted-foreground">Nenhum veículo encontrado.</div>
+        )}
+        {globalSearchResult && globalSearchResult.map((v) => {
+          const active = activePoliciesForVehicle(v.id);
+          return (
+            <div key={v.id} className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-primary" />
+                  <span className="font-mono font-bold text-primary text-base">{v.plate}</span>
+                  <span className="text-sm text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                </div>
+                {v.chassis && <span className="text-[11px] font-mono text-muted-foreground">Chassi: {v.chassis}</span>}
+              </div>
+              {active.length === 0 ? (
+                <div className="text-sm text-amber-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" /> Veículo sem apólice ativa
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {active.map((p) => {
+                    const broker = brokers.find((b) => b.id === p.broker_id);
+                    const st = policyStatus(p);
+                    return (
+                      <div key={p.id} className="rounded-md border border-border bg-background/40 p-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-muted-foreground">Seguradora:</span> <strong>{p.insurer_name}</strong></div>
+                        <div><span className="text-muted-foreground">Apólice:</span> <span className="font-mono">#{p.policy_number}</span></div>
+                        <div><span className="text-muted-foreground">Vigência:</span> {p.start_date ? format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy") : "—"} → {p.end_date ? format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy") : "—"}</div>
+                        <div><Badge variant="outline" className={st.cls}>{st.label}</Badge></div>
+                        <div><span className="text-muted-foreground">Corretor:</span> {broker?.name || "—"}</div>
+                        <div className="flex items-center gap-3">
+                          {broker?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{broker.phone}</span>}
+                          {broker?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{broker.email}</span>}
+                        </div>
+                        <div><span className="text-muted-foreground">Franquia:</span> {fmtBRL(p.deductible)}</div>
+                        <div className="md:col-span-2"><span className="text-muted-foreground">Cobertura:</span> {p.coverage_summary || "—"}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
