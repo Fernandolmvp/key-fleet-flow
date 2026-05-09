@@ -453,9 +453,7 @@ export default function InsurancePanel() {
 
   async function linkVehicle(vehicleId: string, type: "apolice" | "adendo" | "manual") {
     if (!selectedPolicyId || !currentCompanyId) return;
-    if (selectedPolicy && !!selectedPolicy.ai_extracted
-        && typeof selectedPolicy.ai_extracted === "object"
-        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+    if (isAiPolicy(selectedPolicy)) {
       toast.error("Apólice importada via IA — não é permitido vincular veículos manualmente.");
       return;
     }
@@ -476,8 +474,7 @@ export default function InsurancePanel() {
     const linkObj = links.find((l) => l.id === linkId);
     if (linkObj) {
       const pol = policies.find((p) => p.id === linkObj.policy_id);
-      if (pol && !!pol.ai_extracted && typeof pol.ai_extracted === "object"
-          && Object.keys(pol.ai_extracted as object).length > 0) {
+      if (isAiPolicy(pol)) {
         toast.error("Apólice importada via IA — não é permitido remover vínculos.");
         return;
       }
@@ -513,9 +510,7 @@ export default function InsurancePanel() {
   );
   const linkedVehicleIds = new Set(selectedLinks.map((l) => l.vehicle_id));
 
-  const policyIsAi = !!selectedPolicy?.ai_extracted
-    && typeof selectedPolicy.ai_extracted === "object"
-    && Object.keys(selectedPolicy.ai_extracted as object).length > 0;
+  const policyIsAi = isAiPolicy(selectedPolicy);
 
   // === VALIDAÇÃO CRUZADA da apólice selecionada ===
   const validation = useMemo(() => {
@@ -571,9 +566,7 @@ export default function InsurancePanel() {
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
-    if (selectedPolicy && !!selectedPolicy.ai_extracted
-        && typeof selectedPolicy.ai_extracted === "object"
-        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+    if (isAiPolicy(selectedPolicy)) {
       toast.error("Apólice importada via IA — vínculos são gerados automaticamente na importação.");
       return;
     }
