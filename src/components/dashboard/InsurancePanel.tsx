@@ -537,6 +537,29 @@ export default function InsurancePanel() {
     return [v.plate, v.brand, v.model].join(" ").toLowerCase().includes(q);
   });
 
+  // === Busca global por placa ou chassi ===
+  const globalSearchResult = useMemo(() => {
+    const q = normId(globalSearch);
+    if (!q || q.length < 3) return null;
+    const matches = vehicles.filter(
+      (v) => normId(v.plate).includes(q) || normId(v.chassis).includes(q)
+    );
+    return matches.slice(0, 10);
+  }, [globalSearch, vehicles]);
+
+  function activePoliciesForVehicle(vehicleId: string) {
+    const today = new Date();
+    const ids = links
+      .filter((l) => l.vehicle_id === vehicleId)
+      .map((l) => l.policy_id);
+    return policies.filter((p) => {
+      if (!ids.includes(p.id)) return false;
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    });
+  }
+
   const fmtBRL = (n: number | null | undefined) =>
     n == null ? "—" : n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
