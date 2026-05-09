@@ -84,6 +84,11 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    console.log("extract-insurance-policy: received", {
+      mimeType,
+      base64Len: fileBase64.length,
+      approxBytes: Math.round((fileBase64.length * 3) / 4),
+    });
 
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
     const isPdf = (mimeType || "").toLowerCase().includes("pdf");
