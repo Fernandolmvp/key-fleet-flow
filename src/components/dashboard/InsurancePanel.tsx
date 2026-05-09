@@ -565,7 +565,13 @@ export default function InsurancePanel() {
 
   // Veículos da empresa SEM cobertura em NENHUMA apólice ativa
   const companyUncovered = useMemo(() => {
-    const activePolicyIds = new Set(policies.filter((p) => p.status === "ativa").map((p) => p.id));
+    const today = new Date();
+    const isVigente = (p: Policy) => {
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    };
+    const activePolicyIds = new Set(policies.filter(isVigente).map((p) => p.id));
     const coveredIds = new Set(
       links.filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
     );
