@@ -483,6 +483,10 @@ export default function InsurancePanel() {
   );
   const linkedVehicleIds = new Set(selectedLinks.map((l) => l.vehicle_id));
 
+  const policyIsAi = !!selectedPolicy?.ai_extracted
+    && typeof selectedPolicy.ai_extracted === "object"
+    && Object.keys(selectedPolicy.ai_extracted as object).length > 0;
+
   // === VALIDAÇÃO CRUZADA da apólice selecionada ===
   const validation = useMemo(() => {
     if (!selectedPolicy) return null;
@@ -738,6 +742,15 @@ export default function InsurancePanel() {
 
         {selectedPolicy && (
           <>
+            {policyIsAi && (
+              <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 flex items-start gap-2">
+                <Lock className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <div className="text-xs text-destructive font-medium">
+                  Apólice importada via IA — dados protegidos contra alteração.
+                  Vínculos de veículos não podem ser adicionados ou removidos manualmente.
+                </div>
+              </div>
+            )}
             {/* ====== PAINEL DE VALIDAÇÃO ====== */}
             {validation && (
               <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-3">
@@ -818,6 +831,7 @@ export default function InsurancePanel() {
                                   className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
                                   disabled={alreadyLinkedHere}
                                   onClick={() => linkVehicle(v.id, "manual")}
+                                  hidden={policyIsAi}
                                 >
                                   <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
                                 </Button>
@@ -905,7 +919,7 @@ export default function InsurancePanel() {
                           </Badge>
                         )}
                         <span className="text-[11px] text-muted-foreground">{format(new Date(l.included_at + "T00:00:00"), "dd/MM/yy")}</span>
-                        {l.inclusion_type === "manual" && (
+                        {l.inclusion_type === "manual" && !policyIsAi && (
                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => unlinkVehicle(l.id)}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
@@ -917,6 +931,7 @@ export default function InsurancePanel() {
               </div>
             </div>
 
+            {!policyIsAi && (
             <div className="border-t border-border pt-3">
               <div className="text-xs uppercase text-muted-foreground mb-2">Adicionar veículo</div>
               <div className="relative mb-2">
@@ -946,6 +961,7 @@ export default function InsurancePanel() {
                 Use <strong className="mx-1">Adendo</strong> para veículos incluídos após o fechamento da apólice.
               </div>
             </div>
+            )}
           </>
         )}
       </Card>
