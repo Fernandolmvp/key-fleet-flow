@@ -438,6 +438,12 @@ export default function InsurancePanel() {
 
   async function linkVehicle(vehicleId: string, type: "apolice" | "adendo" | "manual") {
     if (!selectedPolicyId || !currentCompanyId) return;
+    if (selectedPolicy && !!selectedPolicy.ai_extracted
+        && typeof selectedPolicy.ai_extracted === "object"
+        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+      toast.error("Apólice importada via IA — não é permitido vincular veículos manualmente.");
+      return;
+    }
     const r = await supabase.from("insurance_policy_vehicles").upsert({
       company_id: currentCompanyId,
       policy_id: selectedPolicyId,
@@ -452,6 +458,15 @@ export default function InsurancePanel() {
   }
 
   async function unlinkVehicle(linkId: string) {
+    const linkObj = links.find((l) => l.id === linkId);
+    if (linkObj) {
+      const pol = policies.find((p) => p.id === linkObj.policy_id);
+      if (pol && !!pol.ai_extracted && typeof pol.ai_extracted === "object"
+          && Object.keys(pol.ai_extracted as object).length > 0) {
+        toast.error("Apólice importada via IA — não é permitido remover vínculos.");
+        return;
+      }
+    }
     // capturar vehicle_id antes
     const { data: link } = await supabase
       .from("insurance_policy_vehicles").select("vehicle_id").eq("id", linkId).maybeSingle();
@@ -541,6 +556,12 @@ export default function InsurancePanel() {
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
+    if (selectedPolicy && !!selectedPolicy.ai_extracted
+        && typeof selectedPolicy.ai_extracted === "object"
+        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+      toast.error("Apólice importada via IA — vínculos são gerados automaticamente na importação.");
+      return;
+    }
     const toLink = validation.covered.filter((v) => !linkedVehicleIds.has(v.id));
     if (!toLink.length) { toast.info("Todos os veículos cobertos já estão vinculados."); return; }
     const rows = toLink.map((v) => ({
