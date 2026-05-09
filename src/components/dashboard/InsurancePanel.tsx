@@ -1035,38 +1035,50 @@ export default function InsurancePanel() {
               </div>
             )}
 
+            {(() => {
+              const aiLocked = !!form.ai_extracted && Object.keys(form.ai_extracted || {}).length > 0;
+              const lockedCls = aiLocked ? "bg-muted/40 cursor-not-allowed" : "";
+              const LockLabel = ({ children }: { children: React.ReactNode }) => (
+                <Label className="flex items-center gap-1">{children}{aiLocked && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
+              );
+              return (
             <div className="grid grid-cols-2 gap-3">
+              {aiLocked && (
+                <div className="col-span-2 text-[11px] text-muted-foreground bg-muted/20 border border-border rounded p-2 flex items-center gap-2">
+                  <Lock className="h-3 w-3" /> Os dados desta apólice foram extraídos do PDF pela IA e são somente leitura. Para alterá-los, importe uma nova apólice.
+                </div>
+              )}
               <div>
-                <Label>Número da apólice *</Label>
-                <Input value={form.policy_number || ""} onChange={(e) => setForm({ ...form, policy_number: e.target.value })} />
+                <LockLabel>Número da apólice *</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.policy_number || ""} onChange={(e) => setForm({ ...form, policy_number: e.target.value })} />
               </div>
               <div>
-                <Label>Seguradora *</Label>
-                <Input value={form.insurer_name || ""} onChange={(e) => setForm({ ...form, insurer_name: e.target.value })} />
+                <LockLabel>Seguradora *</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.insurer_name || ""} onChange={(e) => setForm({ ...form, insurer_name: e.target.value })} />
               </div>
               <div>
-                <Label>Telefone seguradora</Label>
-                <Input value={form.insurer_phone || ""} onChange={(e) => setForm({ ...form, insurer_phone: e.target.value })} />
+                <LockLabel>Telefone seguradora</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.insurer_phone || ""} onChange={(e) => setForm({ ...form, insurer_phone: e.target.value })} />
               </div>
               <div>
-                <Label>Email seguradora</Label>
-                <Input value={form.insurer_email || ""} onChange={(e) => setForm({ ...form, insurer_email: e.target.value })} />
+                <LockLabel>Email seguradora</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} value={form.insurer_email || ""} onChange={(e) => setForm({ ...form, insurer_email: e.target.value })} />
               </div>
               <div>
-                <Label>Início vigência</Label>
-                <Input type="date" value={form.start_date || ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+                <LockLabel>Início vigência</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="date" value={form.start_date || ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
               </div>
               <div>
-                <Label>Fim vigência</Label>
-                <Input type="date" value={form.end_date || ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+                <LockLabel>Fim vigência</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="date" value={form.end_date || ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
               </div>
               <div>
-                <Label>Prêmio total (R$)</Label>
-                <Input type="number" step="0.01" value={form.total_value ?? ""} onChange={(e) => setForm({ ...form, total_value: e.target.value ? parseFloat(e.target.value) : null })} />
+                <LockLabel>Prêmio total (R$)</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="number" step="0.01" value={form.total_value ?? ""} onChange={(e) => setForm({ ...form, total_value: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div>
-                <Label>Franquia (R$)</Label>
-                <Input type="number" step="0.01" value={form.deductible ?? ""} onChange={(e) => setForm({ ...form, deductible: e.target.value ? parseFloat(e.target.value) : null })} />
+                <LockLabel>Franquia (R$)</LockLabel>
+                <Input className={lockedCls} readOnly={aiLocked} type="number" step="0.01" value={form.deductible ?? ""} onChange={(e) => setForm({ ...form, deductible: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div className="col-span-2">
                 <Label>Corretor</Label>
@@ -1079,14 +1091,16 @@ export default function InsurancePanel() {
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label>Coberturas</Label>
-                <Textarea value={form.coverage_summary || ""} onChange={(e) => setForm({ ...form, coverage_summary: e.target.value })} />
+                <LockLabel>Coberturas</LockLabel>
+                <Textarea className={lockedCls} readOnly={aiLocked} value={form.coverage_summary || ""} onChange={(e) => setForm({ ...form, coverage_summary: e.target.value })} />
               </div>
               <div className="col-span-2">
                 <Label>Observações</Label>
                 <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
+              );
+            })()}
           </div>
 
           <DialogFooter>
