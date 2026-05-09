@@ -375,8 +375,17 @@ export default function InsurancePanel() {
       file_name: form.file_name || null,
       notes: form.notes || null,
       status: form.status || "ativa",
-      ai_extracted: { ...(form.ai_extracted || {}), plates: aiPlates, vehicles: aiVehicles },
     };
+    // ai_extracted: só preserva/grava se houver conteúdo real (vindo da IA).
+    // Apólice 100% manual fica com ai_extracted = {} para não disparar isAiPolicy().
+    const existingAi = (form.ai_extracted && typeof form.ai_extracted === "object") ? form.ai_extracted : {};
+    const hasExistingAi =
+      Object.keys(existingAi).some((k) => k !== "plates" && k !== "vehicles" && (existingAi as any)[k] != null);
+    if (hasExistingAi || aiPlates.length > 0 || aiVehicles.length > 0) {
+      payload.ai_extracted = { ...existingAi, plates: aiPlates, vehicles: aiVehicles };
+    } else {
+      payload.ai_extracted = {};
+    }
     let policyId = form.id;
     if (form.id) {
       const r = await supabase.from("insurance_policies").update(payload).eq("id", form.id);
