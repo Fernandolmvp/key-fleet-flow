@@ -764,6 +764,40 @@ export default function InsurancePanel() {
         })}
       </Card>
 
+      {/* RESUMO GERAL DA FROTA */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <div className="font-display font-bold">Resumo da frota</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
+          <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
+            <div className="text-xl font-bold text-emerald-400">{fleetSummary.coveredCount}</div>
+            <div className="text-[10px] uppercase text-emerald-400/80">Veículos cobertos</div>
+          </div>
+          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
+            <div className="text-xl font-bold text-amber-400">{fleetSummary.onlyInPolicyCount}</div>
+            <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
+          </div>
+          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
+            <div className="text-xl font-bold text-destructive">{fleetSummary.uncoveredCount}</div>
+            <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
+          </div>
+          <div className="rounded-md p-2 border bg-primary/10 border-primary/30">
+            <div className="text-xl font-bold text-primary">{fleetSummary.vigentes}</div>
+            <div className="text-[10px] uppercase text-primary/80">Apólices vigentes</div>
+          </div>
+          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
+            <div className="text-xl font-bold text-amber-400">{fleetSummary.vencendo30}</div>
+            <div className="text-[10px] uppercase text-amber-400/80">Vencendo em 30d</div>
+          </div>
+          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
+            <div className="text-xl font-bold text-destructive">{fleetSummary.vencidas}</div>
+            <div className="text-[10px] uppercase text-destructive/80">Vencidas</div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
