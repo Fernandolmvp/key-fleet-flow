@@ -483,6 +483,10 @@ export default function InsurancePanel() {
   );
   const linkedVehicleIds = new Set(selectedLinks.map((l) => l.vehicle_id));
 
+  const policyIsAi = !!selectedPolicy?.ai_extracted
+    && typeof selectedPolicy.ai_extracted === "object"
+    && Object.keys(selectedPolicy.ai_extracted as object).length > 0;
+
   // === VALIDAÇÃO CRUZADA da apólice selecionada ===
   const validation = useMemo(() => {
     if (!selectedPolicy) return null;
