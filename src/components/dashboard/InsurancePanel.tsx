@@ -752,9 +752,7 @@ export default function InsurancePanel() {
                       </Button>
                     )}
                     {(() => {
-                      const isAi = !!p.ai_extracted
-                        && typeof p.ai_extracted === "object"
-                        && Object.keys(p.ai_extracted as object).length > 0;
+                      const isAi = isAiPolicy(p);
                       if (isAi) {
                         return (
                           <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px] flex items-center gap-1 px-1.5 py-0.5">
@@ -764,6 +762,9 @@ export default function InsurancePanel() {
                       }
                       return (
                         <>
+                          <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 text-[10px] px-1.5 py-0.5">
+                            Manual
+                          </Badge>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
