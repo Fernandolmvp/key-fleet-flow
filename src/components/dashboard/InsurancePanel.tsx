@@ -841,6 +841,24 @@ export default function InsurancePanel() {
                         {format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy")} → {format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy")}
                       </div>
                     )}
+                    {(() => {
+                      const s = policyStats[p.id] || { covered: 0, onlyInPolicy: 0 };
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0.5">
+                            {s.covered} cobertos
+                          </Badge>
+                          {s.onlyInPolicy > 0 && (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0.5">
+                              {s.onlyInPolicy} s/ cadastro
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px] px-1.5 py-0.5">
+                            {fleetSummary.uncoveredCount} sem cobertura
+                          </Badge>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex flex-col gap-1">
                     {p.file_url && (
