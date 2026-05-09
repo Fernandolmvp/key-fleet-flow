@@ -75,6 +75,21 @@ function normId(s?: string | null): string {
   return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+/** Detecta se uma apólice veio de importação por IA.
+ *  ai_extracted vazio, ou só com plates/vehicles vazios, NÃO conta como IA. */
+function isAiPolicy(p: { ai_extracted?: any } | null | undefined): boolean {
+  const ex = p?.ai_extracted;
+  if (!ex || typeof ex !== "object") return false;
+  const platesLen = Array.isArray(ex.plates) ? ex.plates.length : 0;
+  const vehLen = Array.isArray(ex.vehicles) ? ex.vehicles.length : 0;
+  if (platesLen > 0 || vehLen > 0) return true;
+  const meaningful =
+    ex.policy_number || ex.insurer_name || ex.broker_name ||
+    ex.start_date || ex.end_date || ex.coverage_summary ||
+    ex.total_value != null || ex.deductible != null;
+  return !!meaningful;
+}
+
 /** Converte ArrayBuffer -> base64 sem estourar a stack em PDFs grandes. */
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -360,8 +375,17 @@ export default function InsurancePanel() {
       file_name: form.file_name || null,
       notes: form.notes || null,
       status: form.status || "ativa",
-      ai_extracted: { ...(form.ai_extracted || {}), plates: aiPlates, vehicles: aiVehicles },
     };
+    // ai_extracted: só preserva/grava se houver conteúdo real (vindo da IA).
+    // Apólice 100% manual fica com ai_extracted = {} para não disparar isAiPolicy().
+    const existingAi = (form.ai_extracted && typeof form.ai_extracted === "object") ? form.ai_extracted : {};
+    const hasExistingAi =
+      Object.keys(existingAi).some((k) => k !== "plates" && k !== "vehicles" && (existingAi as any)[k] != null);
+    if (hasExistingAi || aiPlates.length > 0 || aiVehicles.length > 0) {
+      payload.ai_extracted = { ...existingAi, plates: aiPlates, vehicles: aiVehicles };
+    } else {
+      payload.ai_extracted = {};
+    }
     let policyId = form.id;
     if (form.id) {
       const r = await supabase.from("insurance_policies").update(payload).eq("id", form.id);
@@ -438,9 +462,7 @@ export default function InsurancePanel() {
 
   async function linkVehicle(vehicleId: string, type: "apolice" | "adendo" | "manual") {
     if (!selectedPolicyId || !currentCompanyId) return;
-    if (selectedPolicy && !!selectedPolicy.ai_extracted
-        && typeof selectedPolicy.ai_extracted === "object"
-        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+    if (isAiPolicy(selectedPolicy)) {
       toast.error("Apólice importada via IA — não é permitido vincular veículos manualmente.");
       return;
     }
@@ -461,8 +483,7 @@ export default function InsurancePanel() {
     const linkObj = links.find((l) => l.id === linkId);
     if (linkObj) {
       const pol = policies.find((p) => p.id === linkObj.policy_id);
-      if (pol && !!pol.ai_extracted && typeof pol.ai_extracted === "object"
-          && Object.keys(pol.ai_extracted as object).length > 0) {
+      if (isAiPolicy(pol)) {
         toast.error("Apólice importada via IA — não é permitido remover vínculos.");
         return;
       }
@@ -498,9 +519,7 @@ export default function InsurancePanel() {
   );
   const linkedVehicleIds = new Set(selectedLinks.map((l) => l.vehicle_id));
 
-  const policyIsAi = !!selectedPolicy?.ai_extracted
-    && typeof selectedPolicy.ai_extracted === "object"
-    && Object.keys(selectedPolicy.ai_extracted as object).length > 0;
+  const policyIsAi = isAiPolicy(selectedPolicy);
 
   // === VALIDAÇÃO CRUZADA da apólice selecionada ===
   const validation = useMemo(() => {
@@ -553,12 +572,73 @@ export default function InsurancePanel() {
     return vehicles.filter((v) => !coveredIds.has(v.id));
   }, [vehicles, links, policies]);
 
+  // === RESUMO GERAL (todas as apólices) ===
+  const fleetSummary = useMemo(() => {
+    const today = new Date();
+    const isVigente = (p: Policy) => {
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    };
+    const activePolicies = policies.filter(isVigente);
+    const activeIds = new Set(activePolicies.map((p) => p.id));
+    const coveredVehicleIds = new Set(
+      links.filter((l) => activeIds.has(l.policy_id)).map((l) => l.vehicle_id)
+    );
+    // Placas presentes em ai_extracted das apólices ativas mas não cadastradas
+    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
+    const onlyInPolicy = new Set<string>();
+    activePolicies.forEach((p) => {
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((v: any) => v?.plate).filter(Boolean) : [];
+      plates.forEach((pl) => {
+        const norm = String(pl).toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (norm && !cadastradas.has(norm)) onlyInPolicy.add(norm);
+      });
+    });
+    let vencidas = 0, vencendo30 = 0, vigentes = 0;
+    policies.forEach((p) => {
+      if (p.status !== "ativa") return;
+      if (!p.end_date) { vigentes++; return; }
+      const d = differenceInDays(new Date(p.end_date + "T00:00:00"), today);
+      if (d < 0) vencidas++;
+      else if (d <= 30) { vencendo30++; vigentes++; }
+      else vigentes++;
+    });
+    return {
+      coveredCount: coveredVehicleIds.size,
+      onlyInPolicyCount: onlyInPolicy.size,
+      uncoveredCount: vehicles.filter((v) => !coveredVehicleIds.has(v.id)).length,
+      vigentes,
+      vencendo30,
+      vencidas,
+    };
+  }, [policies, links, vehicles]);
+
+  // === Estatísticas por apólice (para os cards) ===
+  const policyStats = useMemo(() => {
+    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
+    const map: Record<string, { covered: number; onlyInPolicy: number }> = {};
+    policies.forEach((p) => {
+      const linkedHere = links.filter((l) => l.policy_id === p.id);
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((v: any) => v?.plate).filter(Boolean) : [];
+      const onlyInPolicy = plates
+        .map((pl) => String(pl).toUpperCase().replace(/[^A-Z0-9]/g, ""))
+        .filter((pl) => pl && !cadastradas.has(pl)).length;
+      map[p.id] = { covered: linkedHere.length, onlyInPolicy };
+    });
+    return map;
+  }, [policies, links, vehicles]);
+
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
-    if (selectedPolicy && !!selectedPolicy.ai_extracted
-        && typeof selectedPolicy.ai_extracted === "object"
-        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+    if (isAiPolicy(selectedPolicy)) {
       toast.error("Apólice importada via IA — vínculos são gerados automaticamente na importação.");
       return;
     }
@@ -684,6 +764,40 @@ export default function InsurancePanel() {
         })}
       </Card>
 
+      {/* RESUMO GERAL DA FROTA */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <div className="font-display font-bold">Resumo da frota</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
+          <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
+            <div className="text-xl font-bold text-emerald-400">{fleetSummary.coveredCount}</div>
+            <div className="text-[10px] uppercase text-emerald-400/80">Veículos cobertos</div>
+          </div>
+          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
+            <div className="text-xl font-bold text-amber-400">{fleetSummary.onlyInPolicyCount}</div>
+            <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
+          </div>
+          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
+            <div className="text-xl font-bold text-destructive">{fleetSummary.uncoveredCount}</div>
+            <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
+          </div>
+          <div className="rounded-md p-2 border bg-primary/10 border-primary/30">
+            <div className="text-xl font-bold text-primary">{fleetSummary.vigentes}</div>
+            <div className="text-[10px] uppercase text-primary/80">Apólices vigentes</div>
+          </div>
+          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
+            <div className="text-xl font-bold text-amber-400">{fleetSummary.vencendo30}</div>
+            <div className="text-[10px] uppercase text-amber-400/80">Vencendo em 30d</div>
+          </div>
+          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
+            <div className="text-xl font-bold text-destructive">{fleetSummary.vencidas}</div>
+            <div className="text-[10px] uppercase text-destructive/80">Vencidas</div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
@@ -727,6 +841,24 @@ export default function InsurancePanel() {
                         {format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy")} → {format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy")}
                       </div>
                     )}
+                    {(() => {
+                      const s = policyStats[p.id] || { covered: 0, onlyInPolicy: 0 };
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0.5">
+                            {s.covered} cobertos
+                          </Badge>
+                          {s.onlyInPolicy > 0 && (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0.5">
+                              {s.onlyInPolicy} s/ cadastro
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px] px-1.5 py-0.5">
+                            {fleetSummary.uncoveredCount} sem cobertura
+                          </Badge>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex flex-col gap-1">
                     {p.file_url && (
@@ -735,9 +867,7 @@ export default function InsurancePanel() {
                       </Button>
                     )}
                     {(() => {
-                      const isAi = !!p.ai_extracted
-                        && typeof p.ai_extracted === "object"
-                        && Object.keys(p.ai_extracted as object).length > 0;
+                      const isAi = isAiPolicy(p);
                       if (isAi) {
                         return (
                           <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px] flex items-center gap-1 px-1.5 py-0.5">
@@ -747,6 +877,9 @@ export default function InsurancePanel() {
                       }
                       return (
                         <>
+                          <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 text-[10px] px-1.5 py-0.5">
+                            Manual
+                          </Badge>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -820,11 +953,14 @@ export default function InsurancePanel() {
                 </div>
 
                 {/* Diagnóstico */}
-                {validation.hasAi ? (
+                {(() => {
+                  // Para apólice manual, "cobertos" = vínculos manuais; para IA, = matches da IA.
+                  const coveredCount = validation.hasAi ? validation.covered.length : selectedLinks.length;
+                  return (
                   <>
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
-                        <div className="text-lg font-bold text-emerald-400">{validation.covered.length}</div>
+                        <div className="text-lg font-bold text-emerald-400">{coveredCount}</div>
                         <div className="text-[10px] uppercase text-emerald-400/80">Cobertos & cadastrados</div>
                       </div>
                       <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
@@ -837,7 +973,7 @@ export default function InsurancePanel() {
                       </div>
                     </div>
 
-                    {validation.covered.length > 0 && !policyIsAi && (
+                    {validation.hasAi && validation.covered.length > 0 && !policyIsAi && (
                       <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
                         <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
                       </Button>
@@ -922,12 +1058,8 @@ export default function InsurancePanel() {
                     )}
 
                   </>
-                ) : (
-                  <div className="text-xs text-muted-foreground rounded-md border border-dashed border-border p-3 text-center">
-                    Nenhuma análise de IA disponível para esta apólice.
-                    {selectedPolicy.file_url && " Abra a edição e clique em 'Reanalisar com IA'."}
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
@@ -1144,7 +1276,7 @@ export default function InsurancePanel() {
             )}
 
             {(() => {
-              const aiLocked = !!form.ai_extracted && Object.keys(form.ai_extracted || {}).length > 0;
+              const aiLocked = isAiPolicy(form as any);
               const lockedCls = aiLocked ? "bg-muted/40 cursor-not-allowed" : "";
               const LockLabel = ({ children }: { children: React.ReactNode }) => (
                 <Label className="flex items-center gap-1">{children}{aiLocked && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
