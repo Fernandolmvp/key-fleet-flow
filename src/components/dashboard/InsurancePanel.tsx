@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
 type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
-type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; vehicle_type: string | null };
 type AiVehicle = {
   plate: string;
   brand?: string | null;
@@ -198,7 +198,7 @@ export default function InsurancePanel() {
     const [p, b, v, l] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
-      supabase.from("vehicles").select("id,plate,brand,model,status,chassis").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,status,chassis,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
     ]);
     if (p.error) toast.error(p.error.message);
@@ -525,6 +525,15 @@ export default function InsurancePanel() {
     return { aiPl, aiVehByPlate, covered, onlyInPolicy, linkedNotInAi, notCovered, sumIS, sumPremium, hasAi: aiPl.length > 0 };
   }, [selectedPolicy, vehicles, selectedLinks, linkedVehicleIds]);
 
+  // Veículos da empresa SEM cobertura em NENHUMA apólice ativa
+  const companyUncovered = useMemo(() => {
+    const activePolicyIds = new Set(policies.filter((p) => p.status === "ativa").map((p) => p.id));
+    const coveredIds = new Set(
+      links.filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
+    );
+    return vehicles.filter((v) => !coveredIds.has(v.id));
+  }, [vehicles, links, policies]);
+
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
@@ -774,8 +783,8 @@ export default function InsurancePanel() {
                         <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
                       </div>
                       <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
-                        <div className="text-lg font-bold text-destructive">{validation.linkedNotInAi.length}</div>
-                        <div className="text-[10px] uppercase text-destructive/80">Vinculados s/ cobertura</div>
+                        <div className="text-lg font-bold text-destructive">{companyUncovered.length}</div>
+                        <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
                       </div>
                     </div>
 
@@ -783,6 +792,43 @@ export default function InsurancePanel() {
                       <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
                         <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
                       </Button>
+                    )}
+
+                    {companyUncovered.length > 0 && (
+                      <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3">
+                        <div className="text-sm font-bold text-destructive flex items-center gap-2 mb-2 uppercase tracking-wide">
+                          <AlertTriangle className="h-4 w-4" />
+                          Veículos sem cobertura ({companyUncovered.length})
+                        </div>
+                        <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                          {companyUncovered.map((v) => {
+                            const alreadyLinkedHere = linkedVehicleIds.has(v.id);
+                            return (
+                              <div key={v.id} className="flex items-center justify-between gap-2 p-2 rounded border border-destructive/30 bg-background/40">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="font-mono font-bold text-destructive text-sm">{v.plate}</span>
+                                  <span className="text-xs text-muted-foreground truncate">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                                  {v.vehicle_type && (
+                                    <Badge variant="outline" className="text-[10px] h-5">{v.vehicle_type}</Badge>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
+                                  disabled={alreadyLinkedHere}
+                                  onClick={() => linkVehicle(v.id, "manual")}
+                                >
+                                  <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="text-[10px] text-destructive/80 mt-2">
+                          Vincule esses veículos a uma apólice para garantir cobertura.
+                        </div>
+                      </div>
                     )}
 
                     {validation.onlyInPolicy.length > 0 && (
@@ -824,21 +870,6 @@ export default function InsurancePanel() {
                       </div>
                     )}
 
-                    {validation.notCovered.length > 0 && (
-                      <details className="rounded-md border border-border bg-background/30 p-2">
-                        <summary className="text-xs font-medium cursor-pointer text-muted-foreground">
-                          {validation.notCovered.length} veículo(s) da empresa SEM cobertura nesta apólice
-                        </summary>
-                        <div className="space-y-1 max-h-40 overflow-y-auto mt-2">
-                          {validation.notCovered.map((v) => (
-                            <div key={v.id} className="flex items-center justify-between gap-2 text-[11px] py-0.5">
-                              <span className="font-mono">{v.plate}</span>
-                              <span className="text-muted-foreground truncate">{v.brand} {v.model}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    )}
                   </>
                 ) : (
                   <div className="text-xs text-muted-foreground rounded-md border border-dashed border-border p-3 text-center">
