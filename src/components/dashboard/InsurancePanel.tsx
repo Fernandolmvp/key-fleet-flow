@@ -615,6 +615,7 @@ export default function InsurancePanel() {
                       <div key={p.id} className="rounded-md border border-border bg-background/40 p-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                         <div><span className="text-muted-foreground">Seguradora:</span> <strong>{p.insurer_name}</strong></div>
                         <div><span className="text-muted-foreground">Apólice:</span> <span className="font-mono">#{p.policy_number}</span></div>
+                        <div className="flex items-center gap-1"><span className="text-muted-foreground">Tel. seguradora:</span> {p.insurer_phone ? (<span className="flex items-center gap-1"><Phone className="h-3 w-3" />{p.insurer_phone}</span>) : "—"}</div>
                         <div><span className="text-muted-foreground">Vigência:</span> {p.start_date ? format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy") : "—"} → {p.end_date ? format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy") : "—"}</div>
                         <div><Badge variant="outline" className={st.cls}>{st.label}</Badge></div>
                         <div><span className="text-muted-foreground">Corretor:</span> {broker?.name || "—"}</div>
