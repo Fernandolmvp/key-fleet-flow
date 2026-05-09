@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
 type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
-type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; vehicle_type: string | null };
 type AiVehicle = {
   plate: string;
   brand?: string | null;
@@ -198,7 +198,7 @@ export default function InsurancePanel() {
     const [p, b, v, l] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
-      supabase.from("vehicles").select("id,plate,brand,model,status,chassis").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,status,chassis,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
     ]);
     if (p.error) toast.error(p.error.message);
