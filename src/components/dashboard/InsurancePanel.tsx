@@ -525,6 +525,15 @@ export default function InsurancePanel() {
     return { aiPl, aiVehByPlate, covered, onlyInPolicy, linkedNotInAi, notCovered, sumIS, sumPremium, hasAi: aiPl.length > 0 };
   }, [selectedPolicy, vehicles, selectedLinks, linkedVehicleIds]);
 
+  // Veículos da empresa SEM cobertura em NENHUMA apólice ativa
+  const companyUncovered = useMemo(() => {
+    const activePolicyIds = new Set(policies.filter((p) => p.status === "ativa").map((p) => p.id));
+    const coveredIds = new Set(
+      links.filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
+    );
+    return vehicles.filter((v) => !coveredIds.has(v.id));
+  }, [vehicles, links, policies]);
+
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
