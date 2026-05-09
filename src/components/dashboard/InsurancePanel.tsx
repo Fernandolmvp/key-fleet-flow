@@ -780,11 +780,10 @@ export default function InsurancePanel() {
         {selectedPolicy && (
           <>
             {policyIsAi && (
-              <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 flex items-start gap-2">
-                <Lock className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <div className="text-xs text-destructive font-medium">
-                  Apólice importada via IA — dados protegidos contra alteração.
-                  Vínculos de veículos não podem ser adicionados ou removidos manualmente.
+              <div className="sticky top-0 z-10 rounded-lg border-2 border-destructive bg-destructive/15 p-3 flex items-center gap-2 shadow-md">
+                <Lock className="h-5 w-5 text-destructive shrink-0" />
+                <div className="text-sm text-destructive font-bold">
+                  🔒 Apólice importada via IA — nenhuma alteração permitida
                 </div>
               </div>
             )}
@@ -838,7 +837,7 @@ export default function InsurancePanel() {
                       </div>
                     </div>
 
-                    {validation.covered.length > 0 && (
+                    {validation.covered.length > 0 && !policyIsAi && (
                       <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
                         <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
                       </Button>
@@ -862,16 +861,17 @@ export default function InsurancePanel() {
                                     <Badge variant="outline" className="text-[10px] h-5">{v.vehicle_type}</Badge>
                                   )}
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
-                                  disabled={alreadyLinkedHere}
-                                  onClick={() => linkVehicle(v.id, "manual")}
-                                  hidden={policyIsAi}
-                                >
-                                  <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
-                                </Button>
+                                {!policyIsAi && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
+                                    disabled={alreadyLinkedHere}
+                                    onClick={() => linkVehicle(v.id, "manual")}
+                                  >
+                                    <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
+                                  </Button>
+                                )}
                               </div>
                             );
                           })}
