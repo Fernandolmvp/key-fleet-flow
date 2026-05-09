@@ -438,6 +438,12 @@ export default function InsurancePanel() {
 
   async function linkVehicle(vehicleId: string, type: "apolice" | "adendo" | "manual") {
     if (!selectedPolicyId || !currentCompanyId) return;
+    if (selectedPolicy && !!selectedPolicy.ai_extracted
+        && typeof selectedPolicy.ai_extracted === "object"
+        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+      toast.error("Apólice importada via IA — não é permitido vincular veículos manualmente.");
+      return;
+    }
     const r = await supabase.from("insurance_policy_vehicles").upsert({
       company_id: currentCompanyId,
       policy_id: selectedPolicyId,
@@ -452,6 +458,15 @@ export default function InsurancePanel() {
   }
 
   async function unlinkVehicle(linkId: string) {
+    const linkObj = links.find((l) => l.id === linkId);
+    if (linkObj) {
+      const pol = policies.find((p) => p.id === linkObj.policy_id);
+      if (pol && !!pol.ai_extracted && typeof pol.ai_extracted === "object"
+          && Object.keys(pol.ai_extracted as object).length > 0) {
+        toast.error("Apólice importada via IA — não é permitido remover vínculos.");
+        return;
+      }
+    }
     // capturar vehicle_id antes
     const { data: link } = await supabase
       .from("insurance_policy_vehicles").select("vehicle_id").eq("id", linkId).maybeSingle();
@@ -541,6 +556,12 @@ export default function InsurancePanel() {
   // Vincula em massa todas as placas da IA que estão cadastradas
   async function autoLinkAi() {
     if (!selectedPolicyId || !currentCompanyId || !validation) return;
+    if (selectedPolicy && !!selectedPolicy.ai_extracted
+        && typeof selectedPolicy.ai_extracted === "object"
+        && Object.keys(selectedPolicy.ai_extracted as object).length > 0) {
+      toast.error("Apólice importada via IA — vínculos são gerados automaticamente na importação.");
+      return;
+    }
     const toLink = validation.covered.filter((v) => !linkedVehicleIds.has(v.id));
     if (!toLink.length) { toast.info("Todos os veículos cobertos já estão vinculados."); return; }
     const rows = toLink.map((v) => ({
@@ -713,12 +734,28 @@ export default function InsurancePanel() {
                         <a href={p.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); removePolicy(p.id); }}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
+                    {(() => {
+                      const isAi = !!p.ai_extracted
+                        && typeof p.ai_extracted === "object"
+                        && Object.keys(p.ai_extracted as object).length > 0;
+                      if (isAi) {
+                        return (
+                          <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px] flex items-center gap-1 px-1.5 py-0.5">
+                            <Lock className="h-2.5 w-2.5" /> IA
+                          </Badge>
+                        );
+                      }
+                      return (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); removePolicy(p.id); }}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -743,11 +780,10 @@ export default function InsurancePanel() {
         {selectedPolicy && (
           <>
             {policyIsAi && (
-              <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 flex items-start gap-2">
-                <Lock className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <div className="text-xs text-destructive font-medium">
-                  Apólice importada via IA — dados protegidos contra alteração.
-                  Vínculos de veículos não podem ser adicionados ou removidos manualmente.
+              <div className="sticky top-0 z-10 rounded-lg border-2 border-destructive bg-destructive/15 p-3 flex items-center gap-2 shadow-md">
+                <Lock className="h-5 w-5 text-destructive shrink-0" />
+                <div className="text-sm text-destructive font-bold">
+                  🔒 Apólice importada via IA — nenhuma alteração permitida
                 </div>
               </div>
             )}
@@ -801,7 +837,7 @@ export default function InsurancePanel() {
                       </div>
                     </div>
 
-                    {validation.covered.length > 0 && (
+                    {validation.covered.length > 0 && !policyIsAi && (
                       <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
                         <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
                       </Button>
@@ -825,16 +861,17 @@ export default function InsurancePanel() {
                                     <Badge variant="outline" className="text-[10px] h-5">{v.vehicle_type}</Badge>
                                   )}
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
-                                  disabled={alreadyLinkedHere}
-                                  onClick={() => linkVehicle(v.id, "manual")}
-                                  hidden={policyIsAi}
-                                >
-                                  <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
-                                </Button>
+                                {!policyIsAi && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
+                                    disabled={alreadyLinkedHere}
+                                    onClick={() => linkVehicle(v.id, "manual")}
+                                  >
+                                    <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
+                                  </Button>
+                                )}
                               </div>
                             );
                           })}
