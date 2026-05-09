@@ -2220,6 +2220,7 @@ export type Database = {
           slug: string
           sort_order: number
           stripe_price_id: string | null
+          stripe_price_id_annual: string | null
           updated_at: string
           vehicle_limit: number | null
         }
@@ -2234,6 +2235,7 @@ export type Database = {
           slug: string
           sort_order?: number
           stripe_price_id?: string | null
+          stripe_price_id_annual?: string | null
           updated_at?: string
           vehicle_limit?: number | null
         }
@@ -2248,6 +2250,7 @@ export type Database = {
           slug?: string
           sort_order?: number
           stripe_price_id?: string | null
+          stripe_price_id_annual?: string | null
           updated_at?: string
           vehicle_limit?: number | null
         }
