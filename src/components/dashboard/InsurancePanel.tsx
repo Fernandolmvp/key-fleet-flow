@@ -41,6 +41,7 @@ type Policy = {
   total_value: number | null;
   deductible: number | null;
   coverage_summary: string | null;
+  coverage_type: string | null;
   file_url: string | null;
   file_name: string | null;
   notes: string | null;
@@ -57,6 +58,17 @@ type Link = {
 };
 
 const emptyPolicy: Partial<Policy> = { status: "ativa" };
+
+const COVERAGE_TYPES: { value: string; label: string }[] = [
+  { value: "compreensivo", label: "Compreensivo" },
+  { value: "terceiros", label: "Terceiros (RCF)" },
+  { value: "casco_total", label: "Casco Total" },
+  { value: "casco_parcial", label: "Casco Parcial" },
+  { value: "frota", label: "Frota" },
+  { value: "outro", label: "Outro" },
+];
+const coverageTypeLabel = (v?: string | null) =>
+  COVERAGE_TYPES.find((c) => c.value === v)?.label || null;
 
 /** Normaliza placa/chassi: maiúsculas e somente A-Z/0-9. */
 function normId(s?: string | null): string {
@@ -260,6 +272,7 @@ export default function InsurancePanel() {
         total_value: f.total_value ?? ex.total_value ?? null,
         deductible: f.deductible ?? ex.deductible ?? null,
         coverage_summary: f.coverage_summary || ex.coverage_summary || "",
+        coverage_type: f.coverage_type || (COVERAGE_TYPES.some((c) => c.value === ex.coverage_type) ? ex.coverage_type : null),
         ai_extracted: ex,
       }));
       // se IA retornou corretor e não existe, cria
@@ -342,6 +355,7 @@ export default function InsurancePanel() {
       total_value: form.total_value ?? null,
       deductible: form.deductible ?? null,
       coverage_summary: form.coverage_summary || null,
+      coverage_type: form.coverage_type || null,
       file_url: form.file_url || null,
       file_name: form.file_name || null,
       notes: form.notes || null,
@@ -624,6 +638,7 @@ export default function InsurancePanel() {
                           {broker?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{broker.email}</span>}
                         </div>
                         <div><span className="text-muted-foreground">Franquia:</span> {fmtBRL(p.deductible)}</div>
+                        <div><span className="text-muted-foreground">Tipo cobertura:</span> {coverageTypeLabel(p.coverage_type) || "—"}</div>
                         <div className="md:col-span-2"><span className="text-muted-foreground">Cobertura:</span> {p.coverage_summary || "—"}</div>
                       </div>
                     );
@@ -671,6 +686,7 @@ export default function InsurancePanel() {
                       <span className="text-xs text-muted-foreground flex items-center gap-1"><Truck className="h-3 w-3" /> {vCount} veíc.</span>
                       {broker && <span className="text-xs text-muted-foreground">Corretor: {broker.name}</span>}
                       {p.insurer_phone && <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{p.insurer_phone}</span>}
+                      {coverageTypeLabel(p.coverage_type) && <span className="text-xs text-muted-foreground">Tipo: {coverageTypeLabel(p.coverage_type)}</span>}
                     </div>
                     {p.start_date && p.end_date && (
                       <div className="text-[11px] text-muted-foreground mt-1">
@@ -1080,6 +1096,16 @@ export default function InsurancePanel() {
               <div>
                 <LockLabel>Franquia (R$)</LockLabel>
                 <Input className={lockedCls} readOnly={aiLocked} type="number" step="0.01" value={form.deductible ?? ""} onChange={(e) => setForm({ ...form, deductible: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div>
+                <LockLabel>Tipo de cobertura</LockLabel>
+                <Select value={form.coverage_type || "none"} onValueChange={(v) => !aiLocked && setForm({ ...form, coverage_type: v === "none" ? null : v })}>
+                  <SelectTrigger className={lockedCls} disabled={aiLocked}><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Não definido —</SelectItem>
+                    {COVERAGE_TYPES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="col-span-2">
                 <Label>Corretor</Label>
