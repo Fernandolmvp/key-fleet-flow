@@ -51,6 +51,45 @@ export default function Documents() {
   const [editing, setEditing] = useState<DocFormDoc | null>(null);
   const [prefill, setPrefill] = useState<Partial<DocFormDoc> | null>(null);
 
+  const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+
+  const vehiclesPending = useMemo(() => {
+    const vDocs = docs.filter((d) => d.entity_type === "vehicle");
+    let count = 0;
+    vehicles.forEach((v) => {
+      if (!vDocs.some((d) => d.entity_id === v.id)) count++;
+    });
+    vDocs.forEach((d) => {
+      if (!d.expires_at) return;
+      const exp = new Date(d.expires_at + "T00:00:00");
+      const diff = Math.ceil((exp.getTime() - today.getTime()) / 86400000);
+      if (diff < 0 || diff <= 30) count++;
+    });
+    return count;
+  }, [vehicles, docs, today]);
+
+  const driversPending = useMemo(() => {
+    const dDocs = docs.filter((d) => d.entity_type === "driver");
+    let count = 0;
+    drivers.forEach((dr) => {
+      const cnhDoc = dDocs.find((x) => x.entity_id === dr.id && x.doc_type === "cnh");
+      const cnhExp = cnhDoc?.expires_at || dr.cnh_expires_at;
+      if (!dr.cnh_number && !cnhDoc) {
+        count++;
+      } else if (cnhExp) {
+        const exp = new Date(cnhExp + "T00:00:00");
+        const diff = Math.ceil((exp.getTime() - today.getTime()) / 86400000);
+        if (diff < 0 || diff <= 30) count++;
+      }
+      if (dr.medical_exam_expires_at) {
+        const exp = new Date(dr.medical_exam_expires_at + "T00:00:00");
+        const diff = Math.ceil((exp.getTime() - today.getTime()) / 86400000);
+        if (diff < 0 || diff <= 30) count++;
+      }
+    });
+    return count;
+  }, [drivers, docs, today]);
+
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
@@ -116,8 +155,26 @@ export default function Documents() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
-          {canViewTab("vehicles") && <TabsTrigger value="vehicles" className="gap-2"><Truck className="h-4 w-4" /> Veículos</TabsTrigger>}
-          {canViewTab("drivers") && <TabsTrigger value="drivers" className="gap-2"><User className="h-4 w-4" /> Motoristas</TabsTrigger>}
+          {canViewTab("vehicles") && (
+            <TabsTrigger value="vehicles" className="gap-2">
+              <Truck className="h-4 w-4" /> Veículos
+              {vehiclesPending > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground">
+                  {vehiclesPending > 99 ? "99+" : vehiclesPending}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
+          {canViewTab("drivers") && (
+            <TabsTrigger value="drivers" className="gap-2">
+              <User className="h-4 w-4" /> Motoristas
+              {driversPending > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground">
+                  {driversPending > 99 ? "99+" : driversPending}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="vehicles" className="mt-4">
