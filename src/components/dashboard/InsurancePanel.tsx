@@ -408,6 +408,15 @@ export default function InsurancePanel() {
     const r = await supabase.from("insurance_policies").delete().eq("id", id);
     if (r.error) { toast.error(r.error.message); return; }
     if (currentCompanyId && vIds.length) await syncVehicleInsuranceFields(currentCompanyId, vIds);
+    if (currentCompanyId) {
+      await logAudit({
+        companyId: currentCompanyId,
+        table: "insurance_policies",
+        recordId: id,
+        action: "delete",
+        changes: { affected_vehicles: vIds.length },
+      });
+    }
     toast.success("Excluída");
     if (selectedPolicyId === id) setSelectedPolicyId(null);
     load();
