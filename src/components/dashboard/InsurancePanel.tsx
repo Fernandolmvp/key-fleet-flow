@@ -894,6 +894,7 @@ export default function InsurancePanel() {
           </>
         )}
       </Card>
+      </div>
 
       {/* DIALOG DE APÓLICE */}
       <Dialog open={policyDialog} onOpenChange={setPolicyDialog}>
