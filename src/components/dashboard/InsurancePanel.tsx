@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2 } from "lucide-react";
+import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
-type Broker = { id: string; name: string };
+type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
 type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null };
 type AiVehicle = {
   plate: string;
@@ -141,6 +141,25 @@ async function syncVehicleInsuranceFields(_companyId: string, vehicleIds: string
   return true;
 }
 
+/** Audit log helper para o módulo de seguros. */
+async function logAudit(params: {
+  companyId: string;
+  table: "insurance_policies" | "insurance_policy_vehicles";
+  recordId: string;
+  action: string;
+  changes?: Record<string, unknown>;
+}) {
+  const { data: u } = await supabase.auth.getUser();
+  await supabase.from("audit_logs").insert({
+    company_id: params.companyId,
+    table_name: params.table,
+    record_id: params.recordId,
+    action: params.action,
+    user_id: u?.user?.id || null,
+    changes: (params.changes as any) || {},
+  });
+}
+
 export default function InsurancePanel() {
   const { currentCompanyId } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -159,15 +178,16 @@ export default function InsurancePanel() {
   const [reextracting, setReextracting] = useState(false);
 
   const [vehicleSearch, setVehicleSearch] = useState("");
+  const [globalSearch, setGlobalSearch] = useState("");
 
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
     const [p, b, v, l] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
-      supabase.from("insurance_brokers").select("id,name").eq("company_id", currentCompanyId).eq("active", true).order("name"),
+      supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
       supabase.from("vehicles").select("id,plate,brand,model,status,chassis").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
-      supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId),
+      supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
     ]);
     if (p.error) toast.error(p.error.message);
     setPolicies((p.data as any[]) || []);
@@ -413,9 +433,22 @@ export default function InsurancePanel() {
     const { data: link } = await supabase
       .from("insurance_policy_vehicles").select("vehicle_id").eq("id", linkId).maybeSingle();
     const vehicleId = (link as any)?.vehicle_id;
-    const r = await supabase.from("insurance_policy_vehicles").delete().eq("id", linkId);
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await supabase
+      .from("insurance_policy_vehicles")
+      .update({ removed_at: today })
+      .eq("id", linkId);
     if (r.error) { toast.error(r.error.message); return; }
     if (currentCompanyId && vehicleId) await syncVehicleInsuranceFields(currentCompanyId, [vehicleId]);
+    if (currentCompanyId) {
+      await logAudit({
+        companyId: currentCompanyId,
+        table: "insurance_policy_vehicles",
+        recordId: linkId,
+        action: "soft_delete",
+        changes: { vehicle_id: vehicleId, removed_at: today },
+      });
+    }
     toast.success("Vínculo removido");
     load();
   }
