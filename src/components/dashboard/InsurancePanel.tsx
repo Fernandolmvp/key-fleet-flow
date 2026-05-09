@@ -74,6 +74,25 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
   return btoa(binary);
 }
 
+/** Normaliza nome de arquivo: sem acentos, minúsculas, espaços→underline, mantém extensão. */
+function normalizeFileName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot + 1) : "";
+  const clean = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .toLowerCase()
+      .replace(/\s+/g, "_")            // espaços → _
+      .replace(/[^a-z0-9._-]/g, "_")   // caracteres não permitidos → _
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  const baseClean = clean(base) || "arquivo";
+  const extClean = clean(ext);
+  return extClean ? `${baseClean}.${extClean}` : baseClean;
+}
+
 type MatchStatus = "linked" | "not_found" | "mismatch";
 type MatchResult = {
   ai: AiVehicle;
@@ -173,11 +192,12 @@ export default function InsurancePanel() {
     if (!currentCompanyId) return;
     setUploading(true);
     try {
-      const path = `${currentCompanyId}/${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
+      const safeName = normalizeFileName(file.name);
+      const path = `${currentCompanyId}/${Date.now()}-${safeName}`;
       const up = await supabase.storage.from("insurance-policies").upload(path, file, { upsert: false });
       if (up.error) throw up.error;
       const { data: signed } = await supabase.storage.from("insurance-policies").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
-      setForm((f) => ({ ...f, file_url: signed?.signedUrl || path, file_name: file.name }));
+      setForm((f) => ({ ...f, file_url: signed?.signedUrl || path, file_name: safeName }));
       toast.success("PDF enviado");
       // tenta extrair com IA
       await extractWithAI(file);
