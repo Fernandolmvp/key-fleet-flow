@@ -948,57 +948,77 @@ export default function InsurancePanel() {
               )}
             </div>
 
-            {aiVehicles.length > 0 ? (
-              <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
-                <div className="text-xs font-medium mb-2 flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" /> Revisão da apólice ({aiVehicles.length} veículo(s))
+            {aiVehicles.length > 0 ? (() => {
+              const matches = aiVehicles.map((v) => matchAiVehicle(v, vehicles));
+              const linkedM = matches.filter((m) => m.status === "linked");
+              const mismatchM = matches.filter((m) => m.status === "mismatch");
+              const notFoundM = matches.filter((m) => m.status === "not_found");
+              return (
+                <div className="space-y-3">
+                  <div className="text-xs font-medium flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-primary" /> Resultado da importação ({aiVehicles.length} veículo(s))
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* QUADRANTE 1 — VINCULADOS */}
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <div className="text-xs font-bold text-emerald-400 mb-2 flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Vinculados ({linkedM.length})
+                      </div>
+                      {linkedM.length === 0 ? (
+                        <div className="text-[11px] text-muted-foreground">Nenhum veículo da apólice foi encontrado no cadastro.</div>
+                      ) : (
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {linkedM.map((m) => (
+                            <div key={m.ai.plate} className="flex items-center justify-between gap-2 text-[11px] p-1.5 rounded bg-background/40">
+                              <span className="font-mono font-bold text-emerald-400">{m.vehicle!.plate}</span>
+                              <span className="text-muted-foreground truncate">{[m.vehicle!.brand, m.vehicle!.model].filter(Boolean).join(" ") || "—"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-muted-foreground mt-2">Serão vinculados automaticamente ao salvar.</div>
+                    </div>
+                    {/* QUADRANTE 2 — NÃO ENCONTRADOS */}
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                      <div className="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Não encontrados ({notFoundM.length})
+                      </div>
+                      {notFoundM.length === 0 ? (
+                        <div className="text-[11px] text-muted-foreground">Todos os veículos da apólice estão cadastrados.</div>
+                      ) : (
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {notFoundM.map((m) => (
+                            <div key={m.ai.plate} className="text-[11px] p-1.5 rounded bg-background/40">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono font-bold text-amber-400">{m.ai.plate || "—"}</span>
+                                <span className="text-muted-foreground truncate">{[m.ai.brand, m.ai.model, m.ai.year].filter(Boolean).join(" ") || "—"}</span>
+                              </div>
+                              {m.ai.chassis && <div className="font-mono text-[10px] text-muted-foreground">Chassi: {m.ai.chassis}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-amber-400/80 mt-2">Esses veículos vieram na apólice mas não existem no cadastro. Cadastre-os manualmente para vinculá-los.</div>
+                    </div>
+                  </div>
+                  {mismatchM.length > 0 && (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                      <div className="text-xs font-bold text-destructive mb-2 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Inconsistência placa × chassi ({mismatchM.length})
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {mismatchM.map((m) => (
+                          <div key={m.ai.plate} className="text-[11px] p-1.5 rounded bg-background/40">
+                            <div className="font-mono font-bold text-destructive">{m.ai.plate}</div>
+                            <div className="text-muted-foreground">{m.reason}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="max-h-56 overflow-y-auto rounded border border-border bg-background/40">
-                  <table className="w-full text-[11px]">
-                    <thead className="bg-muted/40 sticky top-0">
-                      <tr>
-                        <th className="text-left p-1.5">Placa</th>
-                        <th className="text-left p-1.5">Chassi</th>
-                        <th className="text-left p-1.5">Veículo</th>
-                        <th className="text-center p-1.5">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {aiVehicles.map((v) => {
-                        const m = matchAiVehicle(v, vehicles);
-                        return (
-                          <tr key={v.plate} className="border-t border-border">
-                            <td className="p-1.5 font-mono font-bold">{v.plate}</td>
-                            <td className="p-1.5 font-mono text-muted-foreground truncate max-w-[120px]" title={v.chassis || ""}>
-                              {v.chassis || "—"}
-                            </td>
-                            <td className="p-1.5 text-muted-foreground">
-                              {[v.brand, v.model, v.year].filter(Boolean).join(" ") || "—"}
-                            </td>
-                            <td className="p-1.5 text-center">
-                              {m.status === "linked" && (
-                                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">VINCULADO</Badge>
-                              )}
-                              {m.status === "not_found" && (
-                                <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">NÃO ENCONTRADO</Badge>
-                              )}
-                              {m.status === "mismatch" && (
-                                <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]" title={m.reason}>INCONSISTÊNCIA</Badge>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-2">
-                  <span className="text-emerald-400">VINCULADO</span> será criado em <code>insurance_policy_vehicles</code> ao salvar.{" "}
-                  <span className="text-amber-400">NÃO ENCONTRADO</span> = placa/chassi da apólice não existe no cadastro — cadastre o veículo depois.{" "}
-                  <span className="text-destructive">INCONSISTÊNCIA</span> = placa e chassi divergem entre apólice e cadastro — revise manualmente antes de salvar.
-                </div>
-              </div>
-            ) : aiPlates.length > 0 && (
+              );
+            })() : aiPlates.length > 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
                 <div className="text-xs font-medium mb-1 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Placas identificadas pela IA</div>
                 <div className="flex flex-wrap gap-1">
