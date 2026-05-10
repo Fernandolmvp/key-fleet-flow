@@ -1577,16 +1577,25 @@ export default function InsurancePanel() {
         </div>
       </Card>
 
-        {/* ===================== TAB 1 — ASSEGURADOS ===================== */}
-        <TabsContent value="assegurados" className="space-y-4 mt-0">
-      {/* COLUNA ESQUERDA — Apólices */}
+        {/* ===================== TAB 1 — APÓLICES ===================== */}
+        <TabsContent value="apolices" className="space-y-4 mt-0">
       <Card className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="font-display font-bold flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Apólices da frota</div>
-            <div className="text-xs text-muted-foreground">Suba o PDF — a IA extrai dados, corretor e placas cobertas.</div>
+            <div className="text-xs text-muted-foreground">Suba o PDF — a IA extrai dados, corretor e placas cobertas. Clique num card para expandir.</div>
           </div>
           <Button onClick={openNew}><Plus className="h-4 w-4" /> Nova apólice</Button>
+        </div>
+
+        <div className="relative">
+          <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9 h-9"
+            placeholder="Filtrar por seguradora, nº da apólice ou corretor..."
+            value={policySearch}
+            onChange={(e) => setPolicySearch(e.target.value)}
+          />
         </div>
 
         <div className="space-y-2 max-h-[800px] overflow-y-auto">
@@ -1594,7 +1603,14 @@ export default function InsurancePanel() {
           {!loading && policies.length === 0 && (
             <div className="text-sm text-muted-foreground py-8 text-center">Nenhuma apólice cadastrada.</div>
           )}
-          {policies.map((p) => {
+          {policies
+            .filter((p) => {
+              const q = policySearch.trim().toLowerCase();
+              if (!q) return true;
+              const broker = brokers.find((b) => b.id === p.broker_id);
+              return [p.insurer_name, p.policy_number, broker?.name].filter(Boolean).join(" ").toLowerCase().includes(q);
+            })
+            .map((p) => {
             const st = policyStatus(p);
             const broker = brokers.find((b) => b.id === p.broker_id);
             const vCount = links.filter((l) => l.policy_id === p.id).length;
