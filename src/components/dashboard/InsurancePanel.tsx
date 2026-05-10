@@ -828,24 +828,25 @@ export default function InsurancePanel() {
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-primary" />
           <div className="font-display font-bold">Resumo da frota</div>
+          <div className="text-[10px] text-muted-foreground ml-auto">Clique nos cards para filtrar</div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
-          <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
+          <button type="button" onClick={() => { setActiveTab("assegurados"); setAssuredFilter("all"); }} className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left">
             <div className="text-xl font-bold text-emerald-400">{fleetSummary.coveredCount}</div>
             <div className="text-[10px] uppercase text-emerald-400/80">Veículos cobertos</div>
-          </div>
+          </button>
           <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
             <div className="text-xl font-bold text-amber-400">{fleetSummary.onlyInPolicyCount}</div>
             <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
           </div>
-          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
+          <button type="button" onClick={() => setActiveTab("sem-cobertura")} className="rounded-md p-2 border bg-destructive/10 border-destructive/30 hover:bg-destructive/20 transition-colors text-left">
             <div className="text-xl font-bold text-destructive">{fleetSummary.uncoveredCount}</div>
             <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
-          </div>
-          <div className="rounded-md p-2 border bg-primary/10 border-primary/30">
+          </button>
+          <button type="button" onClick={() => setActiveTab("assegurados")} className="rounded-md p-2 border bg-primary/10 border-primary/30 hover:bg-primary/20 transition-colors text-left">
             <div className="text-xl font-bold text-primary">{fleetSummary.vigentes}</div>
             <div className="text-[10px] uppercase text-primary/80">Apólices vigentes</div>
-          </div>
+          </button>
           <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
             <div className="text-xl font-bold text-amber-400">{fleetSummary.vencendo30}</div>
             <div className="text-[10px] uppercase text-amber-400/80">Vencendo em 30d</div>
@@ -857,7 +858,79 @@ export default function InsurancePanel() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* ABAS PRINCIPAIS */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="assegurados" className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Veículos Assegurados
+            <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 ml-1">
+              {fleetSummary.coveredCount}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="sem-cobertura" className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            Sem Cobertura
+            <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 ml-1">
+              {companyUncovered.length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ===================== TAB 1 — ASSEGURADOS ===================== */}
+        <TabsContent value="assegurados" className="space-y-4 mt-0">
+          {/* Lista de veículos assegurados com filtro por apólice */}
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                <div className="font-display font-bold">Veículos cobertos por apólice vigente</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Select value={assuredFilter} onValueChange={setAssuredFilter}>
+                  <SelectTrigger className="h-8 min-w-[220px]">
+                    <SelectValue placeholder="Filtrar por apólice..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as apólices</SelectItem>
+                    {policies.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.insurer_name} · #{p.policy_number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1 max-h-[340px] overflow-y-auto">
+              {assuredVehicles.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-8 text-center">
+                  Nenhum veículo assegurado {assuredFilter !== "all" ? "nesta apólice" : "encontrado"}.
+                </div>
+              ) : (
+                assuredVehicles.map(({ vehicle, policy }) => {
+                  const st = policyStatus(policy);
+                  return (
+                    <div key={`${vehicle.id}-${policy.id}`} className="flex items-center justify-between gap-2 p-2 rounded border border-border bg-muted/10 hover:bg-muted/20">
+                      <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
+                        <span className="font-mono font-bold text-primary">{vehicle.plate}</span>
+                        <span className="text-xs text-muted-foreground truncate">{[vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "—"}</span>
+                        <span className="text-xs text-muted-foreground">·</span>
+                        <span className="text-xs">{policy.insurer_name} <span className="font-mono text-muted-foreground">#{policy.policy_number}</span></span>
+                        <Badge variant="outline" className={st.cls + " text-[10px]"}>{st.label}</Badge>
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-7" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(policy.id); }}>
+                        <ExternalLink className="h-3 w-3" /> Ver apólice
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -912,9 +985,6 @@ export default function InsurancePanel() {
                               {s.onlyInPolicy} s/ cadastro
                             </Badge>
                           )}
-                          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px] px-1.5 py-0.5">
-                            {fleetSummary.uncoveredCount} sem cobertura
-                          </Badge>
                         </div>
                       );
                     })()}
@@ -963,6 +1033,9 @@ export default function InsurancePanel() {
           {selectedPolicy ? (
             <div className="text-xs text-muted-foreground">
               {selectedPolicy.insurer_name} · #{selectedPolicy.policy_number}
+              <Badge variant="outline" className={"ml-2 text-[10px] " + (policyIsAi ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-primary/15 text-primary border-primary/30")}>
+                {policyIsAi ? "IA" : "Manual"}
+              </Badge>
             </div>
           ) : (
             <div className="text-xs text-muted-foreground">Selecione uma apólice à esquerda.</div>
@@ -1125,7 +1198,11 @@ export default function InsurancePanel() {
             <div>
               <div className="text-xs uppercase text-muted-foreground mb-2">Já vinculados ({selectedLinks.length})</div>
               <div className="space-y-1 max-h-60 overflow-y-auto">
-                {selectedLinks.length === 0 && <div className="text-xs text-muted-foreground py-2">Nenhum veículo vinculado ainda.</div>}
+                {selectedLinks.length === 0 && (
+                  <div className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
+                    Nenhum veículo vinculado a esta apólice ainda.
+                  </div>
+                )}
                 {selectedLinks.map((l) => {
                   const v = vehicles.find((x) => x.id === l.vehicle_id);
                   return (
@@ -1160,21 +1237,26 @@ export default function InsurancePanel() {
             </div>
 
             {!policyIsAi && (
-            <div className="border-t border-border pt-3">
-              <div className="text-xs uppercase text-muted-foreground mb-2">Adicionar veículo</div>
+            <div className="mt-4 pt-4 border-t-2 border-dashed border-border">
+              <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-2">
+                <Plus className="h-3.5 w-3.5" /> Adicionar veículo (somente sem cobertura ativa)
+              </div>
               <div className="relative mb-2">
                 <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input className="pl-9 h-9" placeholder="Placa, marca ou modelo..." value={vehicleSearch} onChange={(e) => setVehicleSearch(e.target.value)} />
               </div>
               <div className="space-y-1 max-h-72 overflow-y-auto">
                 {(() => {
+                  // Apenas veículos SEM cobertura ativa em qualquer apólice
                   const uncoveredIds = new Set(companyUncovered.map((x) => x.id));
                   const list = filteredVehicles.filter(
-                    (v) => !linkedVehicleIds.has(v.id) && !uncoveredIds.has(v.id),
+                    (v) => !linkedVehicleIds.has(v.id) && uncoveredIds.has(v.id),
                   );
                   if (list.length === 0) {
                     return (
-                      <div className="text-xs text-muted-foreground py-2 text-center">Nenhum veículo disponível.</div>
+                      <div className="text-xs text-muted-foreground py-2 text-center">
+                        Nenhum veículo sem cobertura disponível para vincular.
+                      </div>
                     );
                   }
                   return list.map((v) => (
@@ -1194,14 +1276,105 @@ export default function InsurancePanel() {
               </div>
               <div className="text-[11px] text-muted-foreground mt-2 flex items-start gap-1">
                 <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                Use <strong className="mx-1">Adendo</strong> para veículos incluídos após o fechamento da apólice.
+                Veículos já cobertos por outra apólice vigente não aparecem aqui — vá em "Sem Cobertura" para revisar.
               </div>
             </div>
             )}
           </>
         )}
       </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        {/* ===================== TAB 2 — SEM COBERTURA ===================== */}
+        <TabsContent value="sem-cobertura" className="mt-0">
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              <div>
+                <div className="font-display font-bold">Veículos sem cobertura</div>
+                <div className="text-xs text-muted-foreground">
+                  {companyUncovered.length === 0
+                    ? "Toda a frota possui apólice vigente."
+                    : `${companyUncovered.length} veículo(s) ativos da frota sem nenhuma apólice vigente.`}
+                </div>
+              </div>
+            </div>
+            {companyUncovered.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-10 text-center border border-dashed border-border rounded-lg">
+                ✓ Nenhum veículo sem cobertura.
+              </div>
+            ) : (
+              <div className="space-y-1 max-h-[600px] overflow-y-auto">
+                {companyUncovered.map((v) => (
+                  <div key={v.id} className="flex items-center justify-between gap-2 p-2 rounded border border-destructive/30 bg-destructive/5">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
+                      <span className="font-mono font-bold text-destructive">{v.plate}</span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {[v.brand, v.model].filter(Boolean).join(" ") || "—"}
+                      </span>
+                      {v.vehicle_type && <Badge variant="outline" className="text-[10px] h-5">{v.vehicle_type}</Badge>}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
+                      onClick={() => {
+                        setAddToPolicyVehicleId(v.id);
+                        setAddToPolicyTargetId(manualPolicies[0]?.id || "");
+                      }}
+                    >
+                      <Link2 className="h-3 w-3" /> Adicionar à apólice
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* DIALOG — adicionar veículo a uma apólice (Tab 2) */}
+      <Dialog open={!!addToPolicyVehicleId} onOpenChange={(o) => { if (!o) { setAddToPolicyVehicleId(null); setAddToPolicyTargetId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Adicionar veículo a uma apólice</DialogTitle></DialogHeader>
+          {(() => {
+            const v = vehicles.find((x) => x.id === addToPolicyVehicleId);
+            return v ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2 rounded border border-border bg-muted/20">
+                  <Truck className="h-4 w-4 text-primary" />
+                  <span className="font-mono font-bold text-primary">{v.plate}</span>
+                  <span className="text-xs text-muted-foreground truncate">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                </div>
+                <div>
+                  <Label>Apólice de destino (somente manuais)</Label>
+                  <Select value={addToPolicyTargetId} onValueChange={setAddToPolicyTargetId}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar apólice..." /></SelectTrigger>
+                    <SelectContent>
+                      {manualPolicies.length === 0 && (
+                        <SelectItem value="none" disabled>Nenhuma apólice manual cadastrada</SelectItem>
+                      )}
+                      {manualPolicies.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.insurer_name} · #{p.policy_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Apólices importadas via IA não permitem vínculo manual. Crie uma nova apólice se necessário.
+                  </div>
+                </div>
+              </div>
+            ) : null;
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddToPolicyVehicleId(null); setAddToPolicyTargetId(""); }}>Cancelar</Button>
+            <Button onClick={addVehicleToPolicy} disabled={!addToPolicyTargetId || manualPolicies.length === 0}>Vincular</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* DIALOG DE APÓLICE */}
       <Dialog open={policyDialog} onOpenChange={setPolicyDialog}>
