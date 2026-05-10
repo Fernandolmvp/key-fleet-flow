@@ -34,7 +34,7 @@ export default function CreditosIATab({ companyId }: Props) {
           .from("subscriptions")
           .select("plan_id, plans(tokens_monthly)")
           .eq("company_id", companyId)
-          .in("status", ["active", "trialing", "past_due"])
+          .in("status", ["ativa", "atrasada", "aguardando_pagamento"])
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
