@@ -1,5 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -14,8 +13,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  ShieldCheck, Building2, Search, DollarSign, Users, Truck, AlertTriangle,
-  CheckCircle2, XCircle, Pencil, Receipt, Loader2, ArrowLeft, Layers, ChevronDown, ChevronRight
+  Building2, Search, DollarSign, Users, Truck, AlertTriangle,
+  CheckCircle2, Pencil, Receipt, Loader2, Layers, ChevronDown, ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 import CompanyMembersDialog from "./CompanyMembersDialog";
@@ -57,8 +56,7 @@ const fmtBRL = (v: number | null | undefined) =>
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString("pt-BR") : "—";
 
-export default function SuperAdmin() {
-  const { user, loading: authLoading, isSuperAdmin, signOut } = useAuth();
+export default function CompaniesPanel() {
   const [items, setItems] = useState<Usage[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,11 +101,7 @@ export default function SuperAdmin() {
     setLoading(false);
   };
 
-  useEffect(() => { if (isSuperAdmin) load(); }, [isSuperAdmin]);
-
-  if (authLoading) return <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
-  if (!user) return <Navigate to="/login" replace />;
-  if (!isSuperAdmin) return <Navigate to="/super-admin/ativar" replace />;
+  useEffect(() => { load(); }, []);
 
   const byTab = items.filter((i) => {
     if (tab === "todas") return true;
@@ -156,24 +150,7 @@ export default function SuperAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="h-16 border-b border-border bg-background-elevated/50 backdrop-blur flex items-center justify-between px-6">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <div>
-            <div className="font-display font-bold">Super Admin</div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-widest">SaaS Control</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => window.location.href = "/app"}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Voltar ao app
-          </Button>
-          <Button variant="ghost" size="sm" onClick={signOut}>Sair</Button>
-        </div>
-      </header>
-
-      <main className="p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
         {/* KPIs */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <KPI icon={DollarSign} label="MRR" value={fmtBRL(mrr)} accent="text-success" />
@@ -363,7 +340,6 @@ export default function SuperAdmin() {
           onClose={() => setMembersOf(null)}
         />
         <GroupInfoDialog groupId={groupInfo} onClose={() => setGroupInfo(null)} />
-      </main>
     </div>
   );
 }
