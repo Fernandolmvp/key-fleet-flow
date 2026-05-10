@@ -1142,50 +1142,6 @@ export default function InsurancePanel() {
               </div>
             </div>
 
-            {!policyIsAi && (
-            <div className="mt-4 pt-4 border-t-2 border-dashed border-border">
-              <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-2">
-                <Plus className="h-3.5 w-3.5" /> Adicionar veículo (somente sem cobertura ativa)
-              </div>
-              <div className="relative mb-2">
-                <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input className="pl-9 h-9" placeholder="Placa, marca ou modelo..." value={vehicleSearch} onChange={(e) => setVehicleSearch(e.target.value)} />
-              </div>
-              <div className="space-y-1 max-h-72 overflow-y-auto">
-                {(() => {
-                  // Apenas veículos SEM cobertura ativa em qualquer apólice
-                  const uncoveredIds = new Set(companyUncovered.map((x) => x.id));
-                  const list = filteredVehicles.filter(
-                    (v) => !linkedVehicleIds.has(v.id) && uncoveredIds.has(v.id),
-                  );
-                  if (list.length === 0) {
-                    return (
-                      <div className="text-xs text-muted-foreground py-2 text-center">
-                        Nenhum veículo sem cobertura disponível para vincular.
-                      </div>
-                    );
-                  }
-                  return list.map((v) => (
-                  <div key={v.id} className="flex items-center justify-between gap-2 p-2 rounded border border-border hover:bg-muted/30">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono font-bold text-primary">{v.plate}</span>
-                      <span className="text-xs text-muted-foreground truncate">{v.brand} {v.model}</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="outline" className="h-7" onClick={() => linkVehicle(v.id, "manual")}>
-                        Vincular
-                      </Button>
-                    </div>
-                  </div>
-                  ));
-                })()}
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-2 flex items-start gap-1">
-                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                Veículos já cobertos por outra apólice vigente não aparecem aqui — vá em "Sem Cobertura" para revisar.
-              </div>
-            </div>
-            )}
           </>
         )}
       </Card>
