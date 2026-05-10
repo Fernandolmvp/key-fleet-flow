@@ -135,6 +135,7 @@ export type Database = {
           feature: string
           id: string
           model: string | null
+          request_id: string | null
           source: string
           success: boolean
           tokens_input: number
@@ -149,6 +150,7 @@ export type Database = {
           feature: string
           id?: string
           model?: string | null
+          request_id?: string | null
           source?: string
           success?: boolean
           tokens_input?: number
@@ -163,6 +165,7 @@ export type Database = {
           feature?: string
           id?: string
           model?: string | null
+          request_id?: string | null
           source?: string
           success?: boolean
           tokens_input?: number
@@ -3445,20 +3448,36 @@ export type Database = {
         }
         Returns: string
       }
-      consume_ai_tokens: {
-        Args: {
-          _company_id: string
-          _error?: string
-          _feature: string
-          _model?: string
-          _success?: boolean
-          _tokens_input?: number
-          _tokens_output?: number
-          _tokens_used: number
-          _user_id: string
-        }
-        Returns: Json
-      }
+      consume_ai_tokens:
+        | {
+            Args: {
+              _company_id: string
+              _error?: string
+              _feature: string
+              _model?: string
+              _success?: boolean
+              _tokens_input?: number
+              _tokens_output?: number
+              _tokens_used: number
+              _user_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _company_id: string
+              _error?: string
+              _feature: string
+              _model?: string
+              _request_id?: string
+              _success?: boolean
+              _tokens_input?: number
+              _tokens_output?: number
+              _tokens_used: number
+              _user_id: string
+            }
+            Returns: Json
+          }
       generate_fuel_auth_code: { Args: never; Returns: string }
       get_company_vehicle_limit: {
         Args: { _company_id: string }
@@ -3472,6 +3491,10 @@ export type Database = {
           is_active: boolean
           subscription_status: string
         }[]
+      }
+      has_enough_ai_tokens: {
+        Args: { _company_id: string; _required: number }
+        Returns: boolean
       }
       has_permission:
         | {
