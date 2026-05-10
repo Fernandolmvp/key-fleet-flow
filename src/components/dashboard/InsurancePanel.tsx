@@ -215,6 +215,7 @@ export default function InsurancePanel() {
   const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
   const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   async function load() {
     if (!currentCompanyId) return;
@@ -789,9 +790,24 @@ export default function InsurancePanel() {
     return (
       <>
         {policyIsAi && (
-          <div className="rounded-lg border-2 border-destructive bg-destructive/15 p-2 flex items-center gap-2">
-            <Lock className="h-4 w-4 text-destructive shrink-0" />
-            <div className="text-xs text-destructive font-bold">🔒 Apólice importada via IA — nenhuma alteração permitida</div>
+          <div className="rounded-lg border-2 border-destructive bg-destructive/15 p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-destructive shrink-0" />
+              <div className="text-xs text-destructive font-bold">🔒 Apólice importada via IA — nenhuma alteração permitida</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setReviewOpen(true)}>
+                <Search className="h-3.5 w-3.5" /> Revisar Veículos com Apólice
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/20"
+                onClick={() => removePolicy(selectedPolicy.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Excluir apólice
+              </Button>
+            </div>
           </div>
         )}
 
@@ -1405,6 +1421,99 @@ export default function InsurancePanel() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setAddToPolicyVehicleId(null); setAddToPolicyTargetId(""); }}>Cancelar</Button>
             <Button onClick={addVehicleToPolicy} disabled={!addToPolicyTargetId || manualPolicies.length === 0}>Vincular</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG — Revisar veículos da apólice (IA) */}
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" /> Revisão de veículos · {selectedPolicy?.insurer_name} #{selectedPolicy?.policy_number}
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            if (!selectedPolicy) return null;
+            const ex: any = selectedPolicy.ai_extracted || {};
+            const aiVeh: AiVehicle[] = Array.isArray(ex.vehicles) ? ex.vehicles : [];
+            const norm = (s: string) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+            const linkedSet = new Set(selectedLinks.map((l) => l.vehicle_id));
+            const rows = aiVeh.map((v) => {
+              const plateN = norm(v.plate);
+              const reg = vehicles.find((x) => norm(x.plate) === plateN) || null;
+              const linked = reg ? linkedSet.has(reg.id) : false;
+              return { v, reg, linked, plateN };
+            });
+            const cadastrados = rows.filter((r) => !!r.reg).length;
+            const vinculados = rows.filter((r) => r.linked).length;
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-md p-2 border border-border bg-background/40">
+                    <div className="text-lg font-bold">{rows.length}</div>
+                    <div className="text-[10px] uppercase text-muted-foreground">Na apólice (IA)</div>
+                  </div>
+                  <div className="rounded-md p-2 border border-emerald-500/30 bg-emerald-500/10">
+                    <div className="text-lg font-bold text-emerald-400">{cadastrados}</div>
+                    <div className="text-[10px] uppercase text-emerald-400/80">Cadastrados na frota</div>
+                  </div>
+                  <div className="rounded-md p-2 border border-amber-500/30 bg-amber-500/10">
+                    <div className="text-lg font-bold text-amber-400">{vinculados}</div>
+                    <div className="text-[10px] uppercase text-amber-400/80">Vinculados à apólice</div>
+                  </div>
+                </div>
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] uppercase text-muted-foreground bg-muted/30 border-b border-border">
+                    <div className="col-span-2">Placa</div>
+                    <div className="col-span-4">Veículo</div>
+                    <div className="col-span-2 text-right">IS</div>
+                    <div className="col-span-2 text-right">Prêmio</div>
+                    <div className="col-span-1 text-center">Pág.</div>
+                    <div className="col-span-1 text-center">Status</div>
+                  </div>
+                  <div className="max-h-[55vh] overflow-y-auto divide-y divide-border">
+                    {rows.length === 0 && (
+                      <div className="text-xs text-muted-foreground py-6 text-center">Nenhum veículo extraído pela IA.</div>
+                    )}
+                    {rows.map(({ v, reg, linked }) => (
+                      <div key={v.plate} className="grid grid-cols-12 gap-2 px-3 py-2 text-xs items-center">
+                        <div className="col-span-2 font-mono font-bold text-primary">{v.plate}</div>
+                        <div className="col-span-4 truncate">
+                          {[v.brand, v.model, v.year].filter(Boolean).join(" ") || "—"}
+                          {v.inclusion_type === "adendo" && (
+                            <Badge variant="outline" className="ml-1 text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/30">Adendo</Badge>
+                          )}
+                        </div>
+                        <div className="col-span-2 text-right font-medium">{fmtBRL(v.insured_amount ?? null)}</div>
+                        <div className="col-span-2 text-right">{fmtBRL(v.premium ?? null)}</div>
+                        <div className="col-span-1 text-center">
+                          {(v as any).page_number && selectedPolicy?.file_url ? (
+                            <Button asChild variant="ghost" size="icon" className="h-6 w-6" title={`Pág. ${(v as any).page_number}`}>
+                              <a href={`${selectedPolicy.file_url}#page=${(v as any).page_number}`} target="_blank" rel="noreferrer">
+                                <FileText className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </div>
+                        <div className="col-span-1 text-center">
+                          {linked ? (
+                            <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">OK</Badge>
+                          ) : reg ? (
+                            <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/30">S/ vínc.</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30">S/ cad.</Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
