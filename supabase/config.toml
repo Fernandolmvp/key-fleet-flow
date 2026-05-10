@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.extract-insurance-policy]
 verify_jwt = false
 
+[functions.review-insurance-policy]
+verify_jwt = false
+
 [functions.driver-onboarding]
 verify_jwt = false
 
