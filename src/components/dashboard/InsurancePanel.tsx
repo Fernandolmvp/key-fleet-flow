@@ -216,6 +216,55 @@ export default function InsurancePanel() {
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
   const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewResult, setReviewResult] = useState<any | null>(null);
+
+  async function runAiReview() {
+    if (!selectedPolicy?.file_url) {
+      toast.error("Apólice sem PDF anexado para revisar.");
+      return;
+    }
+    setReviewLoading(true);
+    setReviewResult(null);
+    try {
+      const resp = await fetch(selectedPolicy.file_url);
+      if (!resp.ok) throw new Error("Não foi possível baixar o PDF da apólice.");
+      const blob = await resp.blob();
+      const mimeType = blob.type || "application/pdf";
+      const buf = await blob.arrayBuffer();
+      let bin = "";
+      const bytes = new Uint8Array(buf);
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+      }
+      const fileBase64 = btoa(bin);
+      const registryVehicles = vehicles.map((v) => ({ plate: v.plate, brand: v.brand, model: v.model }));
+      const { data, error } = await supabase.functions.invoke("review-insurance-policy", {
+        body: {
+          fileBase64,
+          mimeType,
+          registryVehicles,
+          policyMeta: { policy_number: selectedPolicy.policy_number, insurer_name: selectedPolicy.insurer_name },
+        },
+      });
+      if (error) {
+        let msg = error.message || "Falha ao revisar com IA";
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx?.json) { const b = await ctx.json(); if (b?.error) msg = b.error; }
+        } catch {}
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setReviewResult((data as any)?.data ?? null);
+      toast.success("Revisão concluída pela IA");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao revisar");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
 
   async function load() {
     if (!currentCompanyId) return;
