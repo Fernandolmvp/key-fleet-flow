@@ -760,6 +760,24 @@ export default function InsurancePanel() {
 
   return (
     <div className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="assegurados" className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Veículos Assegurados
+            <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 ml-1">
+              {fleetSummary.coveredCount}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="sem-cobertura" className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            Sem Cobertura
+            <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 ml-1">
+              {companyUncovered.length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
       {/* BUSCA GLOBAL POR VEÍCULO */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
@@ -857,25 +875,6 @@ export default function InsurancePanel() {
           </div>
         </div>
       </Card>
-
-      {/* ABAS PRINCIPAIS */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="assegurados" className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            Veículos Assegurados
-            <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 ml-1">
-              {fleetSummary.coveredCount}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="sem-cobertura" className="flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4" />
-            Sem Cobertura
-            <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 ml-1">
-              {companyUncovered.length}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
 
         {/* ===================== TAB 1 — ASSEGURADOS ===================== */}
         <TabsContent value="assegurados" className="space-y-4 mt-0">
