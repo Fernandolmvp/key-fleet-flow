@@ -33,6 +33,9 @@ import Welcome from "./pages/auth/Welcome";
 import RequireAuth from "./components/auth/RequireAuth";
 import RequireActiveSubscription from "./components/auth/RequireActiveSubscription";
 import RequireJustPaid from "./components/auth/RequireJustPaid";
+import { PostoAuthProvider } from "./contexts/PostoAuthContext";
+import PostoLogin from "./pages/posto/PostoLogin";
+import PostoShell from "./pages/posto/PostoShell";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +46,7 @@ const App = () => (
       <Sonner theme="dark" />
       <BrowserRouter>
         <AuthProvider>
+         <PostoAuthProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/app" replace />} />
             <Route path="/login" element={<Login />} />
@@ -52,6 +56,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
+            <Route path="/posto/login" element={<PostoLogin />} />
+            <Route path="/posto" element={<PostoShell />} />
             <Route element={<RequireAuth />}>
               <Route path="/planos" element={<PlanSelection />} />
               <Route element={<RequireJustPaid />}>
@@ -80,6 +86,7 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+         </PostoAuthProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
