@@ -523,6 +523,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           email: string | null
+          fuel_auth_code_ttl_minutes: number
           group_id: string | null
           id: string
           logo_url: string | null
@@ -539,6 +540,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
           logo_url?: string | null
@@ -555,6 +557,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
           logo_url?: string | null
@@ -1183,6 +1186,7 @@ export type Database = {
       }
       fuel_authorizations: {
         Row: {
+          approved_amount: number | null
           approved_at: string | null
           approved_by: string | null
           authorization_code: string | null
@@ -1216,6 +1220,7 @@ export type Database = {
           vehicle_id: string
         }
         Insert: {
+          approved_amount?: number | null
           approved_at?: string | null
           approved_by?: string | null
           authorization_code?: string | null
@@ -1249,6 +1254,7 @@ export type Database = {
           vehicle_id: string
         }
         Update: {
+          approved_amount?: number | null
           approved_at?: string | null
           approved_by?: string | null
           authorization_code?: string | null
@@ -1604,6 +1610,73 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fuel_station_users: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          last_login_at: string | null
+          name: string
+          password_hash: string
+          role: string
+          station_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          last_login_at?: string | null
+          name: string
+          password_hash: string
+          role?: string
+          station_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          last_login_at?: string | null
+          name?: string
+          password_hash?: string
+          role?: string
+          station_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_station_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_station_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "fuel_station_users_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_stations"
             referencedColumns: ["id"]
           },
         ]
@@ -3187,6 +3260,18 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      confirm_authorization_by_station: {
+        Args: {
+          _code: string
+          _km_at_fueling?: number
+          _liters: number
+          _receipt_number: string
+          _receipt_url?: string
+          _station_id: string
+          _total_value: number
+        }
+        Returns: string
+      }
       generate_fuel_auth_code: { Args: never; Returns: string }
       get_company_vehicle_limit: {
         Args: { _company_id: string }
@@ -3244,6 +3329,13 @@ export type Database = {
           _stripe_payment_intent_id: string
         }
         Returns: undefined
+      }
+      regenerate_authorization_code: {
+        Args: { _authorization_id: string }
+        Returns: {
+          authorization_code: string
+          expires_at: string
+        }[]
       }
       seed_default_role_permissions: {
         Args: { _company_id: string }
