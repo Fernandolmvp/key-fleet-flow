@@ -60,6 +60,11 @@ export async function guardAiCall(
   feature: string,
 ): Promise<{ ctx: GuardContext } | { err: GuardError }> {
   const auth = req.headers.get("Authorization") || req.headers.get("authorization");
+  console.log("[ai-tokens] guard:start", {
+    feature,
+    hasAuth: Boolean(auth),
+    requestIdHeader: req.headers.get("x-request-id") || req.headers.get("X-Request-Id") || null,
+  });
   if (!auth) return { err: { status: 401, body: { error: "Não autenticado" } } };
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
@@ -69,6 +74,7 @@ export async function guardAiCall(
 
   const { data: userResp, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userResp?.user) {
+    console.error("[ai-tokens] guard:user-error", { feature, error: userErr?.message ?? "unknown" });
     return { err: { status: 401, body: { error: "Sessão inválida" } } };
   }
   const userId = userResp.user.id;
@@ -95,6 +101,7 @@ export async function guardAiCall(
   }
 
   const required = FEATURE_MIN_TOKENS[feature] ?? 1000;
+  console.log("[ai-tokens] guard:resolved", { feature, userId, companyId, required });
   const { data: enough, error: balErr } = await supabase.rpc("has_enough_ai_tokens", {
     _company_id: companyId,
     _required: required,
@@ -103,6 +110,7 @@ export async function guardAiCall(
     console.error("has_enough_ai_tokens error", balErr);
     return { err: { status: 500, body: { error: "Falha ao verificar créditos" } } };
   }
+  console.log("[ai-tokens] guard:balance", { feature, companyId, required, enough: Boolean(enough) });
   if (!enough) {
     // registra tentativa bloqueada (best-effort, não falha a request)
     try {
@@ -134,6 +142,8 @@ export async function guardAiCall(
     req.headers.get("x-request-id") ||
     req.headers.get("X-Request-Id") ||
     crypto.randomUUID();
+
+  console.log("[ai-tokens] guard:ok", { feature, userId, companyId, requestId });
 
   return { ctx: { supabase, userId, companyId, requestId } };
 }
@@ -171,6 +181,19 @@ export async function registerAiUsage(
       ? `${ctx.requestId}:${args.callIndex}`
       : ctx.requestId;
 
+  console.log("[ai-tokens] register:start", {
+    companyId: ctx.companyId,
+    userId: ctx.userId,
+    requestId: reqId,
+    feature: args.feature,
+    model: args.model,
+    tokensInput: args.tokensInput,
+    tokensOutput: args.tokensOutput,
+    tokensTotal: args.tokensTotal,
+    success: args.success,
+    error: args.error ?? null,
+  });
+
   const { error } = await ctx.supabase.rpc("consume_ai_tokens", {
     _company_id: ctx.companyId,
     _user_id: ctx.userId,
@@ -189,6 +212,14 @@ export async function registerAiUsage(
       feature: args.feature,
       tokensTotal: args.tokensTotal,
       requestId: reqId,
+    });
+  } else {
+    console.log("[ai-tokens] register:done", {
+      companyId: ctx.companyId,
+      requestId: reqId,
+      feature: args.feature,
+      tokensTotal: args.tokensTotal,
+      success: args.success,
     });
   }
 }
