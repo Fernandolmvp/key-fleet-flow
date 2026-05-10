@@ -58,6 +58,7 @@ interface PolicyLink {
 export default function Vehicles() {
   const { currentCompanyId } = useAuth();
   const [items, setItems] = useState<Vehicle[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [docsByVehicle, setDocsByVehicle] = useState<Record<string, DocRow[]>>({});
   const [policiesByVehicle, setPoliciesByVehicle] = useState<Record<string, PolicyLink[]>>({});
   const [driverByVehicle, setDriverByVehicle] = useState<Record<string, string>>({});
