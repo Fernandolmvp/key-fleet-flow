@@ -879,57 +879,6 @@ export default function InsurancePanel() {
 
         {/* ===================== TAB 1 — ASSEGURADOS ===================== */}
         <TabsContent value="assegurados" className="space-y-4 mt-0">
-          {/* Lista de veículos assegurados com filtro por apólice */}
-          <Card className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                <div className="font-display font-bold">Veículos cobertos por apólice vigente</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                <Select value={assuredFilter} onValueChange={setAssuredFilter}>
-                  <SelectTrigger className="h-8 min-w-[220px]">
-                    <SelectValue placeholder="Filtrar por apólice..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as apólices</SelectItem>
-                    {policies.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.insurer_name} · #{p.policy_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1 max-h-[340px] overflow-y-auto">
-              {assuredVehicles.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-8 text-center">
-                  Nenhum veículo assegurado {assuredFilter !== "all" ? "nesta apólice" : "encontrado"}.
-                </div>
-              ) : (
-                assuredVehicles.map(({ vehicle, policy }) => {
-                  const st = policyStatus(policy);
-                  return (
-                    <div key={`${vehicle.id}-${policy.id}`} className="flex items-center justify-between gap-2 p-2 rounded border border-border bg-muted/10 hover:bg-muted/20">
-                      <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
-                        <span className="font-mono font-bold text-primary">{vehicle.plate}</span>
-                        <span className="text-xs text-muted-foreground truncate">{[vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "—"}</span>
-                        <span className="text-xs text-muted-foreground">·</span>
-                        <span className="text-xs">{policy.insurer_name} <span className="font-mono text-muted-foreground">#{policy.policy_number}</span></span>
-                        <Badge variant="outline" className={st.cls + " text-[10px]"}>{st.label}</Badge>
-                      </div>
-                      <Button size="sm" variant="ghost" className="h-7" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(policy.id); }}>
-                        <ExternalLink className="h-3 w-3" /> Ver apólice
-                      </Button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </Card>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
