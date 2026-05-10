@@ -286,6 +286,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("[extract-document] start", { method: req.method });
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -307,6 +308,7 @@ Deno.serve(async (req) => {
     const guard = await guardAiCall(req, feature);
     if ("err" in guard) return jsonResponse(guard.err.status, guard.err.body);
     const ctx = guard.ctx;
+    console.log("[extract-document] guard-ok", { feature, requestId: ctx.requestId, companyId: ctx.companyId });
 
     let tool: any, fnName: string, sys: string;
     if (type === "vehicle") {
@@ -405,6 +407,7 @@ Deno.serve(async (req) => {
 
     // ✅ Sucesso: debita os tokens reais consumidos
     await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: true });
+    console.log("[extract-document] success", { feature, requestId: ctx.requestId, tokensTotal: usage.total });
 
     // Validação de tipo de documento: garante que o arquivo enviado corresponde
     // ao que o usuário está cadastrando (ex.: motorista exige CNH, veículo exige CRLV).
