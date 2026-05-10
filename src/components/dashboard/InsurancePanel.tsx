@@ -216,6 +216,55 @@ export default function InsurancePanel() {
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
   const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewResult, setReviewResult] = useState<any | null>(null);
+
+  async function runAiReview() {
+    if (!selectedPolicy?.file_url) {
+      toast.error("Apólice sem PDF anexado para revisar.");
+      return;
+    }
+    setReviewLoading(true);
+    setReviewResult(null);
+    try {
+      const resp = await fetch(selectedPolicy.file_url);
+      if (!resp.ok) throw new Error("Não foi possível baixar o PDF da apólice.");
+      const blob = await resp.blob();
+      const mimeType = blob.type || "application/pdf";
+      const buf = await blob.arrayBuffer();
+      let bin = "";
+      const bytes = new Uint8Array(buf);
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+      }
+      const fileBase64 = btoa(bin);
+      const registryVehicles = vehicles.map((v) => ({ plate: v.plate, brand: v.brand, model: v.model }));
+      const { data, error } = await supabase.functions.invoke("review-insurance-policy", {
+        body: {
+          fileBase64,
+          mimeType,
+          registryVehicles,
+          policyMeta: { policy_number: selectedPolicy.policy_number, insurer_name: selectedPolicy.insurer_name },
+        },
+      });
+      if (error) {
+        let msg = error.message || "Falha ao revisar com IA";
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx?.json) { const b = await ctx.json(); if (b?.error) msg = b.error; }
+        } catch {}
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setReviewResult((data as any)?.data ?? null);
+      toast.success("Revisão concluída pela IA");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao revisar");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
 
   async function load() {
     if (!currentCompanyId) return;
@@ -1426,13 +1475,131 @@ export default function InsurancePanel() {
       </Dialog>
 
       {/* DIALOG — Revisar veículos da apólice (IA) */}
-      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+      <Dialog open={reviewOpen} onOpenChange={(o) => { setReviewOpen(o); if (!o) setReviewResult(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Search className="h-4 w-4 text-primary" /> Revisão de veículos · {selectedPolicy?.insurer_name} #{selectedPolicy?.policy_number}
             </DialogTitle>
           </DialogHeader>
+          <div className="flex flex-wrap items-center gap-2 -mt-1">
+            <Button size="sm" onClick={runAiReview} disabled={reviewLoading || !selectedPolicy?.file_url}>
+              {reviewLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {reviewLoading ? "IA analisando apólice..." : "Analisar com IA (apólice × cadastro)"}
+            </Button>
+            {!selectedPolicy?.file_url && (
+              <span className="text-[11px] text-muted-foreground">Anexe um PDF na apólice para liberar a análise.</span>
+            )}
+          </div>
+
+          {reviewResult && (() => {
+            const r = reviewResult || {};
+            const added: any[] = Array.isArray(r.added_in_policy_not_in_registry) ? r.added_in_policy_not_in_registry : [];
+            const missing: any[] = Array.isArray(r.in_registry_not_in_policy) ? r.in_registry_not_in_policy : [];
+            const inPolicy: any[] = Array.isArray(r.vehicles_in_policy) ? r.vehicles_in_policy : [];
+            const divergences: any[] = Array.isArray(r.divergences) ? r.divergences : [];
+            return (
+              <div className="space-y-3 rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-primary">
+                  <Sparkles className="h-3.5 w-3.5" /> Análise da IA
+                </div>
+                {r.summary && <div className="text-xs whitespace-pre-wrap">{r.summary}</div>}
+
+                {added.length > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+                    <div className="text-xs font-medium text-amber-400 flex items-center gap-1 mb-1">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Veículos NA apólice mas NÃO no cadastro ({added.length})
+                    </div>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {added.map((x: any) => (
+                        <div key={x.plate} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-mono font-bold text-amber-400">{x.plate}</span>
+                          <span className="text-muted-foreground truncate flex-1">
+                            {[x.brand, x.model, x.year].filter(Boolean).join(" ") || "—"}
+                            {x.inclusion_type === "adendo" && (
+                              <Badge variant="outline" className="ml-1 text-[9px] bg-amber-500/15 text-amber-400 border-amber-500/30">
+                                Adendo {x.endorsement_number || ""}
+                              </Badge>
+                            )}
+                          </span>
+                          {x.page_number && selectedPolicy?.file_url && (
+                            <Button asChild variant="ghost" size="icon" className="h-5 w-5">
+                              <a href={`${selectedPolicy.file_url}#page=${x.page_number}`} target="_blank" rel="noreferrer" title={`Pág. ${x.page_number}`}>
+                                <FileText className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {divergences.length > 0 && (
+                  <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+                    <div className="text-xs font-medium text-amber-400 flex items-center gap-1 mb-1">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Divergências de dados ({divergences.length})
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {divergences.map((d: any, i: number) => (
+                        <div key={i} className="text-[11px] flex items-center gap-2">
+                          <span className="font-mono font-bold text-amber-400">{d.plate}</span>
+                          <span className="text-muted-foreground">{d.field}:</span>
+                          <span>"{d.policy_value || "—"}"</span>
+                          <span className="text-muted-foreground">vs</span>
+                          <span>"{d.registry_value || "—"}"</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {missing.length > 0 && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
+                    <div className="text-xs font-medium text-destructive flex items-center gap-1 mb-1">
+                      <ShieldAlert className="h-3.5 w-3.5" /> Cadastrados mas SEM esta apólice ({missing.length})
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {missing.map((x: any) => (
+                        <div key={x.plate} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-mono font-bold text-destructive">{x.plate}</span>
+                          <span className="text-muted-foreground truncate">{[x.brand, x.model].filter(Boolean).join(" ") || "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {added.length === 0 && missing.length === 0 && divergences.length === 0 && (
+                  <div className="text-xs text-emerald-400 flex items-center gap-1">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Tudo em ordem: nenhum veículo extra na apólice e nenhuma divergência detectada.
+                  </div>
+                )}
+
+                <details className="text-[11px] text-muted-foreground">
+                  <summary className="cursor-pointer">Ver detalhamento por veículo da apólice ({inPolicy.length})</summary>
+                  <div className="mt-1 space-y-0.5">
+                    {inPolicy.map((v: any) => (
+                      <div key={v.plate} className="flex items-center gap-2">
+                        <span className="font-mono font-bold">{v.plate}</span>
+                        <span className="truncate flex-1">{[v.brand, v.model, v.year].filter(Boolean).join(" ") || "—"}</span>
+                        <Badge variant="outline" className={
+                          v.status_vs_registry === "cadastrado_ok"
+                            ? "text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                            : v.status_vs_registry === "cadastrado_divergente"
+                              ? "text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "text-[9px] bg-destructive/15 text-destructive border-destructive/30"
+                        }>
+                          {v.status_vs_registry?.replace(/_/g, " ") || "—"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            );
+          })()}
+
           {(() => {
             if (!selectedPolicy) return null;
             const ex: any = selectedPolicy.ai_extracted || {};
