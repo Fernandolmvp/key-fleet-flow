@@ -1,9 +1,8 @@
 import {
   guardAiCall,
-  registerAiUsage,
-  extractTokensFromResponse,
   jsonResponse,
 } from "../_shared/ai-tokens.ts";
+import { callAi } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,8 +87,6 @@ Deno.serve(async (req) => {
 
   try {
     console.log("[extract-insurance-policy] start", { method: req.method });
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
     const { fileBase64, mimeType } = (await req.json()) as { fileBase64: string; mimeType: string };
     if (!fileBase64 || !mimeType) {
@@ -100,7 +97,6 @@ Deno.serve(async (req) => {
     }
 
     const FEATURE = "extract_insurance_policy";
-    const MODEL = "google/gemini-2.5-pro";
     const guard = await guardAiCall(req, FEATURE);
     if ("err" in guard) return jsonResponse(guard.err.status, guard.err.body);
     const ctx = guard.ctx;
@@ -130,62 +126,42 @@ Deno.serve(async (req) => {
       userContent.push({ type: "image_url", image_url: { url: dataUrl } });
     }
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: userContent },
-        ],
-        tools: [TOOL],
-        tool_choice: { type: "function", function: { name: "extract_insurance_policy" } },
-      }),
+    const result = await callAi({
+      ctx, feature: FEATURE,
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: userContent },
+      ],
+      tools: [TOOL],
+      toolChoice: { type: "function", function: { name: "extract_insurance_policy" } },
     });
 
-    if (aiResp.status === 429) {
-      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "rate_limited_429" });
-      return new Response(JSON.stringify({ error: "Limite de requisições da IA excedido." }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiResp.status === 402) {
-      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "gateway_402" });
-      return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!aiResp.ok) {
-      const t = await aiResp.text();
-      console.error("AI error:", aiResp.status, t);
-      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: `gateway_${aiResp.status}` });
-      return new Response(JSON.stringify({ error: "Falha ao processar apólice" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!result.success) {
+      const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
+      const userMsg =
+        status === 429 ? "Limite de requisições da IA excedido." :
+        status === 402 ? "Créditos de IA esgotados." :
+        "Falha ao processar apólice";
+      console.error("[extract-insurance-policy] ai-failed", { feature: FEATURE, status, provider: result.providerUsed, error: result.errorMessage });
+      return new Response(JSON.stringify({ error: userMsg }), {
+        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await aiResp.json();
-    const usage = extractTokensFromResponse(data);
-    const call = data?.choices?.[0]?.message?.tool_calls?.[0];
+    const call = result.data?.choices?.[0]?.message?.tool_calls?.[0];
     if (!call?.function?.arguments) {
-      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "no_tool_call" });
       return new Response(JSON.stringify({ error: "IA não conseguiu extrair dados." }), {
         status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(call.function.arguments); }
     catch {
-      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "invalid_ai_response" });
       return new Response(JSON.stringify({ error: "Resposta da IA inválida" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: true });
-    console.log("[extract-insurance-policy] success", { feature: FEATURE, requestId: ctx.requestId, tokensTotal: usage.total });
+    console.log("[extract-insurance-policy] success", { feature: FEATURE, requestId: ctx.requestId, provider: result.providerUsed, model: result.modelUsed, fallback: result.wasFallback, tokensTotal: result.tokensTotal });
 
     return new Response(JSON.stringify({ data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
