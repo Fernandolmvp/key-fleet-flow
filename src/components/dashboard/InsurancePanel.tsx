@@ -686,10 +686,25 @@ export default function InsurancePanel() {
       if (!p.end_date) return true;
       return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
     };
-    const activePolicyIds = new Set(policies.filter(isVigente).map((p) => p.id));
-    const coveredIds = new Set(
-      links.filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
+    const activePolicies = policies.filter(isVigente);
+    const activePolicyIds = new Set(activePolicies.map((p) => p.id));
+    const norm = (s: string) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const plateToVehicleId = new Map<string, string>();
+    vehicles.forEach((v) => plateToVehicleId.set(norm(v.plate), v.id));
+    const coveredIds = new Set<string>(
+      links.filter((l) => activePolicyIds.has(l.policy_id) && !l.removed_at).map((l) => l.vehicle_id)
     );
+    // também considera coberto qualquer veículo cujas placas/chassis aparecem na extração IA
+    activePolicies.forEach((p) => {
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((x: any) => x?.plate).filter(Boolean) : [];
+      plates.forEach((pl) => {
+        const vid = plateToVehicleId.get(norm(pl));
+        if (vid) coveredIds.add(vid);
+      });
+    });
     return vehicles.filter((v) => !coveredIds.has(v.id));
   }, [vehicles, links, policies]);
 
