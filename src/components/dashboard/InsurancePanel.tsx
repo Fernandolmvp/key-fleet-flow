@@ -205,6 +205,7 @@ export default function InsurancePanel() {
   const [aiPlates, setAiPlates] = useState<string[]>([]);
   const [aiVehicles, setAiVehicles] = useState<AiVehicle[]>([]);
   const [reextracting, setReextracting] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
 
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
@@ -470,9 +471,12 @@ export default function InsurancePanel() {
 
   async function savePolicy() {
     if (!currentCompanyId) return;
+    if (savingPolicy) return; // trava contra duplo-clique
     if (!form.policy_number?.trim() || !form.insurer_name?.trim()) {
       toast.error("Número e seguradora são obrigatórios"); return;
     }
+    setSavingPolicy(true);
+    try {
     const payload: any = {
       company_id: currentCompanyId,
       policy_number: form.policy_number.trim(),
@@ -506,8 +510,28 @@ export default function InsurancePanel() {
       const r = await supabase.from("insurance_policies").update(payload).eq("id", form.id);
       if (r.error) { toast.error(r.error.message); return; }
     } else {
+      // Validação prévia: já existe apólice com este número nesta empresa?
+      const dup = await supabase
+        .from("insurance_policies")
+        .select("id")
+        .eq("company_id", currentCompanyId)
+        .eq("policy_number", payload.policy_number)
+        .eq("insurer_name", payload.insurer_name)
+        .limit(1)
+        .maybeSingle();
+      if (dup.data?.id) {
+        toast.error("Já existe apólice com esse número nesta seguradora.");
+        return;
+      }
       const r = await supabase.from("insurance_policies").insert(payload).select("id").single();
-      if (r.error) { toast.error(r.error.message); return; }
+      if (r.error) {
+        if ((r.error as any).code === "23505") {
+          toast.error("Já existe apólice com esse número nesta seguradora.");
+        } else {
+          toast.error(r.error.message);
+        }
+        return;
+      }
       policyId = (r.data as any).id;
     }
     // vincula veículos extraídos pela IA (placa OU chassi), com classificação
@@ -550,6 +574,9 @@ export default function InsurancePanel() {
     setPolicyDialog(false);
     setSelectedPolicyId(policyId || null);
     load();
+    } finally {
+      setSavingPolicy(false);
+    }
   }
 
   async function removePolicy(id: string) {
@@ -2005,7 +2032,10 @@ export default function InsurancePanel() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPolicyDialog(false)}>Cancelar</Button>
-            <Button onClick={savePolicy} disabled={uploading || extracting}>Salvar</Button>
+            <Button onClick={savePolicy} disabled={uploading || extracting || savingPolicy}>
+              {savingPolicy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {savingPolicy ? "Salvando..." : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
