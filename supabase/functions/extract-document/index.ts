@@ -1,10 +1,9 @@
 import {
   guardAiCall,
-  registerAiUsage,
-  extractTokensFromResponse,
   featureForDocType,
   jsonResponse,
 } from "../_shared/ai-tokens.ts";
+import { callAi } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -287,8 +286,6 @@ Deno.serve(async (req) => {
 
   try {
     console.log("[extract-document] start", { method: req.method });
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
     const { type, fileBase64, mimeType } = (await req.json()) as {
       type: DocType;
@@ -339,75 +336,50 @@ Deno.serve(async (req) => {
 
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Extraia todos os dados visíveis e retorne pela function call." },
-              { type: "image_url", image_url: { url: dataUrl } },
-            ],
-          },
-        ],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: fnName } },
-      }),
+    const result = await callAi({
+      ctx,
+      feature,
+      messages: [
+        { role: "system", content: sys },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Extraia todos os dados visíveis e retorne pela function call." },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+      tools: [tool],
+      toolChoice: { type: "function", function: { name: fnName } },
     });
 
-    if (aiResp.status === 429) {
-      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "rate_limited_429" });
-      return new Response(JSON.stringify({ error: "Limite de requisições da IA excedido. Tente em alguns instantes." }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiResp.status === 402) {
-      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "gateway_402" });
-      return new Response(JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos no workspace." }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!aiResp.ok) {
-      const t = await aiResp.text();
-      console.error("AI error:", aiResp.status, t);
-      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: `gateway_${aiResp.status}` });
-      return new Response(JSON.stringify({ error: "Falha ao processar documento" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!result.success) {
+      const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
+      const userMsg =
+        status === 429 ? "Limite de requisições da IA excedido. Tente em alguns instantes." :
+        status === 402 ? "Créditos de IA esgotados. Adicione créditos no workspace." :
+        "Falha ao processar documento";
+      console.error("[extract-document] ai-failed", { feature, status, provider: result.providerUsed, error: result.errorMessage });
+      return new Response(JSON.stringify({ error: userMsg }), {
+        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await aiResp.json();
-    const usage = extractTokensFromResponse(data);
-    const call = data?.choices?.[0]?.message?.tool_calls?.[0];
+    const call = result.data?.choices?.[0]?.message?.tool_calls?.[0];
     if (!call?.function?.arguments) {
-      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "no_tool_call" });
       return new Response(JSON.stringify({ error: "IA não conseguiu extrair dados deste documento." }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
     let parsed: Record<string, unknown> = {};
-    try {
-      parsed = JSON.parse(call.function.arguments);
-    } catch {
-      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "invalid_ai_response" });
+    try { parsed = JSON.parse(call.function.arguments); }
+    catch {
       return new Response(JSON.stringify({ error: "Resposta da IA inválida" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ✅ Sucesso: debita os tokens reais consumidos
-    await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: true });
-    console.log("[extract-document] success", { feature, requestId: ctx.requestId, tokensTotal: usage.total });
+    console.log("[extract-document] success", { feature, requestId: ctx.requestId, provider: result.providerUsed, model: result.modelUsed, fallback: result.wasFallback, tokensTotal: result.tokensTotal });
 
     // Validação de tipo de documento: garante que o arquivo enviado corresponde
     // ao que o usuário está cadastrando (ex.: motorista exige CNH, veículo exige CRLV).
