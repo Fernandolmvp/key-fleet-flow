@@ -1,10 +1,15 @@
 // Adapter: Lovable AI Gateway (compatível OpenAI Chat Completions).
 import type { ProviderCallArgs, ProviderCallResult } from "./types.ts";
 
-const DEFAULT_ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const DEFAULT_BASE = "https://ai.gateway.lovable.dev/v1";
+
+function buildUrl(endpoint?: string | null): string {
+  const base = (endpoint || DEFAULT_BASE).replace(/\/$/, "");
+  return base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+}
 
 export async function callLovable(args: ProviderCallArgs): Promise<ProviderCallResult> {
-  const url = args.endpoint || DEFAULT_ENDPOINT;
+  const url = buildUrl(args.endpoint);
   const body: Record<string, unknown> = {
     model: args.model,
     messages: args.messages,
