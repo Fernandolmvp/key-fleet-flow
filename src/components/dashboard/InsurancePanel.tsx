@@ -1105,10 +1105,30 @@ export default function InsurancePanel() {
                   {active.map((p) => {
                     const broker = brokers.find((b) => b.id === p.broker_id);
                     const st = policyStatus(p);
+                    const ex: any = p.ai_extracted || {};
+                    const norm = (s: string) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+                    const aiVeh = (ex.vehicles || []).find((av: any) => norm(av.plate || "") === norm(v.plate || ""));
+                    const pageNum = aiVeh?.page_number;
                     return (
                       <div key={p.id} className="rounded-md border border-border bg-background/40 p-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        <div><span className="text-muted-foreground">Seguradora:</span> <strong>{p.insurer_name}</strong></div>
-                        <div><span className="text-muted-foreground">Apólice:</span> <span className="font-mono">#{p.policy_number}</span></div>
+                        <div className="flex items-center gap-2"><span className="text-muted-foreground">Seguradora:</span> <strong>{p.insurer_name}</strong></div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-muted-foreground">Apólice:</span>
+                          <span className="font-mono">#{p.policy_number}</span>
+                          {pageNum && (
+                            <Badge variant="outline" className="text-[10px]">Pág. {pageNum}</Badge>
+                          )}
+                          {p.file_url && (
+                            <Button asChild variant="ghost" size="icon" className="h-6 w-6" title={pageNum ? `Abrir PDF na página ${pageNum}` : "Abrir PDF da apólice"}>
+                              <a href={pageNum ? `${p.file_url}#page=${pageNum}` : p.file_url} target="_blank" rel="noreferrer">
+                                <FileText className="h-3 w-3 text-primary" />
+                              </a>
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(p.id); }}>
+                            <ExternalLink className="h-3 w-3" /> Abrir
+                          </Button>
+                        </div>
                         <div className="flex items-center gap-1"><span className="text-muted-foreground">Tel. seguradora:</span> {p.insurer_phone ? (<span className="flex items-center gap-1"><Phone className="h-3 w-3" />{p.insurer_phone}</span>) : "—"}</div>
                         <div><span className="text-muted-foreground">Vigência:</span> {p.start_date ? format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy") : "—"} → {p.end_date ? format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy") : "—"}</div>
                         <div><Badge variant="outline" className={st.cls}>{st.label}</Badge></div>
