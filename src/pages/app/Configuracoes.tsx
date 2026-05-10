@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Settings, Users, Shield, Building2, Loader2 } from "lucide-react";
+import { Settings, Users, Shield, Building2, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MembersTab from "./configuracoes/MembersTab";
 import PermissionsTab from "./configuracoes/PermissionsTab";
 import CompanyTab from "./configuracoes/CompanyTab";
+import CreditosIATab from "./configuracoes/CreditosIATab";
 
 export default function Configuracoes() {
   const { roles, currentCompanyId, loading } = useAuth();
@@ -64,10 +65,14 @@ export default function Configuracoes() {
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4" /> Empresa
           </TabsTrigger>
+          <TabsTrigger value="credits" className="gap-2">
+            <Sparkles className="h-4 w-4" /> Créditos IA
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="members"><MembersTab companyId={currentCompanyId} /></TabsContent>
         <TabsContent value="permissions"><PermissionsTab companyId={currentCompanyId} /></TabsContent>
         <TabsContent value="company"><CompanyTab companyId={currentCompanyId} /></TabsContent>
+        <TabsContent value="credits"><CreditosIATab companyId={currentCompanyId} /></TabsContent>
       </Tabs>
     </div>
   );
