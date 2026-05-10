@@ -6,6 +6,7 @@ import BalanceCards from "./credits/BalanceCards";
 import UsageChart from "./credits/UsageChart";
 import UsageHistory from "./credits/UsageHistory";
 import TopFeatures from "./credits/TopFeatures";
+import BalanceAlert from "./credits/BalanceAlert";
 
 interface Props { companyId: string; }
 
@@ -78,6 +79,11 @@ export default function CreditosIATab({ companyId }: Props) {
 
   return (
     <div className="space-y-5">
+      <BalanceAlert
+        totalAvailable={planRemaining + extraBalance}
+        planTotal={planTotal}
+      />
+
       <BalanceCards
         planRemaining={planRemaining}
         planTotal={planTotal}

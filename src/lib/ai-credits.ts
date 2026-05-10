@@ -1,12 +1,22 @@
 export const FEATURE_LABELS: Record<string, string> = {
-  apolice_pdf: "Importação de Apólice",
-  cupom_fiscal: "Leitura de Cupom Fiscal",
-  cnh: "Validação de CNH",
-  crlv: "Leitura de CRLV",
-  analise_consumo: "Análise de Consumo",
-  extract_document: "Extração de Documento",
-  extract_insurance_policy: "Extração de Apólice",
+  // Apólices
+  extract_insurance_policy: "Importação de Apólice",
   review_insurance_policy: "Revisão de Apólice",
+  apolice_pdf: "Importação de Apólice",
+  // Documentos de motorista / veículo
+  crlv: "Leitura de CRLV",
+  cnh: "Validação de CNH",
+  // Abastecimento
+  leitura_placa: "Leitura de Placa",
+  leitura_hodometro: "Leitura de Hodômetro",
+  cupom_fiscal: "Cupom Fiscal",
+  // Manutenção / pneus
+  nota_manutencao: "Nota de Manutenção",
+  nota_pneu: "Nota de Pneu",
+  // Genéricos
+  documento_generico: "Documento",
+  extract_document: "Documento",
+  analise_consumo: "Análise de Consumo",
 };
 
 export function formatFeature(key?: string | null): string {
