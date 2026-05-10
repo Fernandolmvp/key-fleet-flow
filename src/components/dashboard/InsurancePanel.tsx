@@ -998,19 +998,80 @@ export default function InsurancePanel() {
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Search className="h-4 w-4 text-primary" />
-          <div className="font-display font-bold">Consultar seguro de um veículo</div>
+          <div className="font-display font-bold">Consultar seguro</div>
         </div>
-        <Input
-          placeholder="Digite placa ou chassi (ignora traços, pontos e espaços)..."
-          value={globalSearch}
-          onChange={(e) => setGlobalSearch(e.target.value)}
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={globalSearchMode} onValueChange={(v) => setGlobalSearchMode(v as any)}>
+            <SelectTrigger className="h-9 w-44 shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="veiculo">Por veículo (placa/chassi)</SelectItem>
+              <SelectItem value="apolice">Por nº da apólice</SelectItem>
+              <SelectItem value="seguradora">Por seguradora</SelectItem>
+              <SelectItem value="corretora">Por corretora</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            className="flex-1 min-w-[220px]"
+            placeholder={
+              globalSearchMode === "veiculo"
+                ? "Digite placa ou chassi (ignora traços, pontos e espaços)..."
+                : globalSearchMode === "apolice"
+                ? "Digite o número da apólice..."
+                : globalSearchMode === "seguradora"
+                ? "Digite o nome da seguradora..."
+                : "Digite o nome do corretor..."
+            }
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+          />
+        </div>
         {globalSearch && globalSearch.length < 3 && (
           <div className="text-xs text-muted-foreground">Digite ao menos 3 caracteres.</div>
         )}
-        {globalSearchResult && globalSearchResult.length === 0 && (
+        {((globalSearchResult && globalSearchResult.length === 0) || (globalPolicyResult && globalPolicyResult.length === 0)) && (
           <div className="text-xs text-muted-foreground">Nenhum veículo encontrado.</div>
         )}
+        {globalPolicyResult && globalPolicyResult.map((p) => {
+          const broker = brokers.find((b) => b.id === p.broker_id);
+          const st = policyStatus(p);
+          const policyVehicles = links
+            .filter((l) => l.policy_id === p.id)
+            .map((l) => vehicles.find((v) => v.id === l.vehicle_id))
+            .filter(Boolean) as typeof vehicles;
+          return (
+            <div key={p.id} className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  <span className="font-bold">{p.insurer_name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">#{p.policy_number}</span>
+                  <Badge variant="outline" className={st.cls + " text-[10px]"}>{st.label}</Badge>
+                </div>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(p.id); }}>
+                  <ExternalLink className="h-3 w-3" /> Abrir apólice
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                <div><span className="text-muted-foreground">Vigência:</span> {p.start_date ? format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy") : "—"} → {p.end_date ? format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy") : "—"}</div>
+                <div><span className="text-muted-foreground">Tipo cobertura:</span> {coverageTypeLabel(p.coverage_type) || "—"}</div>
+                <div><span className="text-muted-foreground">Tel. seguradora:</span> {p.insurer_phone || "—"}</div>
+                <div><span className="text-muted-foreground">Corretor:</span> {broker?.name || "—"} {broker?.phone ? `· ${broker.phone}` : ""}</div>
+                <div><span className="text-muted-foreground">Prêmio total:</span> <strong className="text-primary">{fmtBRL(p.total_value)}</strong></div>
+                <div><span className="text-muted-foreground">Franquia:</span> {fmtBRL(p.deductible)}</div>
+              </div>
+              {policyVehicles.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase text-muted-foreground mb-1">Veículos cobertos ({policyVehicles.length})</div>
+                  <div className="flex flex-wrap gap-1">
+                    {policyVehicles.map((v) => (
+                      <Badge key={v.id} variant="outline" className="font-mono text-[11px]">{v.plate}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {globalSearchResult && globalSearchResult.map((v) => {
           const active = activePoliciesForVehicle(v.id);
           return (
