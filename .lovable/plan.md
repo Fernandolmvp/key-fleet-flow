@@ -1,72 +1,101 @@
 
-# Prompt 2 — Tela de Saldo + Histórico de Uso de Tokens IA
+# Painel Super Admin — Inteligência Artificial
 
-## Objetivo
-Adicionar uma nova aba **"Créditos IA"** dentro de `/app/configuracoes` para o cliente visualizar saldo de tokens (plano + extras), histórico de consumo, gráfico dos últimos 30 dias e top features. Apenas leitura — botão de compra é placeholder ("Em breve") até o Prompt 3.
+Construir uma área nova dentro de `/super-admin` para o super admin gerenciar **provedores**, **modelos**, **roteamento por feature** e visualizar **estatísticas/logs** de uso de IA, sem precisar tocar no banco. **Esta etapa é só de interface** — nada de mudanças em edge functions.
 
-## Análise do que já existe
-- **Tabelas**: `ai_token_balance` (1:1 por empresa, `plan_tokens_remaining`, `extra_tokens_balance`, `last_plan_reset_at`), `ai_usage_logs` (`feature`, `model`, `tokens_total`, `source`, `success`, `user_id`, `created_at`).
-- **RPC**: `check_ai_token_balance(_company_id)` retorna `total_available, plan_remaining, extra_balance`.
-- **RLS**: já permite membros lerem o balance e os logs da própria empresa. Nenhuma policy nova necessária.
-- **Plano**: `plans.tokens_monthly` (total mensal). Reset = `last_plan_reset_at + 1 mês`.
-- **Configurações**: `src/pages/app/Configuracoes.tsx` usa `Tabs` com 3 abas (Membros, Permissões, Empresa). Vou adicionar a 4ª.
-- **Padrão visual**: `surface-card`, `font-display`, `KpiCard` (`src/components/dashboard/KpiCard.tsx`) para os cards do topo (com `tone` primary/success/warning).
+## Estrutura de navegação
 
-## Layout da aba (mockup textual)
+Hoje `/super-admin` é uma página única (gestão de empresas/planos). Vou transformá-la em um shell com **sidebar interna** preservando 100% do comportamento atual:
 
-```text
-┌───────────────────────────────────────────────────────────────────────┐
-│  [Saldo Plano]   [Tokens Extras]   [Total Disponível]   [Comprar ▸]  │
-│   45.000          12.500             57.500              Em breve     │
-│   Renova 10/06    Sem validade       tokens prontos                   │
-│   ▓▓▓▓░░░ 60%                                                         │
-├───────────────────────────────────────────────────────────────────────┤
-│  Consumo últimos 30 dias — 18.420 tokens                              │
-│   ▁▂▃▅▂▁▃▅█▇▃▂▁ ...                                                   │
-├───────────────────────────────────────┬───────────────────────────────┤
-│  Histórico de Uso                     │  Top 5 funcionalidades (mês)  │
-│  [periodo▾] [feature▾] [usuário▾]     │  1. Importação Apólice 8.2k   │
-│  Data | Funcionalidade | Usuário |    │  2. Cupom Fiscal       4.1k   │
-│  Tokens | Origem | Status             │  3. CRLV               2.3k   │
-│  ...20 linhas + paginação             │  ...                          │
-└───────────────────────────────────────┴───────────────────────────────┘
+```
+/super-admin                          ← shell com sidebar lateral
+  ├─ index (Empresas — conteúdo atual movido p/ aba)
+  └─ Inteligência Artificial
+       ├─ /super-admin/ai/providers   ← Provedores
+       ├─ /super-admin/ai/models      ← Modelos
+       ├─ /super-admin/ai/routing     ← Roteamento por Feature
+       └─ /super-admin/ai/usage       ← Estatísticas e Logs
 ```
 
-## Arquivos a criar / editar
+A sidebar usa shadcn `Sidebar` com itens: **Empresas**, **IA › Provedores / Modelos / Roteamento / Uso**. Tudo dark, alinhado ao visual do `/app`.
 
-### Novos
-- `src/pages/app/configuracoes/CreditosIATab.tsx` — componente principal da aba.
-- `src/pages/app/configuracoes/credits/BalanceCards.tsx` — 4 cards do topo.
-- `src/pages/app/configuracoes/credits/UsageChart.tsx` — gráfico recharts (já no projeto) de barras 30 dias.
-- `src/pages/app/configuracoes/credits/UsageHistory.tsx` — tabela + filtros + paginação.
-- `src/pages/app/configuracoes/credits/TopFeatures.tsx` — ranking lateral.
-- `src/lib/ai-credits.ts` — mapa `FEATURE_LABELS` (apolice_pdf → "Importação de Apólice", etc.) + helper `formatFeature()`.
+## Arquivos novos
 
-### Editar
-- `src/pages/app/Configuracoes.tsx` — adicionar `<TabsTrigger value="credits">` com ícone `Sparkles` e `<TabsContent>` carregando `CreditosIATab`.
+```
+src/pages/admin/
+  SuperAdminShell.tsx              ← shell com sidebar + Outlet
+  SuperAdminSidebar.tsx
+  CompaniesPanel.tsx               ← move conteúdo atual de SuperAdmin.tsx
+  ai/
+    AIAlertsBanner.tsx             ← banner topo (vermelho/amarelo/verde)
+    ProvidersPage.tsx
+    ProviderDialog.tsx             ← criar/editar provedor
+    ModelsPage.tsx
+    ModelDialog.tsx
+    RoutingPage.tsx
+    RoutingDialog.tsx              ← editar primary/fallback/estimate
+    UsagePage.tsx
+    UsageFilters.tsx
+    UsageCharts.tsx                ← pizza, barras, linha (recharts)
+    UsageLogsTable.tsx
+src/lib/
+  ai-admin.ts                      ← queries + types + helpers
+```
+
+`src/App.tsx`: trocar a rota única `/super-admin` por rotas aninhadas em `SuperAdminShell` com children: `index → CompaniesPanel`, `ai/providers`, `ai/models`, `ai/routing`, `ai/usage`.
+
+## Mockup das telas
+
+**Provedores** — grid de cards (1–3 colunas):
+```
+┌── Lovable AI Gateway ─────────────┐
+│ code: lovable      [Ativo ●○]     │
+│ priority: 10       [— +]          │
+│ endpoint: ai.gateway.lovable.dev/ │
+│ secret: LOVABLE_API_KEY ✓         │
+│ último uso: há 2 min              │
+│ [Testar conexão]   [Editar]       │
+└───────────────────────────────────┘
+```
+Banner vermelho se `active && secret ausente`.
+
+**Modelos** — tabela com filtro por provedor, colunas: Provedor · Model ID · Display · Tipo · Custo in/1k · Custo out/1k · Max tokens · Ativo · Ações. "Adicionar Modelo" / "Editar" via `ModelDialog`.
+
+**Roteamento** — lista de cards por feature:
+```
+extract_insurance_policy        [Ativo ●○]
+  Primário:  gemini-2.5-pro (Gemini)
+  Fallback:  google/gemini-2.5-pro (Lovable)
+  Estimativa: 8000 tok    Média real: 7240 tok ✓
+  [Editar]
+```
+Sugestão automática quando `|média - estimativa| > 30%`.
+
+**Uso** — dashboard:
+- KPIs: chamadas hoje, chamadas mês, tokens mês, custo estimado, receita mês, margem
+- Charts (recharts): pizza por provedor, barras chamadas/dia (30d), barras tokens por feature (top 10), linha % fallback/dia
+- Tabela de logs com filtros (empresa, feature, provedor, status, período) — colunas: data · empresa · user · feature · provedor · modelo · tokens · fallback · sucesso · ms
+
+## Banner de alertas (em todas as 4 telas IA)
+
+Calculado no client a partir de `ai_usage_logs` últimas 24h + `ai_providers`:
+- 🔴 provedor primário com >20% erro 24h
+- 🟡 provedor ativo sem secret cadastrado (verificado via edge function `check-ai-secrets`)
+- 🟡 fallback >30% das chamadas
+- 🟢 tudo ok
 
 ## Detalhes técnicos
 
-**Fetch de dados** (todos client-side via `supabase`):
-- `supabase.rpc("check_ai_token_balance", { _company_id })` — saldo.
-- `supabase.from("ai_token_balance").select("last_plan_reset_at, plan_tokens_remaining, extra_tokens_balance").eq("company_id", id).maybeSingle()` — para `last_plan_reset_at` e cálculo da próxima renovação (`last_plan_reset_at + 1 month`).
-- Total mensal do plano: `subscriptions` → `plans.tokens_monthly` (já carregado via join) para a barra de progresso "usado vs total".
-- Histórico: `supabase.from("ai_usage_logs").select("*, profiles:user_id(full_name)", { count: "exact" }).eq("company_id", id)` com filtros e `range()`.
-- Top features: agregação no cliente sobre logs do mês atual (ou view simples).
-- Gráfico: agrupa logs últimos 30 dias por `date_trunc('day')` no cliente.
+- **Queries**: Supabase client direto (RLS já força `is_super_admin`). Nenhum endpoint novo necessário, exceto:
+  - `supabase/functions/check-ai-secrets/index.ts` — recebe lista de `secret_name`, devolve `{ name: boolean }` consultando `Deno.env`. Verifica `is_super_admin` do caller.
+  - `supabase/functions/test-ai-provider/index.ts` — ping mínimo no endpoint do provedor com o secret correspondente; devolve status/latência. (Não consome tokens reais — usa um prompt mínimo `"ping"`.)
+- **Audit logs**: cada UPDATE/INSERT/DELETE em `ai_providers`, `ai_models`, `ai_feature_routing` cria entrada em `audit_logs` (action `ai_provider_update` etc., changes JSON com before/after) — feito via wrapper em `ai-admin.ts`.
+- **Confirmações**: AlertDialog antes de desativar provedor primário ativo ou desativar única rota ativa de uma feature.
+- **Validação**: zod nos dialogs (code único, número não-negativo nos custos, model_id não vazio).
+- **Charts**: usa `recharts` (já no projeto).
+- **Responsivo**: sidebar colapsa em mobile, cards/tabela com scroll horizontal.
+- **Sem mudança em IA atual**: edge functions de IA permanecem intocadas. Próximo prompt do usuário fará o helper genérico.
 
-**Filtros do histórico**: período (preset + custom via `date-fns`), feature (`select` populado a partir das features distintas dos logs), usuário (membros da empresa).
+## Aprovação
 
-**Estados vazios**: se `ai_usage_logs` vier vazio mostrar `EmptyState` com `Sparkles` + "Nenhum uso registrado ainda".
-
-**Botão "Comprar"**: `onClick` abre um `Dialog` simples com "Em breve" — sem rota nova.
-
-**Visual**: tokens semânticos do design system (`bg-primary/10`, `text-success`, `text-warning`, `text-primary` etc.), `surface-card`, sem cores hardcoded. Responsivo: cards em `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`; histórico + top features em `lg:grid-cols-3` (tabela ocupa 2, ranking 1).
-
-## Fora de escopo (deixar para próximos prompts)
-- Stripe / fluxo real de compra de tokens.
-- Interceptar/bloquear chamadas de IA quando saldo zero.
-- Painel super admin global de tokens.
-- Alterar policies RLS ou criar novas tabelas.
-
-Posso executar?
+Aprovo para executar?
