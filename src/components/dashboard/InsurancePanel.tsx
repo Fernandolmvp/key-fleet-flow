@@ -215,6 +215,7 @@ export default function InsurancePanel() {
   const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
   const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   async function load() {
     if (!currentCompanyId) return;
@@ -789,9 +790,24 @@ export default function InsurancePanel() {
     return (
       <>
         {policyIsAi && (
-          <div className="rounded-lg border-2 border-destructive bg-destructive/15 p-2 flex items-center gap-2">
-            <Lock className="h-4 w-4 text-destructive shrink-0" />
-            <div className="text-xs text-destructive font-bold">🔒 Apólice importada via IA — nenhuma alteração permitida</div>
+          <div className="rounded-lg border-2 border-destructive bg-destructive/15 p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-destructive shrink-0" />
+              <div className="text-xs text-destructive font-bold">🔒 Apólice importada via IA — nenhuma alteração permitida</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setReviewOpen(true)}>
+                <Search className="h-3.5 w-3.5" /> Revisar Veículos com Apólice
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/20"
+                onClick={() => removePolicy(selectedPolicy.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Excluir apólice
+              </Button>
+            </div>
           </div>
         )}
 
