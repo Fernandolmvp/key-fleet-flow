@@ -758,6 +758,200 @@ export default function InsurancePanel() {
     return { label: `Vigente (${d}d)`, cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
   }
 
+  function renderPolicyDetails() {
+    if (!selectedPolicy) return null;
+    const ex: any = selectedPolicy.ai_extracted || {};
+    const coverageSummary = selectedPolicy.coverage_summary || ex.coverage_summary || "";
+    const reserveCar = /carro\s*reserva|veículo\s*reserva|veiculo\s*reserva/i.test(coverageSummary);
+    const broker = brokers.find((b) => b.id === selectedPolicy.broker_id);
+    return (
+      <>
+        {policyIsAi && (
+          <div className="rounded-lg border-2 border-destructive bg-destructive/15 p-2 flex items-center gap-2">
+            <Lock className="h-4 w-4 text-destructive shrink-0" />
+            <div className="text-xs text-destructive font-bold">🔒 Apólice importada via IA — nenhuma alteração permitida</div>
+          </div>
+        )}
+
+        {validation && (
+          <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
+                <div className="text-xs font-medium">
+                  {selectedPolicy.start_date ? format(new Date(selectedPolicy.start_date + "T00:00:00"), "dd/MM/yy") : "—"} →{" "}
+                  {selectedPolicy.end_date ? format(new Date(selectedPolicy.end_date + "T00:00:00"), "dd/MM/yy") : "—"}
+                </div>
+                <Badge variant="outline" className={policyStatus(selectedPolicy).cls + " mt-1 text-[10px]"}>
+                  {policyStatus(selectedPolicy).label}
+                </Badge>
+              </div>
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Prêmio total</div>
+                <div className="text-sm font-bold text-primary">{fmtBRL(selectedPolicy.total_value)}</div>
+                {validation.sumPremium > 0 && (
+                  <div className="text-[10px] text-muted-foreground">Soma p/ veíc.: {fmtBRL(validation.sumPremium)}</div>
+                )}
+              </div>
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
+                <div className="text-sm font-bold">{fmtBRL(selectedPolicy.deductible)}</div>
+              </div>
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">IS Total</div>
+                <div className="text-sm font-bold">{validation.sumIS > 0 ? fmtBRL(validation.sumIS) : "—"}</div>
+              </div>
+            </div>
+
+            {/* Info adicional: corretor, contatos, tipo, carro reserva */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Tipo de cobertura</div>
+                <div className="font-medium">{coverageTypeLabel(selectedPolicy.coverage_type) || "—"}</div>
+              </div>
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Carro reserva</div>
+                <div className="font-medium flex items-center gap-1">
+                  {reserveCar ? (
+                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">Sim</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">Não informado</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Seguradora</div>
+                <div className="font-medium">{selectedPolicy.insurer_name}</div>
+                {selectedPolicy.insurer_phone && (
+                  <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5"><Phone className="h-3 w-3" /> {selectedPolicy.insurer_phone}</div>
+                )}
+              </div>
+              <div className="rounded-md bg-background/40 p-2 border border-border">
+                <div className="text-[10px] uppercase text-muted-foreground">Corretor</div>
+                <div className="font-medium">{broker?.name || "—"}</div>
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                  {broker?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{broker.phone}</span>}
+                  {broker?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{broker.email}</span>}
+                </div>
+              </div>
+            </div>
+
+            {coverageSummary && (
+              <div className="rounded-md bg-background/40 p-2 border border-border text-xs">
+                <div className="text-[10px] uppercase text-muted-foreground mb-1">Resumo de cobertura</div>
+                <div className="whitespace-pre-wrap">{coverageSummary}</div>
+              </div>
+            )}
+
+            {(() => {
+              const coveredCount = validation.hasAi ? validation.covered.length : selectedLinks.length;
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
+                      <div className="text-lg font-bold text-emerald-400">{coveredCount}</div>
+                      <div className="text-[10px] uppercase text-emerald-400/80">Cobertos & cadastrados</div>
+                    </div>
+                    <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
+                      <div className="text-lg font-bold text-amber-400">{validation.onlyInPolicy.length}</div>
+                      <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
+                    </div>
+                  </div>
+
+                  {validation.hasAi && validation.covered.length > 0 && !policyIsAi && (
+                    <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
+                      <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v: any) => !linkedVehicleIds.has(v.id)).length} pendente(s)
+                    </Button>
+                  )}
+
+                  {validation.onlyInPolicy.length > 0 && (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+                      <div className="text-xs font-medium text-amber-400 flex items-center gap-1 mb-1">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Placas na apólice mas NÃO cadastradas ({validation.onlyInPolicy.length})
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {validation.onlyInPolicy.map((x: any) => (
+                          <div key={x.plate} className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-mono font-bold text-amber-400">{x.plate}</span>
+                            <span className="text-muted-foreground truncate">{[x.ai?.brand, x.ai?.model, x.ai?.year].filter(Boolean).join(" ") || "—"}</span>
+                            <span className="text-muted-foreground whitespace-nowrap">{fmtBRL(x.ai?.insured_amount ?? null)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {validation.linkedNotInAi.length > 0 && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
+                      <div className="text-xs font-medium text-destructive flex items-center gap-1 mb-1">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Vinculados manualmente mas NÃO encontrados na apólice ({validation.linkedNotInAi.length})
+                      </div>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {validation.linkedNotInAi.map((v: any) => (
+                          <div key={v.id} className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-mono font-bold text-destructive">{v.plate}</span>
+                            <span className="text-muted-foreground truncate">{v.brand} {v.model}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        <div>
+          <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-2">
+            <Truck className="h-3.5 w-3.5" /> Veículos assegurados ({selectedLinks.length})
+          </div>
+          <div className="space-y-1 max-h-72 overflow-y-auto">
+            {selectedLinks.length === 0 && (
+              <div className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
+                Nenhum veículo vinculado a esta apólice ainda.
+              </div>
+            )}
+            {selectedLinks.map((l) => {
+              const v = vehicles.find((x) => x.id === l.vehicle_id);
+              const aiVeh = (ex.vehicles || []).find((av: any) => normalizePlate(av.plate || "") === normalizePlate(v?.plate || ""));
+              return (
+                <div key={l.id} className="flex items-center justify-between gap-2 p-2 rounded border border-border bg-muted/20">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="font-mono font-bold text-primary">{v?.plate || "—"}</span>
+                    <span className="text-xs text-muted-foreground truncate">{v?.brand} {v?.model}</span>
+                    {aiVeh?.insured_amount && (
+                      <span className="text-[11px] text-emerald-400">IS: {fmtBRL(aiVeh.insured_amount)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {l.inclusion_type === "manual" ? (
+                      <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Manual</Badge>
+                    ) : l.inclusion_type === "adendo" ? (
+                      <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> Adendo
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> Via apólice
+                      </Badge>
+                    )}
+                    <span className="text-[11px] text-muted-foreground">{format(new Date(l.included_at + "T00:00:00"), "dd/MM/yy")}</span>
+                    {l.inclusion_type === "manual" && !policyIsAi && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => unlinkVehicle(l.id)}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
