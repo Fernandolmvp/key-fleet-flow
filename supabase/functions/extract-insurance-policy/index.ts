@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("[extract-insurance-policy] start", { method: req.method });
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -103,6 +104,7 @@ Deno.serve(async (req) => {
     const guard = await guardAiCall(req, FEATURE);
     if ("err" in guard) return jsonResponse(guard.err.status, guard.err.body);
     const ctx = guard.ctx;
+    console.log("[extract-insurance-policy] guard-ok", { feature: FEATURE, requestId: ctx.requestId, companyId: ctx.companyId });
 
     console.log("extract-insurance-policy: received", {
       mimeType,
@@ -183,6 +185,7 @@ Deno.serve(async (req) => {
     }
 
     await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: true });
+    console.log("[extract-insurance-policy] success", { feature: FEATURE, requestId: ctx.requestId, tokensTotal: usage.total });
 
     return new Response(JSON.stringify({ data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
