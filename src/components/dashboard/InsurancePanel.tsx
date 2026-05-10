@@ -287,7 +287,6 @@ export default function InsurancePanel() {
     setBrokers((b.data as any[]) || []);
     setVehicles(vehiclesData);
     setLinks(linksData);
-    if (!selectedPolicyId && policiesData.length) setSelectedPolicyId(policiesData[0].id);
     setLoading(false);
     // Auto-vincula novos veículos cadastrados às apólices de IA já importadas
     autoLinkAiPolicies(policiesData, vehiclesData, linksData).catch((e) =>
