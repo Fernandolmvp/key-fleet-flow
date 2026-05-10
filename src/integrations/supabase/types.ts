@@ -14,6 +14,164 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_token_balance: {
+        Row: {
+          company_id: string
+          extra_tokens_balance: number
+          id: string
+          last_plan_reset_at: string | null
+          plan_tokens_remaining: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          extra_tokens_balance?: number
+          id?: string
+          last_plan_reset_at?: string | null
+          plan_tokens_remaining?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          extra_tokens_balance?: number
+          id?: string
+          last_plan_reset_at?: string | null
+          plan_tokens_remaining?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_token_packages: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          price: number
+          sort_order: number
+          stripe_price_id: string | null
+          tokens_amount: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          price: number
+          sort_order?: number
+          stripe_price_id?: string | null
+          tokens_amount: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          sort_order?: number
+          stripe_price_id?: string | null
+          tokens_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_token_purchases: {
+        Row: {
+          amount_paid: number
+          company_id: string
+          created_at: string
+          id: string
+          package_id: string
+          purchased_by_user_id: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          tokens_purchased: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid: number
+          company_id: string
+          created_at?: string
+          id?: string
+          package_id: string
+          purchased_by_user_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tokens_purchased: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          package_id?: string
+          purchased_by_user_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tokens_purchased?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_token_purchases_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "ai_token_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_logs: {
+        Row: {
+          company_id: string
+          created_at: string
+          error_message: string | null
+          feature: string
+          id: string
+          model: string | null
+          source: string
+          success: boolean
+          tokens_input: number
+          tokens_output: number
+          tokens_total: number
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          error_message?: string | null
+          feature: string
+          id?: string
+          model?: string | null
+          source?: string
+          success?: boolean
+          tokens_input?: number
+          tokens_output?: number
+          tokens_total?: number
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          error_message?: string | null
+          feature?: string
+          id?: string
+          model?: string | null
+          source?: string
+          success?: boolean
+          tokens_input?: number
+          tokens_output?: number
+          tokens_total?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2297,6 +2455,7 @@ export type Database = {
           sort_order: number
           stripe_price_id: string | null
           stripe_price_id_annual: string | null
+          tokens_monthly: number
           updated_at: string
           vehicle_limit: number | null
         }
@@ -2312,6 +2471,7 @@ export type Database = {
           sort_order?: number
           stripe_price_id?: string | null
           stripe_price_id_annual?: string | null
+          tokens_monthly?: number
           updated_at?: string
           vehicle_limit?: number | null
         }
@@ -2327,6 +2487,7 @@ export type Database = {
           sort_order?: number
           stripe_price_id?: string | null
           stripe_price_id_annual?: string | null
+          tokens_monthly?: number
           updated_at?: string
           vehicle_limit?: number | null
         }
@@ -3222,6 +3383,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_extra_tokens: {
+        Args: { _company_id: string; _tokens: number }
+        Returns: undefined
+      }
       apply_stripe_subscription: {
         Args: {
           _cancel_at_period_end: boolean
@@ -3260,6 +3425,14 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      check_ai_token_balance: {
+        Args: { _company_id: string }
+        Returns: {
+          extra_balance: number
+          plan_remaining: number
+          total_available: number
+        }[]
+      }
       confirm_authorization_by_station: {
         Args: {
           _code: string
@@ -3271,6 +3444,20 @@ export type Database = {
           _total_value: number
         }
         Returns: string
+      }
+      consume_ai_tokens: {
+        Args: {
+          _company_id: string
+          _error?: string
+          _feature: string
+          _model?: string
+          _success?: boolean
+          _tokens_input?: number
+          _tokens_output?: number
+          _tokens_used: number
+          _user_id: string
+        }
+        Returns: Json
       }
       generate_fuel_auth_code: { Args: never; Returns: string }
       get_company_vehicle_limit: {
@@ -3337,6 +3524,7 @@ export type Database = {
           expires_at: string
         }[]
       }
+      reset_monthly_plan_tokens: { Args: never; Returns: number }
       seed_default_role_permissions: {
         Args: { _company_id: string }
         Returns: undefined
