@@ -914,7 +914,8 @@ export default function InsurancePanel() {
             )}
             {selectedLinks.map((l) => {
               const v = vehicles.find((x) => x.id === l.vehicle_id);
-              const aiVeh = (ex.vehicles || []).find((av: any) => normalizePlate(av.plate || "") === normalizePlate(v?.plate || ""));
+              const norm = (s: string) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+              const aiVeh = (ex.vehicles || []).find((av: any) => norm(av.plate || "") === norm(v?.plate || ""));
               return (
                 <div key={l.id} className="flex items-center justify-between gap-2 p-2 rounded border border-border bg-muted/20">
                   <div className="flex items-center gap-2 min-w-0 flex-wrap">
