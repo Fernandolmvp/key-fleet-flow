@@ -1,129 +1,72 @@
 
-# Sistema de autorização de abastecimento + Portal do Posto
+# Prompt 2 — Tela de Saldo + Histórico de Uso de Tokens IA
 
-Antes de executar — observação importante: já existem na base hoje campos e função muito próximos do que você pediu. Vou **reaproveitar** o que existe em vez de duplicar (pra não quebrar o fluxo atual de aprovações). Onde você pediu campo novo, eu mapeio pro existente:
+## Objetivo
+Adicionar uma nova aba **"Créditos IA"** dentro de `/app/configuracoes` para o cliente visualizar saldo de tokens (plano + extras), histórico de consumo, gráfico dos últimos 30 dias e top features. Apenas leitura — botão de compra é placeholder ("Em breve") até o Prompt 3.
 
-| Pedido | Já existe / Ação |
-|---|---|
-| `authorization_code` | já existe em `fuel_authorizations` |
-| `code_generated_at` | usar `approved_at` (já existe) |
-| `code_expires_at` | usar `expires_at` (já existe, default +24h — vou ajustar pra 2h) |
-| `code_used_at` | usar `used_at` / `confirmed_at` (já existem) |
-| `approved_amount` | **novo** — adicionar |
-| `status_authorization` | usar enum `fuel_auth_status` existente (`pendente / aprovada / utilizada / expirada / cancelada`). "em_uso" = `aprovada`, "concluida" = `utilizada` |
-| `generate_authorization_code` RPC | já existe `generate_fuel_auth_code()` + trigger `tg_fuel_auth_on_approve` |
+## Análise do que já existe
+- **Tabelas**: `ai_token_balance` (1:1 por empresa, `plan_tokens_remaining`, `extra_tokens_balance`, `last_plan_reset_at`), `ai_usage_logs` (`feature`, `model`, `tokens_total`, `source`, `success`, `user_id`, `created_at`).
+- **RPC**: `check_ai_token_balance(_company_id)` retorna `total_available, plan_remaining, extra_balance`.
+- **RLS**: já permite membros lerem o balance e os logs da própria empresa. Nenhuma policy nova necessária.
+- **Plano**: `plans.tokens_monthly` (total mensal). Reset = `last_plan_reset_at + 1 mês`.
+- **Configurações**: `src/pages/app/Configuracoes.tsx` usa `Tabs` com 3 abas (Membros, Permissões, Empresa). Vou adicionar a 4ª.
+- **Padrão visual**: `surface-card`, `font-display`, `KpiCard` (`src/components/dashboard/KpiCard.tsx`) para os cards do topo (com `tone` primary/success/warning).
 
----
+## Layout da aba (mockup textual)
 
-## Etapa 1 — Banco (1 migration nova)
+```text
+┌───────────────────────────────────────────────────────────────────────┐
+│  [Saldo Plano]   [Tokens Extras]   [Total Disponível]   [Comprar ▸]  │
+│   45.000          12.500             57.500              Em breve     │
+│   Renova 10/06    Sem validade       tokens prontos                   │
+│   ▓▓▓▓░░░ 60%                                                         │
+├───────────────────────────────────────────────────────────────────────┤
+│  Consumo últimos 30 dias — 18.420 tokens                              │
+│   ▁▂▃▅▂▁▃▅█▇▃▂▁ ...                                                   │
+├───────────────────────────────────────┬───────────────────────────────┤
+│  Histórico de Uso                     │  Top 5 funcionalidades (mês)  │
+│  [periodo▾] [feature▾] [usuário▾]     │  1. Importação Apólice 8.2k   │
+│  Data | Funcionalidade | Usuário |    │  2. Cupom Fiscal       4.1k   │
+│  Tokens | Origem | Status             │  3. CRLV               2.3k   │
+│  ...20 linhas + paginação             │  ...                          │
+└───────────────────────────────────────┴───────────────────────────────┘
+```
 
-**Tabela `fuel_authorizations`** — adicionar:
-- `approved_amount numeric` (valor máximo autorizado)
-- ajustar default de `expires_at` para `now() + 2h` ao aprovar (alterar `tg_fuel_auth_on_approve`)
+## Arquivos a criar / editar
 
-**Nova tabela `fuel_station_users`**:
-- `id, station_id (FK fuel_stations), email unique, password_hash, name, role text, active bool, created_at, updated_at`
-- Senha **não** armazenada em texto puro — `password_hash` (bcrypt feito pela edge function)
-- RLS: bloqueado pra `anon`/`authenticated` no client. Acesso só via edge function com `service_role` (o portal do posto NÃO usa Supabase Auth do app — login próprio via edge function que emite JWT curto)
+### Novos
+- `src/pages/app/configuracoes/CreditosIATab.tsx` — componente principal da aba.
+- `src/pages/app/configuracoes/credits/BalanceCards.tsx` — 4 cards do topo.
+- `src/pages/app/configuracoes/credits/UsageChart.tsx` — gráfico recharts (já no projeto) de barras 30 dias.
+- `src/pages/app/configuracoes/credits/UsageHistory.tsx` — tabela + filtros + paginação.
+- `src/pages/app/configuracoes/credits/TopFeatures.tsx` — ranking lateral.
+- `src/lib/ai-credits.ts` — mapa `FEATURE_LABELS` (apolice_pdf → "Importação de Apólice", etc.) + helper `formatFeature()`.
 
-**RPC `confirm_authorization_by_station(code, station_id, liters, total_value, receipt_number, receipt_url)`**:
-- security definer, validações: código existe, status='aprovada', `expires_at > now()`, `fuel_station_id = station_id`
-- Se `approved_amount` definido e `total_value > approved_amount` → erro
-- Insere `fuel_records` (origem `posto_portal`)
-- Atualiza autorização: `status='utilizada'`, `used_at=now()`, `confirmed_at=now()`, vincula `fuel_record_id`
-- Retorna o id do fuel_record criado
+### Editar
+- `src/pages/app/Configuracoes.tsx` — adicionar `<TabsTrigger value="credits">` com ícone `Sparkles` e `<TabsContent>` carregando `CreditosIATab`.
 
-**RPC `generate_authorization_code(authorization_id)`** — wrapper público (chama a função interna existente, retorna o code).
+## Detalhes técnicos
 
----
+**Fetch de dados** (todos client-side via `supabase`):
+- `supabase.rpc("check_ai_token_balance", { _company_id })` — saldo.
+- `supabase.from("ai_token_balance").select("last_plan_reset_at, plan_tokens_remaining, extra_tokens_balance").eq("company_id", id).maybeSingle()` — para `last_plan_reset_at` e cálculo da próxima renovação (`last_plan_reset_at + 1 month`).
+- Total mensal do plano: `subscriptions` → `plans.tokens_monthly` (já carregado via join) para a barra de progresso "usado vs total".
+- Histórico: `supabase.from("ai_usage_logs").select("*, profiles:user_id(full_name)", { count: "exact" }).eq("company_id", id)` com filtros e `range()`.
+- Top features: agregação no cliente sobre logs do mês atual (ou view simples).
+- Gráfico: agrupa logs últimos 30 dias por `date_trunc('day')` no cliente.
 
-## Etapa 2 — App do motorista (Colaborador)
+**Filtros do histórico**: período (preset + custom via `date-fns`), feature (`select` populado a partir das features distintas dos logs), usuário (membros da empresa).
 
-Em `src/pages/app/Colaborador.tsx` (ou componente filho de "Solicitar Abastecimento" que já existe):
-- Adicionar seleção de posto (`fuel_stations`)
-- Foto do hodômetro + foto da placa → upload no bucket `driver-uploads`
-- Chamar edge function `extract-document` (já existe) pra validar placa e km via IA
-- Após aprovação, exibir tela cheia com **código de 6 dígitos**, contador regressivo até `expires_at`, e botão "Atualizar status"
+**Estados vazios**: se `ai_usage_logs` vier vazio mostrar `EmptyState` com `Sparkles` + "Nenhum uso registrado ainda".
 
----
+**Botão "Comprar"**: `onClick` abre um `Dialog` simples com "Em breve" — sem rota nova.
 
-## Etapa 3 — Portal do posto `/posto`
+**Visual**: tokens semânticos do design system (`bg-primary/10`, `text-success`, `text-warning`, `text-primary` etc.), `surface-card`, sem cores hardcoded. Responsivo: cards em `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`; histórico + top features em `lg:grid-cols-3` (tabela ocupa 2, ranking 1).
 
-**Rotas novas em `App.tsx`** (fora de `RequireAuth` e `AppLayout`):
-- `/posto/login` — `PostoLogin.tsx`
-- `/posto` — `PostoShell.tsx` (protegido por contexto próprio)
-  - Aba **Confirmar** — `PostoConfirmar.tsx`
-  - Aba **Histórico** — `PostoHistorico.tsx`
-
-**Edge functions novas**:
-- `posto-login` — recebe email+senha, valida bcrypt em `fuel_station_users`, retorna JWT assinado (HS256, secret `POSTO_JWT_SECRET`) com `station_id` e expiração 12h
-- `posto-confirm` — recebe JWT + payload, chama `confirm_authorization_by_station` com service role, dispara email
-- `posto-list` — recebe JWT, retorna histórico filtrado (período, placa, motorista) pro `station_id` do token
-
-**Fluxo confirmar**: digitar código → preview placa/motorista/valor autorizado → preencher litros, total, nº cupom, foto do cupom → confirmar → toast sucesso.
-
-**Histórico**: filtros (data início/fim, placa, motorista). Botões **Exportar PDF** (jsPDF + autoTable) e **Excel** (xlsx) gerando arquivo no client.
-
-**Contexto de auth do posto**: `PostoAuthContext` salva JWT em `localStorage` (`posto_token`), `RequirePosto` redireciona pra `/posto/login` se ausente/expirado.
-
----
-
-## Etapa 4 — Email automático
-
-Edge function `posto-confirm` chama, após sucesso, função `send-fuel-confirmation-email` (nova) que usa **Lovable Emails** (infra já configurada — verificar se há domain). Template:
-- Empresa do veículo (busca pelo `company_id` da autorização)
-- Dados veículo, motorista, posto, data, litros, valor, nº cupom
-- Anexo: foto do cupom (URL do storage assinada)
-- Código usado pra rastreabilidade
-
-⚠️ Se o domínio de email Lovable ainda não estiver configurado, vou avisar e o email fica como TODO até você configurar — o resto do fluxo funciona normalmente.
-
----
-
-## Arquivos modificados / criados
-
-**Migrations** (1 nova):
-- `supabase/migrations/<ts>_posto_portal.sql`
-
-**Edge functions** (novas):
-- `supabase/functions/posto-login/index.ts`
-- `supabase/functions/posto-confirm/index.ts`
-- `supabase/functions/posto-list/index.ts`
-- `supabase/functions/send-fuel-confirmation-email/index.ts`
-- `supabase/config.toml` — registrar com `verify_jwt = false` (auth própria)
-
-**Frontend novo**:
-- `src/contexts/PostoAuthContext.tsx`
-- `src/components/auth/RequirePosto.tsx`
-- `src/pages/posto/PostoLogin.tsx`
-- `src/pages/posto/PostoShell.tsx`
-- `src/pages/posto/PostoConfirmar.tsx`
-- `src/pages/posto/PostoHistorico.tsx`
-
-**Frontend editado**:
-- `src/App.tsx` — adicionar rotas `/posto/*`
-- `src/pages/app/Colaborador.tsx` (ou componente da tela "Solicitar Abastecimento") — fluxo de foto + código
-
-**Dependências novas**: `bcryptjs` (edge), `jspdf`, `jspdf-autotable`, `xlsx` (frontend portal)
-
-**Secret novo**: `POSTO_JWT_SECRET` (vou pedir via add_secret)
-
----
-
-## Garantias de não-quebra
-
-- Trigger `tg_fuel_record_sync_auth` continua válido — `fuel_records` criado pela RPC carrega `authorization_id`
-- Enum `fuel_auth_status` é reaproveitado, nada removido
-- `tg_fuel_auth_require_record_on_use` continua barrando "utilizada" sem fuel_record (a RPC cria o record antes)
-- Fluxo manual atual de aprovação no app continua funcionando — código de 6 dígitos passa a expirar em 2h em vez de 24h (esse é um comportamento intencional do pedido — confirme se OK)
-
----
-
-## Pontos pra você confirmar antes de executar
-
-1. **Expiração 2h**: troco o default de 24h pra 2h em **toda** autorização, ou só pras que vêm do app do motorista?
-2. **Email**: posso seguir e deixar TODO se não houver domain configurado? Ou prefere configurar Lovable Emails primeiro?
-3. **`approved_amount`**: bloquear estritamente se `total_value > approved_amount`, ou só avisar?
-4. **Cadastro de usuários do posto**: crio uma tela de admin (super admin) pra cadastrar `fuel_station_users`, ou por enquanto inserção manual via SQL?
+## Fora de escopo (deixar para próximos prompts)
+- Stripe / fluxo real de compra de tokens.
+- Interceptar/bloquear chamadas de IA quando saldo zero.
+- Painel super admin global de tokens.
+- Alterar policies RLS ou criar novas tabelas.
 
 Posso executar?
