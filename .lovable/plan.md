@@ -1,94 +1,129 @@
-## Reestruturação da tela de Seguros — 3 abas
 
-Atualmente `InsurancePanel.tsx` tem ~2.043 linhas com tudo numa única página: KPIs, busca de veículo, lista de apólices expandidas, quadrantes de cobertos / não cadastrados, painel "Sem cobertura" e dialogs (revisão IA, exclusão, criação manual). Vou reorganizar **sem reescrever a lógica de dados** — apenas distribuindo o JSX existente em 3 abas.
+# Sistema de autorização de abastecimento + Portal do Posto
 
----
+Antes de executar — observação importante: já existem na base hoje campos e função muito próximos do que você pediu. Vou **reaproveitar** o que existe em vez de duplicar (pra não quebrar o fluxo atual de aprovações). Onde você pediu campo novo, eu mapeio pro existente:
 
-### Mockup visual
-
-**Cabeçalho fixo (acima das abas)**
-```
-Seguros                                            [+ Nova apólice]
-Apólices, vínculos com veículos e vencimentos.
-─────────────────────────────────────────────────────────────
-[ Visão Geral ]  [ Apólices (3) ]  [ Sem Cobertura (58) ]
-```
-
-**ABA 1 — Visão Geral** (default)
-```
-┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
-│  37               │ │  58               │ │  1                │
-│  Veículos         │ │  Sem cobertura    │ │  Apólice vigente  │
-│  cobertos  ✅     │ │  ⚠️                │ │  🛡️               │
-│  → ver apólices   │ │  → ver lista      │ │  → ver apólices   │
-└───────────────────┘ └───────────────────┘ └───────────────────┘
-
-┌─ Cobertura da frota ──────┐  ┌─ Alertas críticos ─────────────┐
-│   ◐ 39% cobertos          │  │ • 0 apólices vencendo em 30d   │
-│     (donut chart)         │  │ • 58 veículos sem cobertura    │
-│   61% sem seguro          │  │   há mais de 30 dias           │
-└───────────────────────────┘  └────────────────────────────────┘
-
-Próximas a vencer
-─────────────────
-• ALFA · 31/07/2026 (77d) · 37 veículos
-```
-Os 3 KPIs são clicáveis e navegam para a aba correspondente (com filtro pré-aplicado quando fizer sentido).
-
-**ABA 2 — Apólices**
-```
-🔍 Buscar veículo por placa/chassi nas apólices...
-
-┌────────────────────────────────────────────────────────────┐
-│ ALFA SEGURADORA      [Vigente · 77d]    [IA 🔒]      [▼]  │
-│ Apólice 12345 · 37 cobertos · 12 s/cadastro · 0 vencidos   │
-└────────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────┐
-│ YELLOM               [Vigente]          [Manual]     [▼]   │
-│ Apólice N Crded · 0 cobertos · 0 s/cadastro                │
-└────────────────────────────────────────────────────────────┘
-```
-Ao clicar em `▼` abre o card completo que existe hoje (KPIs vigência/prêmio/franquia/IS, cobertura, quadrante de veículos cobertos, quadrante de não cadastrados, aviso IA, botões Revisar / Excluir). Default = todos colapsados; quando há resultado de busca, o card que contém o veículo abre automaticamente.
-
-**ABA 3 — Sem Cobertura**
-```
-58 veículos sem cobertura ativa                             🔴
-──────────────────────────────────────────────────────────────
-[Tipo ▾] [Ano ▾] [Valor FIPE ▾]              ⇅ Maior FIPE ▾
-
-┌────────────────────────────────────────────────────────────┐
-│ ABC1D23 · Volvo FH 540 · 2022                              │
-│ FIPE R$ 620.000 · sem cobertura há 142 dias                │
-│                                       [Vincular a apólice] │
-└────────────────────────────────────────────────────────────┘
-```
-"Vincular a apólice" abre um pequeno dialog com select das apólices manuais (apólices IA continuam bloqueadas pelo trigger atual).
+| Pedido | Já existe / Ação |
+|---|---|
+| `authorization_code` | já existe em `fuel_authorizations` |
+| `code_generated_at` | usar `approved_at` (já existe) |
+| `code_expires_at` | usar `expires_at` (já existe, default +24h — vou ajustar pra 2h) |
+| `code_used_at` | usar `used_at` / `confirmed_at` (já existem) |
+| `approved_amount` | **novo** — adicionar |
+| `status_authorization` | usar enum `fuel_auth_status` existente (`pendente / aprovada / utilizada / expirada / cancelada`). "em_uso" = `aprovada`, "concluida" = `utilizada` |
+| `generate_authorization_code` RPC | já existe `generate_fuel_auth_code()` + trigger `tg_fuel_auth_on_approve` |
 
 ---
 
-### Arquivos modificados / criados
+## Etapa 1 — Banco (1 migration nova)
 
-**Modificados**
-- `src/components/dashboard/InsurancePanel.tsx` — vira shell com `<Tabs>` (Visão Geral / Apólices / Sem Cobertura). Toda a lógica de fetch, mutations, dialogs e regras existentes (IA bloqueada, soft delete, unique, dedupe de save) **fica intacta** e é passada via props/contexto local para os 3 sub-componentes.
+**Tabela `fuel_authorizations`** — adicionar:
+- `approved_amount numeric` (valor máximo autorizado)
+- ajustar default de `expires_at` para `now() + 2h` ao aprovar (alterar `tg_fuel_auth_on_approve`)
 
-**Novos** (puramente apresentacionais, dentro de `src/components/dashboard/insurance/`)
-- `InsuranceOverviewTab.tsx` — 3 KPIs grandes, donut de cobertura (recharts já está instalado), bloco "Alertas críticos" e "Próximas a vencer".
-- `InsurancePoliciesTab.tsx` — busca de veículo + lista de cards colapsáveis (Radix `Collapsible`). Reaproveita os blocos JSX de KPIs/cobertura/quadrantes do arquivo atual extraídos como `<PolicyCardBody />`.
-- `InsuranceUncoveredTab.tsx` — lista filtrável e ordenável por FIPE dos veículos sem vínculo ativo + dialog "Vincular a apólice manual".
-- `PolicyCardBody.tsx` — extração 1:1 do conteúdo expandido de cada apólice (sem mudança de comportamento).
+**Nova tabela `fuel_station_users`**:
+- `id, station_id (FK fuel_stations), email unique, password_hash, name, role text, active bool, created_at, updated_at`
+- Senha **não** armazenada em texto puro — `password_hash` (bcrypt feito pela edge function)
+- RLS: bloqueado pra `anon`/`authenticated` no client. Acesso só via edge function com `service_role` (o portal do posto NÃO usa Supabase Auth do app — login próprio via edge function que emite JWT curto)
 
-**Não criados / não alterados**
-- Nenhum hook novo, nenhuma migration, nenhuma edge function tocada.
-- Dialogs existentes (revisar IA, excluir apólice, criar manual) continuam idênticos — só são chamados de dentro das novas abas.
+**RPC `confirm_authorization_by_station(code, station_id, liters, total_value, receipt_number, receipt_url)`**:
+- security definer, validações: código existe, status='aprovada', `expires_at > now()`, `fuel_station_id = station_id`
+- Se `approved_amount` definido e `total_value > approved_amount` → erro
+- Insere `fuel_records` (origem `posto_portal`)
+- Atualiza autorização: `status='utilizada'`, `used_at=now()`, `confirmed_at=now()`, vincula `fuel_record_id`
+- Retorna o id do fuel_record criado
+
+**RPC `generate_authorization_code(authorization_id)`** — wrapper público (chama a função interna existente, retorna o code).
 
 ---
 
-### Garantias de preservação
+## Etapa 2 — App do motorista (Colaborador)
 
-1. Trigger `tg_ipv_block_ai_changes`, UNIQUE index, soft delete (`removed_at`), trava `savingPolicy`, validação pre-insert por `policy_number` — **nenhum desses pontos é tocado**.
-2. Todos os fluxos atuais (upload PDF → extract → review → link, criação manual, exclusão, busca por placa) continuam funcionando — apenas mudam de aba.
-3. Tema dark + cores semânticas (`success`/`destructive`/`warning`/`primary`) já existentes no design system.
-4. Sem novas dependências.
+Em `src/pages/app/Colaborador.tsx` (ou componente filho de "Solicitar Abastecimento" que já existe):
+- Adicionar seleção de posto (`fuel_stations`)
+- Foto do hodômetro + foto da placa → upload no bucket `driver-uploads`
+- Chamar edge function `extract-document` (já existe) pra validar placa e km via IA
+- Após aprovação, exibir tela cheia com **código de 6 dígitos**, contador regressivo até `expires_at`, e botão "Atualizar status"
 
-Posso aplicar?
+---
+
+## Etapa 3 — Portal do posto `/posto`
+
+**Rotas novas em `App.tsx`** (fora de `RequireAuth` e `AppLayout`):
+- `/posto/login` — `PostoLogin.tsx`
+- `/posto` — `PostoShell.tsx` (protegido por contexto próprio)
+  - Aba **Confirmar** — `PostoConfirmar.tsx`
+  - Aba **Histórico** — `PostoHistorico.tsx`
+
+**Edge functions novas**:
+- `posto-login` — recebe email+senha, valida bcrypt em `fuel_station_users`, retorna JWT assinado (HS256, secret `POSTO_JWT_SECRET`) com `station_id` e expiração 12h
+- `posto-confirm` — recebe JWT + payload, chama `confirm_authorization_by_station` com service role, dispara email
+- `posto-list` — recebe JWT, retorna histórico filtrado (período, placa, motorista) pro `station_id` do token
+
+**Fluxo confirmar**: digitar código → preview placa/motorista/valor autorizado → preencher litros, total, nº cupom, foto do cupom → confirmar → toast sucesso.
+
+**Histórico**: filtros (data início/fim, placa, motorista). Botões **Exportar PDF** (jsPDF + autoTable) e **Excel** (xlsx) gerando arquivo no client.
+
+**Contexto de auth do posto**: `PostoAuthContext` salva JWT em `localStorage` (`posto_token`), `RequirePosto` redireciona pra `/posto/login` se ausente/expirado.
+
+---
+
+## Etapa 4 — Email automático
+
+Edge function `posto-confirm` chama, após sucesso, função `send-fuel-confirmation-email` (nova) que usa **Lovable Emails** (infra já configurada — verificar se há domain). Template:
+- Empresa do veículo (busca pelo `company_id` da autorização)
+- Dados veículo, motorista, posto, data, litros, valor, nº cupom
+- Anexo: foto do cupom (URL do storage assinada)
+- Código usado pra rastreabilidade
+
+⚠️ Se o domínio de email Lovable ainda não estiver configurado, vou avisar e o email fica como TODO até você configurar — o resto do fluxo funciona normalmente.
+
+---
+
+## Arquivos modificados / criados
+
+**Migrations** (1 nova):
+- `supabase/migrations/<ts>_posto_portal.sql`
+
+**Edge functions** (novas):
+- `supabase/functions/posto-login/index.ts`
+- `supabase/functions/posto-confirm/index.ts`
+- `supabase/functions/posto-list/index.ts`
+- `supabase/functions/send-fuel-confirmation-email/index.ts`
+- `supabase/config.toml` — registrar com `verify_jwt = false` (auth própria)
+
+**Frontend novo**:
+- `src/contexts/PostoAuthContext.tsx`
+- `src/components/auth/RequirePosto.tsx`
+- `src/pages/posto/PostoLogin.tsx`
+- `src/pages/posto/PostoShell.tsx`
+- `src/pages/posto/PostoConfirmar.tsx`
+- `src/pages/posto/PostoHistorico.tsx`
+
+**Frontend editado**:
+- `src/App.tsx` — adicionar rotas `/posto/*`
+- `src/pages/app/Colaborador.tsx` (ou componente da tela "Solicitar Abastecimento") — fluxo de foto + código
+
+**Dependências novas**: `bcryptjs` (edge), `jspdf`, `jspdf-autotable`, `xlsx` (frontend portal)
+
+**Secret novo**: `POSTO_JWT_SECRET` (vou pedir via add_secret)
+
+---
+
+## Garantias de não-quebra
+
+- Trigger `tg_fuel_record_sync_auth` continua válido — `fuel_records` criado pela RPC carrega `authorization_id`
+- Enum `fuel_auth_status` é reaproveitado, nada removido
+- `tg_fuel_auth_require_record_on_use` continua barrando "utilizada" sem fuel_record (a RPC cria o record antes)
+- Fluxo manual atual de aprovação no app continua funcionando — código de 6 dígitos passa a expirar em 2h em vez de 24h (esse é um comportamento intencional do pedido — confirme se OK)
+
+---
+
+## Pontos pra você confirmar antes de executar
+
+1. **Expiração 2h**: troco o default de 24h pra 2h em **toda** autorização, ou só pras que vêm do app do motorista?
+2. **Email**: posso seguir e deixar TODO se não houver domain configurado? Ou prefere configurar Lovable Emails primeiro?
+3. **`approved_amount`**: bloquear estritamente se `total_value > approved_amount`, ou só avisar?
+4. **Cadastro de usuários do posto**: crio uma tela de admin (super admin) pra cadastrar `fuel_station_users`, ou por enquanto inserção manual via SQL?
+
+Posso executar?
