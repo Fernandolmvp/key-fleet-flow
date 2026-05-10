@@ -1238,7 +1238,7 @@ export default function InsurancePanel() {
                   <span className="font-mono text-xs text-muted-foreground">#{p.policy_number}</span>
                   <Badge variant="outline" className={st.cls + " text-[10px]"}>{st.label}</Badge>
                 </div>
-                <Button size="sm" variant="outline" className="h-7" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(p.id); }}>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}>
                   <ExternalLink className="h-3 w-3" /> Abrir apólice
                 </Button>
               </div>
@@ -1304,7 +1304,7 @@ export default function InsurancePanel() {
                               </a>
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(p.id); }}>
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}>
                             <ExternalLink className="h-3 w-3" /> Abrir
                           </Button>
                         </div>
@@ -1353,7 +1353,7 @@ export default function InsurancePanel() {
           <div className="text-[10px] text-muted-foreground ml-auto">Clique nos cards para filtrar</div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
-          <button type="button" onClick={() => { setActiveTab("assegurados"); setAssuredFilter("all"); }} className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left">
+          <button type="button" onClick={() => { setActiveTab("apolices"); setAssuredFilter("all"); }} className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left">
             <div className="text-xl font-bold text-emerald-400">{fleetSummary.coveredCount}</div>
             <div className="text-[10px] uppercase text-emerald-400/80">Veículos cobertos</div>
           </button>
@@ -1365,7 +1365,7 @@ export default function InsurancePanel() {
             <div className="text-xl font-bold text-destructive">{fleetSummary.uncoveredCount}</div>
             <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
           </button>
-          <button type="button" onClick={() => setActiveTab("assegurados")} className="rounded-md p-2 border bg-primary/10 border-primary/30 hover:bg-primary/20 transition-colors text-left">
+          <button type="button" onClick={() => setActiveTab("apolices")} className="rounded-md p-2 border bg-primary/10 border-primary/30 hover:bg-primary/20 transition-colors text-left">
             <div className="text-xl font-bold text-primary">{fleetSummary.vigentes}</div>
             <div className="text-[10px] uppercase text-primary/80">Apólices vigentes</div>
           </button>
