@@ -3642,6 +3642,25 @@ export type Database = {
             }
             Returns: Json
           }
+        | {
+            Args: {
+              _company_id: string
+              _error?: string
+              _feature: string
+              _model?: string
+              _model_id_used?: string
+              _provider_id?: string
+              _request_id?: string
+              _response_time_ms?: number
+              _success?: boolean
+              _tokens_input?: number
+              _tokens_output?: number
+              _tokens_used: number
+              _user_id: string
+              _was_fallback?: boolean
+            }
+            Returns: Json
+          }
       generate_fuel_auth_code: { Args: never; Returns: string }
       get_company_vehicle_limit: {
         Args: { _company_id: string }
