@@ -22,12 +22,13 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [status, setStatus] = useState<"ativa" | "suspensa" | "cancelada">("ativa");
+  const [fuelAuthTtl, setFuelAuthTtl] = useState<number>(30);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase.from("companies")
-        .select("name, cnpj, logo_url, email, phone, contact_name, address, city, state, status")
+        .select("name, cnpj, logo_url, email, phone, contact_name, address, city, state, status, fuel_auth_code_ttl_minutes")
         .eq("id", companyId).maybeSingle();
       setName(data?.name ?? "");
       setCnpj(data?.cnpj ?? "");
@@ -39,6 +40,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
       setCity((data as any)?.city ?? "");
       setState((data as any)?.state ?? "");
       setStatus(((data as any)?.status as any) ?? "ativa");
+      setFuelAuthTtl(Number((data as any)?.fuel_auth_code_ttl_minutes ?? 30));
       setLoading(false);
     })();
   }, [companyId]);
@@ -57,6 +59,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         city: city.trim() || null,
         state: state.trim() || null,
         status,
+        fuel_auth_code_ttl_minutes: Math.max(5, Math.min(1440, Number(fuelAuthTtl) || 30)),
       }).eq("id", companyId);
       if (error) throw error;
       toast.success("Empresa atualizada");
@@ -127,6 +130,21 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
           <Label>Estado (UF)</Label>
           <Input value={state} onChange={(e) => setState(e.target.value.toUpperCase())} maxLength={2} placeholder="SP" />
         </div>
+      </div>
+      <div className="border-t border-border pt-4 space-y-2">
+        <h4 className="font-display font-semibold text-sm">Autorização de abastecimento</h4>
+        <Label>Validade do código (minutos)</Label>
+        <Input
+          type="number"
+          min={5}
+          max={1440}
+          value={fuelAuthTtl}
+          onChange={(e) => setFuelAuthTtl(Number(e.target.value))}
+          className="max-w-[200px]"
+        />
+        <p className="text-xs text-muted-foreground">
+          Tempo que o motorista tem para usar o código de 6 dígitos no posto. Padrão: 30 minutos.
+        </p>
       </div>
       <div className="pt-2">
         <Button onClick={save} disabled={saving || !name.trim()} className="gap-2">
