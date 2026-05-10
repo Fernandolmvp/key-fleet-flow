@@ -62,7 +62,8 @@ const TOOL = {
               deductible: { type: ["number", "null"], description: "Franquia específica deste veículo, se diferente da padrão" },
               inclusion_type: { type: ["string", "null"], enum: ["apolice", "adendo", null], description: "'adendo' se foi incluído por endosso após emissão; 'apolice' se está na lista original" },
               endorsement_number: { type: ["string", "null"] },
-              coverage_notes: { type: ["string", "null"], description: "Observação curta sobre coberturas/limites específicos deste veículo" }
+              coverage_notes: { type: ["string", "null"], description: "Observação curta sobre coberturas/limites específicos deste veículo" },
+              page_number: { type: ["integer", "null"], description: "Número da página do PDF onde este veículo aparece (1-indexado). Se aparecer em várias páginas, indique a primeira." }
             },
             required: ["plate"],
             additionalProperties: false
