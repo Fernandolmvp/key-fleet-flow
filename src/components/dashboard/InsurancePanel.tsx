@@ -693,11 +693,16 @@ export default function InsurancePanel() {
     };
     const activePolicies = policies.filter(isVigente);
     const activeIds = new Set(activePolicies.map((p) => p.id));
-    const coveredVehicleIds = new Set(
-      links.filter((l) => activeIds.has(l.policy_id)).map((l) => l.vehicle_id)
+    const norm = (s: string) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    // Mapa placa -> id do veículo cadastrado
+    const plateToVehicleId = new Map<string, string>();
+    vehicles.forEach((v) => plateToVehicleId.set(norm(v.plate), v.id));
+    const cadastradas = new Set(plateToVehicleId.keys());
+
+    // Cobertos = vínculos ativos OU placas presentes em ai_extracted de qualquer apólice vigente
+    const coveredVehicleIds = new Set<string>(
+      links.filter((l) => activeIds.has(l.policy_id) && !l.removed_at).map((l) => l.vehicle_id)
     );
-    // Placas presentes em ai_extracted das apólices ativas mas não cadastradas
-    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
     const onlyInPolicy = new Set<string>();
     activePolicies.forEach((p) => {
       const ex: any = p.ai_extracted || {};
@@ -705,8 +710,11 @@ export default function InsurancePanel() {
         ? ex.plates
         : Array.isArray(ex.vehicles) ? ex.vehicles.map((v: any) => v?.plate).filter(Boolean) : [];
       plates.forEach((pl) => {
-        const norm = String(pl).toUpperCase().replace(/[^A-Z0-9]/g, "");
-        if (norm && !cadastradas.has(norm)) onlyInPolicy.add(norm);
+        const n = norm(pl);
+        if (!n) return;
+        const vid = plateToVehicleId.get(n);
+        if (vid) coveredVehicleIds.add(vid);
+        else onlyInPolicy.add(n);
       });
     });
     let vencidas = 0, vencendo30 = 0, vigentes = 0;
@@ -730,18 +738,24 @@ export default function InsurancePanel() {
 
   // === Estatísticas por apólice (para os cards) ===
   const policyStats = useMemo(() => {
-    const cadastradas = new Set(vehicles.map((v) => v.plate.toUpperCase()));
+    const norm = (s: string) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const cadastradas = new Set(vehicles.map((v) => norm(v.plate)));
     const map: Record<string, { covered: number; onlyInPolicy: number }> = {};
     policies.forEach((p) => {
-      const linkedHere = links.filter((l) => l.policy_id === p.id);
+      const linkedVehicleSet = new Set(
+        links.filter((l) => l.policy_id === p.id && !l.removed_at).map((l) => l.vehicle_id)
+      );
       const ex: any = p.ai_extracted || {};
       const plates: string[] = Array.isArray(ex.plates)
         ? ex.plates
         : Array.isArray(ex.vehicles) ? ex.vehicles.map((v: any) => v?.plate).filter(Boolean) : [];
-      const onlyInPolicy = plates
-        .map((pl) => String(pl).toUpperCase().replace(/[^A-Z0-9]/g, ""))
-        .filter((pl) => pl && !cadastradas.has(pl)).length;
-      map[p.id] = { covered: linkedHere.length, onlyInPolicy };
+      const platesN = plates.map((pl) => norm(pl)).filter(Boolean);
+      // Cobertos por essa apólice: vínculos OU placas (cadastradas) extraídas pela IA
+      const coveredPlates = new Set<string>();
+      vehicles.forEach((v) => { if (linkedVehicleSet.has(v.id)) coveredPlates.add(norm(v.plate)); });
+      platesN.forEach((pl) => { if (cadastradas.has(pl)) coveredPlates.add(pl); });
+      const onlyInPolicy = platesN.filter((pl) => !cadastradas.has(pl)).length;
+      map[p.id] = { covered: coveredPlates.size, onlyInPolicy };
     });
     return map;
   }, [policies, links, vehicles]);
