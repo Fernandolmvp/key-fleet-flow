@@ -277,12 +277,67 @@ export default function InsurancePanel() {
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
     ]);
     if (p.error) toast.error(p.error.message);
-    setPolicies((p.data as any[]) || []);
+    const policiesData = (p.data as any[]) || [];
+    const vehiclesData = (v.data as any[]) || [];
+    const linksData = (l.data as any[]) || [];
+    setPolicies(policiesData);
     setBrokers((b.data as any[]) || []);
-    setVehicles((v.data as any[]) || []);
-    setLinks((l.data as any[]) || []);
-    if (!selectedPolicyId && (p.data as any[])?.length) setSelectedPolicyId((p.data as any[])[0].id);
+    setVehicles(vehiclesData);
+    setLinks(linksData);
+    if (!selectedPolicyId && policiesData.length) setSelectedPolicyId(policiesData[0].id);
     setLoading(false);
+    // Auto-vincula novos veículos cadastrados às apólices de IA já importadas
+    autoLinkAiPolicies(policiesData, vehiclesData, linksData).catch((e) =>
+      console.error("autoLinkAiPolicies failed", e)
+    );
+  }
+
+  // Para cada apólice IA ativa, cria automaticamente os vínculos de veículos
+  // cuja placa/chassi já está cadastrada e ainda não foi vinculada.
+  // Em seguida, sincroniza os campos de seguro no cadastro do veículo.
+  async function autoLinkAiPolicies(pols: Policy[], vehs: Vehicle[], lnks: Link[]) {
+    if (!currentCompanyId) return;
+    const today = new Date();
+    const isVigente = (p: Policy) => {
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    };
+    const aiActive = pols.filter((p) => isAiPolicy(p) && isVigente(p));
+    if (!aiActive.length) return;
+    const newLinks: { company_id: string; policy_id: string; vehicle_id: string; inclusion_type: "apolice" | "adendo"; removed_at: null }[] = [];
+    const touchedVehicleIds = new Set<string>();
+    for (const pol of aiActive) {
+      const existing = new Set(
+        lnks.filter((l) => l.policy_id === pol.id && !l.removed_at).map((l) => l.vehicle_id)
+      );
+      const ex: any = pol.ai_extracted || {};
+      const aiList: AiVehicle[] = Array.isArray(ex.vehicles) && ex.vehicles.length
+        ? ex.vehicles
+        : (Array.isArray(ex.plates) ? ex.plates.map((p: string) => ({ plate: p } as AiVehicle)) : []);
+      aiList.forEach((a) => {
+        const r = matchAiVehicle(a, vehs);
+        if (r.status === "linked" && r.vehicle && !existing.has(r.vehicle.id)) {
+          newLinks.push({
+            company_id: currentCompanyId!,
+            policy_id: pol.id,
+            vehicle_id: r.vehicle.id,
+            inclusion_type: (a.inclusion_type === "adendo" ? "adendo" : "apolice"),
+            removed_at: null,
+          });
+          touchedVehicleIds.add(r.vehicle.id);
+        }
+      });
+    }
+    if (!newLinks.length) return;
+    const ins = await supabase.from("insurance_policy_vehicles").upsert(newLinks, { onConflict: "policy_id,vehicle_id" });
+    if (ins.error) { console.error(ins.error); return; }
+    await syncVehicleInsuranceFields(currentCompanyId, Array.from(touchedVehicleIds));
+    // recarrega vínculos atualizados (sem chamar load() para evitar loop)
+    const { data: refreshed } = await supabase
+      .from("insurance_policy_vehicles").select("*")
+      .eq("company_id", currentCompanyId).is("removed_at", null);
+    setLinks((refreshed as any[]) || []);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
 
