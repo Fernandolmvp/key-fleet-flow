@@ -1280,6 +1280,22 @@ export default function InsurancePanel() {
                             <ExternalLink className="h-3 w-3" /> Abrir
                           </Button>
                         </div>
+                        {p.file_url && (
+                          <div className="md:col-span-2 -mt-1 text-[11px] text-muted-foreground/80 italic">
+                            {pageNum ? (
+                              <a
+                                href={`${p.file_url}#page=${pageNum}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:text-primary hover:underline"
+                              >
+                                Consta na página {pageNum} da apólice
+                              </a>
+                            ) : (
+                              <span>Página não identificada na apólice</span>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-1"><span className="text-muted-foreground">Tel. seguradora:</span> {p.insurer_phone ? (<span className="flex items-center gap-1"><Phone className="h-3 w-3" />{p.insurer_phone}</span>) : "—"}</div>
                         <div><span className="text-muted-foreground">Vigência:</span> {p.start_date ? format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy") : "—"} → {p.end_date ? format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy") : "—"}</div>
                         <div><Badge variant="outline" className={st.cls}>{st.label}</Badge></div>
