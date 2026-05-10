@@ -176,13 +176,23 @@ export default function Vehicles() {
     }) || null;
   };
 
-  const isInsured = (v: Vehicle) => {
-    const today = new Date().toISOString().slice(0, 10);
-    if (findActivePolicy(v.id)) return true;
-    const ins = findInsurance(v.id);
-    if (ins?.expires_at) return ins.expires_at >= today;
-    if (v.insurance_expires_at) return v.insurance_expires_at >= today;
-    return !!(v.insurer && v.insurance_policy);
+  const isInsured = (v: Vehicle) => insuranceStatus(v) !== "sem";
+
+  const insuranceStatus = (v: Vehicle): "ativo" | "vencendo" | "sem" => {
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const policy = findActivePolicy(v.id);
+    const endDate =
+      policy?.policy?.end_date ||
+      v.insurance_expires_at ||
+      findInsurance(v.id)?.expires_at ||
+      null;
+    const hasCover = !!policy || !!(v.insurer && v.insurance_policy && (!v.insurance_expires_at || v.insurance_expires_at >= todayStr));
+    if (!hasCover) return "sem";
+    if (endDate && endDate < todayStr) return "sem";
+    if (endDate && endDate <= in30) return "vencendo";
+    return "ativo";
   };
 
   return (
@@ -439,11 +449,20 @@ export default function Vehicles() {
                               {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
                               {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `${v.licensing_year}` : "Sem"}
                             </Badge>
-                            <Badge variant="outline" title={insured ? "Segurado" : "Sem seguro"}
-                              className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
-                              {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
-                              {insured ? "Seguro" : "Sem seg."}
-                            </Badge>
+                            {(() => {
+                              const st = insuranceStatus(v as any);
+                              const cfg = st === "ativo"
+                                ? { cls: "border-success/40 text-success bg-success/10", icon: <ShieldCheck className="h-3 w-3" />, label: "Seg. ATIVO", title: "Apólice vigente" }
+                                : st === "vencendo"
+                                ? { cls: "border-warning/40 text-warning bg-warning/10", icon: <ShieldAlert className="h-3 w-3" />, label: "Vence 30d", title: "Apólice vence em até 30 dias" }
+                                : { cls: "border-destructive/40 text-destructive bg-destructive/10", icon: <ShieldAlert className="h-3 w-3" />, label: "Sem seg.", title: "Sem apólice ativa" };
+                              return (
+                                <Badge variant="outline" title={cfg.title} className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${cfg.cls}`}>
+                                  {cfg.icon}
+                                  {cfg.label}
+                                </Badge>
+                              );
+                            })()}
                           </div>
                         </td>
                       )}
