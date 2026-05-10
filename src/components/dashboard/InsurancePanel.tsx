@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail, ShieldAlert, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail, ShieldAlert, Filter, ChevronDown, ChevronUp, Activity, CalendarClock, BarChart3 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
@@ -212,7 +213,8 @@ export default function InsurancePanel() {
   const [globalSearchMode, setGlobalSearchMode] = useState<"veiculo" | "apolice" | "seguradora" | "corretora">("veiculo");
 
   // Nova navegação por abas
-  const [activeTab, setActiveTab] = useState<"assegurados" | "sem-cobertura">("assegurados");
+  const [activeTab, setActiveTab] = useState<"overview" | "apolices" | "sem-cobertura">("overview");
+  const [policySearch, setPolicySearch] = useState("");
   const [uncoveredSearch, setUncoveredSearch] = useState("");
   const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
@@ -285,7 +287,6 @@ export default function InsurancePanel() {
     setBrokers((b.data as any[]) || []);
     setVehicles(vehiclesData);
     setLinks(linksData);
-    if (!selectedPolicyId && policiesData.length) setSelectedPolicyId(policiesData[0].id);
     setLoading(false);
     // Auto-vincula novos veículos cadastrados às apólices de IA já importadas
     autoLinkAiPolicies(policiesData, vehiclesData, linksData).catch((e) =>
@@ -1167,12 +1168,16 @@ export default function InsurancePanel() {
   return (
     <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="assegurados" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="apolices" className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
-            Veículos Assegurados
-            <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 ml-1">
-              {fleetSummary.coveredCount}
+            Apólices
+            <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 ml-1">
+              {policies.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="sem-cobertura" className="flex items-center gap-2">
@@ -1183,6 +1188,199 @@ export default function InsurancePanel() {
             </Badge>
           </TabsTrigger>
         </TabsList>
+
+        {/* ===================== TAB 0 — VISÃO GERAL ===================== */}
+        <TabsContent value="overview" className="space-y-4 mt-0">
+          {/* 3 KPIs grandes */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => { setActiveTab("apolices"); setAssuredFilter("all"); }}
+              className="surface-card rounded-xl p-5 text-left hover:border-emerald-500/50 transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Veículos cobertos</p>
+                  <p className="font-display text-4xl font-bold mt-2 text-emerald-400">{fleetSummary.coveredCount}</p>
+                  <p className="text-xs text-muted-foreground mt-1">com apólice vigente</p>
+                </div>
+                <div className="h-10 w-10 rounded-lg grid place-items-center bg-emerald-500/15 text-emerald-400">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("sem-cobertura")}
+              className="surface-card rounded-xl p-5 text-left hover:border-destructive/50 transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Sem cobertura</p>
+                  <p className="font-display text-4xl font-bold mt-2 text-destructive">{companyUncovered.length}</p>
+                  <p className="text-xs text-muted-foreground mt-1">veículos ativos da frota</p>
+                </div>
+                <div className="h-10 w-10 rounded-lg grid place-items-center bg-destructive/15 text-destructive">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("apolices")}
+              className="surface-card rounded-xl p-5 text-left hover:border-primary/50 transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Apólices vigentes</p>
+                  <p className="font-display text-4xl font-bold mt-2 text-primary">{fleetSummary.vigentes}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {fleetSummary.vencidas > 0 && <span className="text-destructive">{fleetSummary.vencidas} vencidas · </span>}
+                    {fleetSummary.vencendo30} vencendo em 30d
+                  </p>
+                </div>
+                <div className="h-10 w-10 rounded-lg grid place-items-center bg-primary/15 text-primary">
+                  <Activity className="h-5 w-5" />
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Donut + Alertas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <div className="font-display font-bold">Cobertura da frota</div>
+              </div>
+              {(() => {
+                const total = fleetSummary.coveredCount + fleetSummary.uncoveredCount;
+                const pctCov = total > 0 ? Math.round((fleetSummary.coveredCount / total) * 100) : 0;
+                const data = [
+                  { name: "Cobertos", value: fleetSummary.coveredCount },
+                  { name: "Sem cobertura", value: fleetSummary.uncoveredCount },
+                ];
+                const COLORS = ["hsl(var(--success))", "hsl(var(--destructive))"];
+                return (
+                  <div className="flex items-center gap-4">
+                    <div className="w-40 h-40 shrink-0 relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={2} dataKey="value">
+                            {data.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
+                          </Pie>
+                          <RTooltip
+                            contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                        <div className="text-center">
+                          <div className="font-display text-2xl font-bold text-emerald-400">{pctCov}%</div>
+                          <div className="text-[10px] uppercase text-muted-foreground">cobertos</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-success" />
+                        <span>{fleetSummary.coveredCount} cobertos</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
+                        <span>{fleetSummary.uncoveredCount} sem cobertura</span>
+                      </div>
+                      {fleetSummary.onlyInPolicyCount > 0 && (
+                        <div className="text-xs text-amber-400 mt-2">
+                          + {fleetSummary.onlyInPolicyCount} placa(s) na apólice sem cadastro na frota
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <div className="font-display font-bold">Alertas críticos</div>
+              </div>
+              <div className="space-y-2 text-sm">
+                {fleetSummary.vencendo30 === 0 && fleetSummary.vencidas === 0 && companyUncovered.length === 0 && (
+                  <div className="text-xs text-emerald-400 flex items-center gap-1">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Tudo em ordem.
+                  </div>
+                )}
+                {fleetSummary.vencidas > 0 && (
+                  <button onClick={() => setActiveTab("apolices")} className="w-full flex items-center justify-between p-2 rounded border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 transition-colors text-left">
+                    <span className="flex items-center gap-2 text-destructive">
+                      <ShieldAlert className="h-4 w-4" /> {fleetSummary.vencidas} apólice(s) vencida(s)
+                    </span>
+                    <ExternalLink className="h-3 w-3 text-destructive" />
+                  </button>
+                )}
+                {fleetSummary.vencendo30 > 0 && (
+                  <button onClick={() => setActiveTab("apolices")} className="w-full flex items-center justify-between p-2 rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-left">
+                    <span className="flex items-center gap-2 text-amber-400">
+                      <CalendarClock className="h-4 w-4" /> {fleetSummary.vencendo30} apólice(s) vencendo em ≤ 30 dias
+                    </span>
+                    <ExternalLink className="h-3 w-3 text-amber-400" />
+                  </button>
+                )}
+                {companyUncovered.length > 0 && (
+                  <button onClick={() => setActiveTab("sem-cobertura")} className="w-full flex items-center justify-between p-2 rounded border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 transition-colors text-left">
+                    <span className="flex items-center gap-2 text-destructive">
+                      <Truck className="h-4 w-4" /> {companyUncovered.length} veículo(s) ativos sem cobertura
+                    </span>
+                    <ExternalLink className="h-3 w-3 text-destructive" />
+                  </button>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Próximas a vencer */}
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarClock className="h-4 w-4 text-primary" />
+              <div className="font-display font-bold">Próximas a vencer</div>
+            </div>
+            {(() => {
+              const today = new Date();
+              const upcoming = policies
+                .filter((p) => p.status === "ativa" && p.end_date)
+                .map((p) => ({ p, days: differenceInDays(new Date(p.end_date! + "T00:00:00"), today) }))
+                .filter((x) => x.days >= 0 && x.days <= 90)
+                .sort((a, b) => a.days - b.days)
+                .slice(0, 5);
+              if (upcoming.length === 0) {
+                return <div className="text-xs text-muted-foreground py-4 text-center">Nenhuma apólice vence nos próximos 90 dias.</div>;
+              }
+              return (
+                <div className="space-y-1">
+                  {upcoming.map(({ p, days }) => {
+                    const st = policyStatus(p);
+                    const vCount = links.filter((l) => l.policy_id === p.id).length;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}
+                        className="w-full flex items-center justify-between gap-2 p-2 rounded border border-border bg-muted/10 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{p.insurer_name}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">#{p.policy_number} · {vCount} veíc.</div>
+                        </div>
+                        <Badge variant="outline" className={st.cls + " whitespace-nowrap"}>{st.label}</Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </Card>
+        </TabsContent>
 
       {/* BUSCA GLOBAL POR VEÍCULO */}
       <Card className="p-4 space-y-3">
@@ -1237,7 +1435,7 @@ export default function InsurancePanel() {
                   <span className="font-mono text-xs text-muted-foreground">#{p.policy_number}</span>
                   <Badge variant="outline" className={st.cls + " text-[10px]"}>{st.label}</Badge>
                 </div>
-                <Button size="sm" variant="outline" className="h-7" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(p.id); }}>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}>
                   <ExternalLink className="h-3 w-3" /> Abrir apólice
                 </Button>
               </div>
@@ -1303,7 +1501,7 @@ export default function InsurancePanel() {
                               </a>
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => { setActiveTab("assegurados"); setSelectedPolicyId(p.id); }}>
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}>
                             <ExternalLink className="h-3 w-3" /> Abrir
                           </Button>
                         </div>
@@ -1344,51 +1542,25 @@ export default function InsurancePanel() {
         })}
       </Card>
 
-      {/* RESUMO GERAL DA FROTA */}
+        {/* ===================== TAB 1 — APÓLICES ===================== */}
+        <TabsContent value="apolices" className="space-y-4 mt-0">
       <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <div className="font-display font-bold">Resumo da frota</div>
-          <div className="text-[10px] text-muted-foreground ml-auto">Clique nos cards para filtrar</div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
-          <button type="button" onClick={() => { setActiveTab("assegurados"); setAssuredFilter("all"); }} className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left">
-            <div className="text-xl font-bold text-emerald-400">{fleetSummary.coveredCount}</div>
-            <div className="text-[10px] uppercase text-emerald-400/80">Veículos cobertos</div>
-          </button>
-          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
-            <div className="text-xl font-bold text-amber-400">{fleetSummary.onlyInPolicyCount}</div>
-            <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
-          </div>
-          <button type="button" onClick={() => setActiveTab("sem-cobertura")} className="rounded-md p-2 border bg-destructive/10 border-destructive/30 hover:bg-destructive/20 transition-colors text-left">
-            <div className="text-xl font-bold text-destructive">{fleetSummary.uncoveredCount}</div>
-            <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
-          </button>
-          <button type="button" onClick={() => setActiveTab("assegurados")} className="rounded-md p-2 border bg-primary/10 border-primary/30 hover:bg-primary/20 transition-colors text-left">
-            <div className="text-xl font-bold text-primary">{fleetSummary.vigentes}</div>
-            <div className="text-[10px] uppercase text-primary/80">Apólices vigentes</div>
-          </button>
-          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
-            <div className="text-xl font-bold text-amber-400">{fleetSummary.vencendo30}</div>
-            <div className="text-[10px] uppercase text-amber-400/80">Vencendo em 30d</div>
-          </div>
-          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
-            <div className="text-xl font-bold text-destructive">{fleetSummary.vencidas}</div>
-            <div className="text-[10px] uppercase text-destructive/80">Vencidas</div>
-          </div>
-        </div>
-      </Card>
-
-        {/* ===================== TAB 1 — ASSEGURADOS ===================== */}
-        <TabsContent value="assegurados" className="space-y-4 mt-0">
-      {/* COLUNA ESQUERDA — Apólices */}
-      <Card className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="font-display font-bold flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Apólices da frota</div>
-            <div className="text-xs text-muted-foreground">Suba o PDF — a IA extrai dados, corretor e placas cobertas.</div>
+            <div className="text-xs text-muted-foreground">Suba o PDF — a IA extrai dados, corretor e placas cobertas. Clique num card para expandir.</div>
           </div>
           <Button onClick={openNew}><Plus className="h-4 w-4" /> Nova apólice</Button>
+        </div>
+
+        <div className="relative">
+          <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9 h-9"
+            placeholder="Filtrar por seguradora, nº da apólice ou corretor..."
+            value={policySearch}
+            onChange={(e) => setPolicySearch(e.target.value)}
+          />
         </div>
 
         <div className="space-y-2 max-h-[800px] overflow-y-auto">
@@ -1396,7 +1568,14 @@ export default function InsurancePanel() {
           {!loading && policies.length === 0 && (
             <div className="text-sm text-muted-foreground py-8 text-center">Nenhuma apólice cadastrada.</div>
           )}
-          {policies.map((p) => {
+          {policies
+            .filter((p) => {
+              const q = policySearch.trim().toLowerCase();
+              if (!q) return true;
+              const broker = brokers.find((b) => b.id === p.broker_id);
+              return [p.insurer_name, p.policy_number, broker?.name].filter(Boolean).join(" ").toLowerCase().includes(q);
+            })
+            .map((p) => {
             const st = policyStatus(p);
             const broker = brokers.find((b) => b.id === p.broker_id);
             const vCount = links.filter((l) => l.policy_id === p.id).length;

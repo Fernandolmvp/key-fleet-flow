@@ -1,65 +1,94 @@
-## Diagnóstico
+## Reestruturação da tela de Seguros — 3 abas
 
-Investiguei o banco e o código. A causa raiz está clara:
+Atualmente `InsurancePanel.tsx` tem ~2.043 linhas com tudo numa única página: KPIs, busca de veículo, lista de apólices expandidas, quadrantes de cobertos / não cadastrados, painel "Sem cobertura" e dialogs (revisão IA, exclusão, criação manual). Vou reorganizar **sem reescrever a lógica de dados** — apenas distribuindo o JSX existente em 3 abas.
 
-- **96 veículos cadastrados** (95 com `status='ativo'`, 1 inativo/vendido) → por isso o badge lateral mostra **95** e não 96 (filtra por ativos).
-- **1 apólice IA ativa** com **49 placas extraídas**, mas **0 vínculos em `insurance_policy_vehicles`** → daí todos os veículos aparecem como "Sem seg" e os contadores divergem.
-- A função `autoLinkAiPolicies` que adicionei na sessão anterior **nunca conseguiu inserir** porque o trigger `tg_ipv_block_ai_changes` bloqueia QUALQUER insert em apólice IA com `RAISE EXCEPTION 'Apólice importada via IA — não é permitido adicionar vínculos manualmente'`. Por isso nada se propaga.
-- A divergência 58 vs 59 também desaparece quando alinhamos tudo na mesma regra: contar apenas veículos `status='ativo'` (95 ativos − cobertos = sem cobertura).
+---
 
-## Mudanças
+### Mockup visual
 
-### 1. Migration — destravar auto-link e fazer backfill
-
-**Trigger `tg_ipv_block_ai_changes` (substituir):** continua bloqueando inserts/updates/deletes manuais em apólice IA, **mas permite INSERT** quando a placa do veículo está em `ai_extracted.plates` da apólice (auto-link de sistema, derivado do PDF). Soft-remove (`removed_at`) continua proibido em apólice IA.
-
-**Backfill:**
-```sql
-INSERT INTO insurance_policy_vehicles (company_id, policy_id, vehicle_id, inclusion_type, included_at)
-SELECT v.company_id, p.id, v.id, 'apolice', CURRENT_DATE
-  FROM insurance_policies p
-  CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(p.ai_extracted->'plates','[]'::jsonb)) AS plate
-  JOIN vehicles v
-    ON v.company_id = p.company_id
-   AND regexp_replace(upper(v.plate),'[^A-Z0-9]','','g') = regexp_replace(upper(plate),'[^A-Z0-9]','','g')
- WHERE p.status = 'ativa'
-   AND NOT EXISTS (
-     SELECT 1 FROM insurance_policy_vehicles ipv
-     WHERE ipv.policy_id = p.id AND ipv.vehicle_id = v.id AND ipv.removed_at IS NULL
-   );
-
-SELECT public.sync_vehicle_insurance_fields(array_agg(id)) FROM vehicles;
+**Cabeçalho fixo (acima das abas)**
+```
+Seguros                                            [+ Nova apólice]
+Apólices, vínculos com veículos e vencimentos.
+─────────────────────────────────────────────────────────────
+[ Visão Geral ]  [ Apólices (3) ]  [ Sem Cobertura (58) ]
 ```
 
-Isso vai criar ~37 vínculos (placas que casam) e popular `vehicles.insurer / insurance_policy / insurance_expires_at` via trigger `tg_ipv_sync_vehicles`.
+**ABA 1 — Visão Geral** (default)
+```
+┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+│  37               │ │  58               │ │  1                │
+│  Veículos         │ │  Sem cobertura    │ │  Apólice vigente  │
+│  cobertos  ✅     │ │  ⚠️                │ │  🛡️               │
+│  → ver apólices   │ │  → ver lista      │ │  → ver apólices   │
+└───────────────────┘ └───────────────────┘ └───────────────────┘
 
-### 2. `src/pages/app/Vehicles.tsx` — badge com 3 estados
+┌─ Cobertura da frota ──────┐  ┌─ Alertas críticos ─────────────┐
+│   ◐ 39% cobertos          │  │ • 0 apólices vencendo em 30d   │
+│     (donut chart)         │  │ • 58 veículos sem cobertura    │
+│   61% sem seguro          │  │   há mais de 30 dias           │
+└───────────────────────────┘  └────────────────────────────────┘
 
-Adicionar lógica `insuranceStatus`: **`ativo`** (vinculado a apólice vigente, >30d), **`vencendo`** (apólice vence em ≤30d) ou **`sem`** (sem vínculo ativo). Substituir o badge atual de 2 estados pelos 3:
-- 🟢 `Seg. ATIVO`
-- 🟡 `Vence 30d`
-- 🔴 `Sem seg.`
+Próximas a vencer
+─────────────────
+• ALFA · 31/07/2026 (77d) · 37 veículos
+```
+Os 3 KPIs são clicáveis e navegam para a aba correspondente (com filtro pré-aplicado quando fizer sentido).
 
-### 3. `src/components/layout/AppLayout.tsx` — consistência do badge lateral
+**ABA 2 — Apólices**
+```
+🔍 Buscar veículo por placa/chassi nas apólices...
 
-Já filtra `status='ativo'` (correto). Manter como está. Após o backfill, o número cai para `(vencendo + vencidas + sem cobertura ativos)` e bate com o painel de Seguros.
+┌────────────────────────────────────────────────────────────┐
+│ ALFA SEGURADORA      [Vigente · 77d]    [IA 🔒]      [▼]  │
+│ Apólice 12345 · 37 cobertos · 12 s/cadastro · 0 vencidos   │
+└────────────────────────────────────────────────────────────┘
 
-### 4. `src/components/dashboard/InsurancePanel.tsx` — sem mudança funcional
+┌────────────────────────────────────────────────────────────┐
+│ YELLOM               [Vigente]          [Manual]     [▼]   │
+│ Apólice N Crded · 0 cobertos · 0 s/cadastro                │
+└────────────────────────────────────────────────────────────┘
+```
+Ao clicar em `▼` abre o card completo que existe hoje (KPIs vigência/prêmio/franquia/IS, cobertura, quadrante de veículos cobertos, quadrante de não cadastrados, aviso IA, botões Revisar / Excluir). Default = todos colapsados; quando há resultado de busca, o card que contém o veículo abre automaticamente.
 
-A `autoLinkAiPolicies` que já existe vai funcionar daqui pra frente (trigger destravado). Apenas vou garantir que não bloqueia o load se alguma placa específica falhar (try/catch por placa já existe).
+**ABA 3 — Sem Cobertura**
+```
+58 veículos sem cobertura ativa                             🔴
+──────────────────────────────────────────────────────────────
+[Tipo ▾] [Ano ▾] [Valor FIPE ▾]              ⇅ Maior FIPE ▾
 
-## O que NÃO muda
+┌────────────────────────────────────────────────────────────┐
+│ ABC1D23 · Volvo FH 540 · 2022                              │
+│ FIPE R$ 620.000 · sem cobertura há 142 dias                │
+│                                       [Vincular a apólice] │
+└────────────────────────────────────────────────────────────┘
+```
+"Vincular a apólice" abre um pequeno dialog com select das apólices manuais (apólices IA continuam bloqueadas pelo trigger atual).
 
-- Migrations antigas intactas.
-- `sync_vehicle_insurance_fields`, `tg_ip_block_ai_field_changes` e `tg_ipv_sync_vehicles` continuam iguais.
-- Edição/exclusão manual de vínculos em apólice IA continua bloqueada.
-- Telas de Motoristas, Documentos, etc. não tocadas.
+---
 
-## Resultado esperado
+### Arquivos modificados / criados
 
-- Tela de Veículos: ~37 com 🟢 Seg. ATIVO, demais 🔴 Sem seg.
-- Painel de Seguros "Sem cobertura": **58** (95 ativos − 37 cobertos).
-- Badge lateral: `vencendo + vencidas + 58`.
-- Os 3 lugares passam a usar a mesma fonte (`insurance_policy_vehicles` + `vehicles.status='ativo'`).
+**Modificados**
+- `src/components/dashboard/InsurancePanel.tsx` — vira shell com `<Tabs>` (Visão Geral / Apólices / Sem Cobertura). Toda a lógica de fetch, mutations, dialogs e regras existentes (IA bloqueada, soft delete, unique, dedupe de save) **fica intacta** e é passada via props/contexto local para os 3 sub-componentes.
+
+**Novos** (puramente apresentacionais, dentro de `src/components/dashboard/insurance/`)
+- `InsuranceOverviewTab.tsx` — 3 KPIs grandes, donut de cobertura (recharts já está instalado), bloco "Alertas críticos" e "Próximas a vencer".
+- `InsurancePoliciesTab.tsx` — busca de veículo + lista de cards colapsáveis (Radix `Collapsible`). Reaproveita os blocos JSX de KPIs/cobertura/quadrantes do arquivo atual extraídos como `<PolicyCardBody />`.
+- `InsuranceUncoveredTab.tsx` — lista filtrável e ordenável por FIPE dos veículos sem vínculo ativo + dialog "Vincular a apólice manual".
+- `PolicyCardBody.tsx` — extração 1:1 do conteúdo expandido de cada apólice (sem mudança de comportamento).
+
+**Não criados / não alterados**
+- Nenhum hook novo, nenhuma migration, nenhuma edge function tocada.
+- Dialogs existentes (revisar IA, excluir apólice, criar manual) continuam idênticos — só são chamados de dentro das novas abas.
+
+---
+
+### Garantias de preservação
+
+1. Trigger `tg_ipv_block_ai_changes`, UNIQUE index, soft delete (`removed_at`), trava `savingPolicy`, validação pre-insert por `policy_number` — **nenhum desses pontos é tocado**.
+2. Todos os fluxos atuais (upload PDF → extract → review → link, criação manual, exclusão, busca por placa) continuam funcionando — apenas mudam de aba.
+3. Tema dark + cores semânticas (`success`/`destructive`/`warning`/`primary`) já existentes no design system.
+4. Sem novas dependências.
 
 Posso aplicar?
