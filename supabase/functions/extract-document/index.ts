@@ -1,7 +1,15 @@
+import {
+  guardAiCall,
+  registerAiUsage,
+  extractTokensFromResponse,
+  featureForDocType,
+  jsonResponse,
+} from "../_shared/ai-tokens.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 // Extrai dados estruturados de imagens/PDFs (CRLV de veículos, CNH de motoristas)
@@ -293,6 +301,12 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // 🔒 Bloqueio prévio por créditos de IA
+    const feature = featureForDocType(type);
+    const guard = await guardAiCall(req, feature);
+    if ("err" in guard) return jsonResponse(guard.err.status, guard.err.body);
+    const ctx = guard.ctx;
 
     let tool: any, fnName: string, sys: string;
     if (type === "vehicle") {
