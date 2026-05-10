@@ -25,7 +25,12 @@ import Brokers from "./pages/app/Brokers";
 import Checklists from "./pages/app/Checklists";
 import Insurance from "./pages/app/Insurance";
 import Configuracoes from "./pages/app/Configuracoes";
-import SuperAdmin from "./pages/admin/SuperAdmin";
+import SuperAdminShell from "./pages/admin/SuperAdminShell";
+import CompaniesPanel from "./pages/admin/CompaniesPanel";
+import ProvidersPage from "./pages/admin/ai/ProvidersPage";
+import ModelsPage from "./pages/admin/ai/ModelsPage";
+import RoutingPage from "./pages/admin/ai/RoutingPage";
+import UsagePage from "./pages/admin/ai/UsagePage";
 import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import NotFound from "./pages/NotFound";
 import PlanSelection from "./pages/auth/PlanSelection";
@@ -54,7 +59,13 @@ const App = () => (
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
             <Route path="/motorista" element={<MotoristaShell />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/super-admin" element={<SuperAdminShell />}>
+              <Route index element={<CompaniesPanel />} />
+              <Route path="ai/providers" element={<ProvidersPage />} />
+              <Route path="ai/models" element={<ModelsPage />} />
+              <Route path="ai/routing" element={<RoutingPage />} />
+              <Route path="ai/usage" element={<UsagePage />} />
+            </Route>
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/posto/login" element={<PostoLogin />} />
             <Route path="/posto" element={<PostoShell />} />
