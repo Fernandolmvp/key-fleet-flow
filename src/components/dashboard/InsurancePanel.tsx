@@ -1039,7 +1039,7 @@ export default function InsurancePanel() {
                   const coveredCount = validation.hasAi ? validation.covered.length : selectedLinks.length;
                   return (
                   <>
-                    <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="grid grid-cols-2 gap-2 text-center">
                       <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
                         <div className="text-lg font-bold text-emerald-400">{coveredCount}</div>
                         <div className="text-[10px] uppercase text-emerald-400/80">Cobertos & cadastrados</div>
@@ -1048,55 +1048,12 @@ export default function InsurancePanel() {
                         <div className="text-lg font-bold text-amber-400">{validation.onlyInPolicy.length}</div>
                         <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
                       </div>
-                      <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
-                        <div className="text-lg font-bold text-destructive">{companyUncovered.length}</div>
-                        <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
-                      </div>
                     </div>
 
                     {validation.hasAi && validation.covered.length > 0 && !policyIsAi && (
                       <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
                         <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
                       </Button>
-                    )}
-
-                    {companyUncovered.length > 0 && (
-                      <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3">
-                        <div className="text-sm font-bold text-destructive flex items-center gap-2 mb-2 uppercase tracking-wide">
-                          <AlertTriangle className="h-4 w-4" />
-                          Veículos sem cobertura ({companyUncovered.length})
-                        </div>
-                        <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                          {companyUncovered.map((v) => {
-                            const alreadyLinkedHere = linkedVehicleIds.has(v.id);
-                            return (
-                              <div key={v.id} className="flex items-center justify-between gap-2 p-2 rounded border border-destructive/30 bg-background/40">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <span className="font-mono font-bold text-destructive text-sm">{v.plate}</span>
-                                  <span className="text-xs text-muted-foreground truncate">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
-                                  {v.vehicle_type && (
-                                    <Badge variant="outline" className="text-[10px] h-5">{v.vehicle_type}</Badge>
-                                  )}
-                                </div>
-                                {!policyIsAi && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 border-destructive/40 text-destructive hover:bg-destructive/20"
-                                    disabled={alreadyLinkedHere}
-                                    onClick={() => linkVehicle(v.id, "manual")}
-                                  >
-                                    <Link2 className="h-3 w-3" /> {alreadyLinkedHere ? "Já vinculado" : "Adicionar cobertura"}
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="text-[10px] text-destructive/80 mt-2">
-                          Vincule esses veículos a uma apólice para garantir cobertura.
-                        </div>
-                      </div>
                     )}
 
                     {validation.onlyInPolicy.length > 0 && (
