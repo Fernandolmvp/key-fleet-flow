@@ -211,6 +211,7 @@ export default function InsurancePanel() {
 
   // Nova navegação por abas
   const [activeTab, setActiveTab] = useState<"assegurados" | "sem-cobertura">("assegurados");
+  const [uncoveredSearch, setUncoveredSearch] = useState("");
   const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
   const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
@@ -1311,8 +1312,32 @@ export default function InsurancePanel() {
                 ✓ Nenhum veículo sem cobertura.
               </div>
             ) : (
+              <>
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9 h-9"
+                  placeholder="Buscar por placa, marca ou modelo..."
+                  value={uncoveredSearch}
+                  onChange={(e) => setUncoveredSearch(e.target.value)}
+                />
+              </div>
               <div className="space-y-1 max-h-[600px] overflow-y-auto">
-                {companyUncovered.map((v) => (
+                {(() => {
+                  const q = uncoveredSearch.trim().toLowerCase();
+                  const list = q
+                    ? companyUncovered.filter((v) =>
+                        [v.plate, v.brand, v.model].filter(Boolean).join(" ").toLowerCase().includes(q),
+                      )
+                    : companyUncovered;
+                  if (list.length === 0) {
+                    return (
+                      <div className="text-xs text-muted-foreground py-6 text-center">
+                        Nenhum veículo encontrado para "{uncoveredSearch}".
+                      </div>
+                    );
+                  }
+                  return list.map((v) => (
                   <div key={v.id} className="flex items-center justify-between gap-2 p-2 rounded border border-destructive/30 bg-destructive/5">
                     <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
                       <span className="font-mono font-bold text-destructive">{v.plate}</span>
@@ -1333,8 +1358,10 @@ export default function InsurancePanel() {
                       <Link2 className="h-3 w-3" /> Adicionar à apólice
                     </Button>
                   </div>
-                ))}
+                  ));
+                })()}
               </div>
+              </>
             )}
           </Card>
         </TabsContent>
