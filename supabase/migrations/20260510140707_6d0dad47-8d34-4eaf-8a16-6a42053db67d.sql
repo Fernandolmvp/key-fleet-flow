@@ -1,0 +1,2 @@
+UPDATE public.ai_token_balance SET plan_tokens_remaining = 50000, extra_tokens_balance = 0, updated_at = now() WHERE company_id = '31a59d73-4bf5-4e6e-8c46-48c91214e123';
+DELETE FROM public.ai_usage_logs WHERE feature IN ('test_proof','test_drain') OR request_id LIKE 'proof-%';
