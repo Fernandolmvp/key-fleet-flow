@@ -3,10 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List } from "lucide-react";
+import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List, Upload } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
+import VehicleBulkImportDialog from "@/components/dashboard/VehicleBulkImportDialog";
 import { Badge } from "@/components/ui/badge";
 import { useTabPermissions } from "@/lib/permissions";
 
@@ -192,6 +193,9 @@ export default function Vehicles() {
         </div>
         <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
           <Plus className="h-4 w-4 mr-2" /> Novo veículo
+        </Button>
+        <Button variant="outline" onClick={() => setBulkOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" /> Importar em lote
         </Button>
       </div>
 
@@ -471,6 +475,7 @@ export default function Vehicles() {
       )}
 
       <VehicleDialog open={open} onOpenChange={setOpen} vehicle={editing} onSaved={load} />
+      <VehicleBulkImportDialog open={bulkOpen} onOpenChange={setBulkOpen} onImported={load} />
     </div>
   );
 }
