@@ -878,7 +878,6 @@ export default function InsurancePanel() {
 
         {/* ===================== TAB 1 — ASSEGURADOS ===================== */}
         <TabsContent value="assegurados" className="space-y-4 mt-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* COLUNA ESQUERDA — Apólices */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -889,7 +888,7 @@ export default function InsurancePanel() {
           <Button onClick={openNew}><Plus className="h-4 w-4" /> Nova apólice</Button>
         </div>
 
-        <div className="space-y-2 max-h-[600px] overflow-y-auto">
+        <div className="space-y-2 max-h-[800px] overflow-y-auto">
           {loading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando…</div>}
           {!loading && policies.length === 0 && (
             <div className="text-sm text-muted-foreground py-8 text-center">Nenhuma apólice cadastrada.</div>
@@ -900,10 +899,10 @@ export default function InsurancePanel() {
             const vCount = links.filter((l) => l.policy_id === p.id).length;
             const isSel = p.id === selectedPolicyId;
             return (
+              <div key={p.id} className="space-y-0">
               <div
-                key={p.id}
-                onClick={() => setSelectedPolicyId(p.id)}
-                className={`p-3 rounded-lg border cursor-pointer transition-colors ${isSel ? "bg-primary/10 border-primary/40" : "border-border hover:bg-muted/30"}`}
+                onClick={() => setSelectedPolicyId(isSel ? null : p.id)}
+                className={`p-3 rounded-lg border cursor-pointer transition-colors ${isSel ? "bg-primary/10 border-primary/40 rounded-b-none" : "border-border hover:bg-muted/30"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -938,6 +937,9 @@ export default function InsurancePanel() {
                     })()}
                   </div>
                   <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-end text-muted-foreground">
+                      {isSel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
                     {p.file_url && (
                       <Button asChild variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
                         <a href={p.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
@@ -969,182 +971,16 @@ export default function InsurancePanel() {
                   </div>
                 </div>
               </div>
+              {isSel && (
+                <div className="border border-t-0 border-primary/40 bg-background/40 rounded-b-lg p-3 space-y-3 animate-accordion-down">
+                  {renderPolicyDetails()}
+                </div>
+              )}
+              </div>
             );
           })}
         </div>
       </Card>
-
-      {/* COLUNA DIREITA — Vínculos veículos ↔ apólice selecionada */}
-      <Card className="p-4 space-y-3">
-        <div>
-          <div className="font-display font-bold flex items-center gap-2"><Link2 className="h-5 w-5 text-primary" /> Veículos cobertos</div>
-          {selectedPolicy ? (
-            <div className="text-xs text-muted-foreground">
-              {selectedPolicy.insurer_name} · #{selectedPolicy.policy_number}
-              <Badge variant="outline" className={"ml-2 text-[10px] " + (policyIsAi ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-primary/15 text-primary border-primary/30")}>
-                {policyIsAi ? "IA" : "Manual"}
-              </Badge>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">Selecione uma apólice à esquerda.</div>
-          )}
-        </div>
-
-        {selectedPolicy && (
-          <>
-            {policyIsAi && (
-              <div className="sticky top-0 z-10 rounded-lg border-2 border-destructive bg-destructive/15 p-3 flex items-center gap-2 shadow-md">
-                <Lock className="h-5 w-5 text-destructive shrink-0" />
-                <div className="text-sm text-destructive font-bold">
-                  🔒 Apólice importada via IA — nenhuma alteração permitida
-                </div>
-              </div>
-            )}
-            {/* ====== PAINEL DE VALIDAÇÃO ====== */}
-            {validation && (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-3">
-                {/* Vigência e valores */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                  <div className="rounded-md bg-background/40 p-2 border border-border">
-                    <div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
-                    <div className="text-xs font-medium">
-                      {selectedPolicy.start_date ? format(new Date(selectedPolicy.start_date + "T00:00:00"), "dd/MM/yy") : "—"} →{" "}
-                      {selectedPolicy.end_date ? format(new Date(selectedPolicy.end_date + "T00:00:00"), "dd/MM/yy") : "—"}
-                    </div>
-                    <Badge variant="outline" className={policyStatus(selectedPolicy).cls + " mt-1 text-[10px]"}>
-                      {policyStatus(selectedPolicy).label}
-                    </Badge>
-                  </div>
-                  <div className="rounded-md bg-background/40 p-2 border border-border">
-                    <div className="text-[10px] uppercase text-muted-foreground">Prêmio total</div>
-                    <div className="text-sm font-bold text-primary">{fmtBRL(selectedPolicy.total_value)}</div>
-                    {validation.sumPremium > 0 && (
-                      <div className="text-[10px] text-muted-foreground">Soma p/ veíc.: {fmtBRL(validation.sumPremium)}</div>
-                    )}
-                  </div>
-                  <div className="rounded-md bg-background/40 p-2 border border-border">
-                    <div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
-                    <div className="text-sm font-bold">{fmtBRL(selectedPolicy.deductible)}</div>
-                  </div>
-                  <div className="rounded-md bg-background/40 p-2 border border-border">
-                    <div className="text-[10px] uppercase text-muted-foreground">IS Total</div>
-                    <div className="text-sm font-bold">{validation.sumIS > 0 ? fmtBRL(validation.sumIS) : "—"}</div>
-                  </div>
-                </div>
-
-                {/* Diagnóstico */}
-                {(() => {
-                  // Para apólice manual, "cobertos" = vínculos manuais; para IA, = matches da IA.
-                  const coveredCount = validation.hasAi ? validation.covered.length : selectedLinks.length;
-                  return (
-                  <>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30">
-                        <div className="text-lg font-bold text-emerald-400">{coveredCount}</div>
-                        <div className="text-[10px] uppercase text-emerald-400/80">Cobertos & cadastrados</div>
-                      </div>
-                      <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
-                        <div className="text-lg font-bold text-amber-400">{validation.onlyInPolicy.length}</div>
-                        <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
-                      </div>
-                    </div>
-
-                    {validation.hasAi && validation.covered.length > 0 && !policyIsAi && (
-                      <Button size="sm" variant="outline" onClick={autoLinkAi} className="w-full">
-                        <Link2 className="h-3.5 w-3.5" /> Vincular automaticamente {validation.covered.filter((v) => !linkedVehicleIds.has(v.id)).length} pendente(s)
-                      </Button>
-                    )}
-
-                    {validation.onlyInPolicy.length > 0 && (
-                      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
-                        <div className="text-xs font-medium text-amber-400 flex items-center gap-1 mb-1">
-                          <AlertTriangle className="h-3.5 w-3.5" />
-                          Placas na apólice mas NÃO cadastradas ({validation.onlyInPolicy.length})
-                        </div>
-                        <div className="space-y-1 max-h-32 overflow-y-auto">
-                          {validation.onlyInPolicy.map((x) => (
-                            <div key={x.plate} className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="font-mono font-bold text-amber-400">{x.plate}</span>
-                              <span className="text-muted-foreground truncate">
-                                {[x.ai?.brand, x.ai?.model, x.ai?.year].filter(Boolean).join(" ") || "—"}
-                              </span>
-                              <span className="text-muted-foreground whitespace-nowrap">{fmtBRL(x.ai?.insured_amount ?? null)}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground mt-1">Cadastre esses veículos para garantir cobertura completa.</div>
-                      </div>
-                    )}
-
-                    {validation.linkedNotInAi.length > 0 && (
-                      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
-                        <div className="text-xs font-medium text-destructive flex items-center gap-1 mb-1">
-                          <AlertTriangle className="h-3.5 w-3.5" />
-                          Vinculados manualmente mas NÃO encontrados na apólice ({validation.linkedNotInAi.length})
-                        </div>
-                        <div className="space-y-1 max-h-24 overflow-y-auto">
-                          {validation.linkedNotInAi.map((v) => (
-                            <div key={v.id} className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="font-mono font-bold text-destructive">{v.plate}</span>
-                              <span className="text-muted-foreground truncate">{v.brand} {v.model}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground mt-1">Verifique a apólice — podem estar como adendo ou fora de cobertura.</div>
-                      </div>
-                    )}
-
-                  </>
-                  );
-                })()}
-              </div>
-            )}
-
-            <div>
-              <div className="text-xs uppercase text-muted-foreground mb-2">Já vinculados ({selectedLinks.length})</div>
-              <div className="space-y-1 max-h-60 overflow-y-auto">
-                {selectedLinks.length === 0 && (
-                  <div className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
-                    Nenhum veículo vinculado a esta apólice ainda.
-                  </div>
-                )}
-                {selectedLinks.map((l) => {
-                  const v = vehicles.find((x) => x.id === l.vehicle_id);
-                  return (
-                    <div key={l.id} className="flex items-center justify-between gap-2 p-2 rounded border border-border bg-muted/20">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono font-bold text-primary">{v?.plate || "—"}</span>
-                        <span className="text-xs text-muted-foreground truncate">{v?.brand} {v?.model}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {l.inclusion_type === "manual" ? (
-                          <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Manual</Badge>
-                        ) : l.inclusion_type === "adendo" ? (
-                          <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 flex items-center gap-1">
-                            <Lock className="h-2.5 w-2.5" /> Adendo
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 flex items-center gap-1">
-                            <Lock className="h-2.5 w-2.5" /> Via apólice
-                          </Badge>
-                        )}
-                        <span className="text-[11px] text-muted-foreground">{format(new Date(l.included_at + "T00:00:00"), "dd/MM/yy")}</span>
-                        {l.inclusion_type === "manual" && !policyIsAi && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => unlinkVehicle(l.id)}>
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-          </>
-        )}
-      </Card>
-          </div>
         </TabsContent>
 
         {/* ===================== TAB 2 — SEM COBERTURA ===================== */}
