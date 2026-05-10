@@ -945,6 +945,18 @@ export default function InsurancePanel() {
                     {aiVeh?.insured_amount && (
                       <span className="text-[11px] text-emerald-400">IS: {fmtBRL(aiVeh.insured_amount)}</span>
                     )}
+                    {aiVeh?.page_number && (
+                      <Badge variant="outline" className="text-[10px] bg-muted/30 text-muted-foreground border-border">
+                        Pág. {aiVeh.page_number}
+                      </Badge>
+                    )}
+                    {selectedPolicy?.file_url && aiVeh?.page_number && (
+                      <Button asChild variant="ghost" size="icon" className="h-6 w-6" title={`Abrir PDF na página ${aiVeh.page_number}`}>
+                        <a href={`${selectedPolicy.file_url}#page=${aiVeh.page_number}`} target="_blank" rel="noreferrer">
+                          <FileText className="h-3 w-3 text-primary" />
+                        </a>
+                      </Button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {l.inclusion_type === "manual" ? (
