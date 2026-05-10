@@ -1,7 +1,14 @@
+import {
+  guardAiCall,
+  registerAiUsage,
+  extractTokensFromResponse,
+  jsonResponse,
+} from "../_shared/ai-tokens.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const TOOL = {
@@ -123,6 +130,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    const FEATURE = "review_insurance_policy";
+    const MODEL = "google/gemini-2.5-pro";
+    const guard = await guardAiCall(req, FEATURE);
+    if ("err" in guard) return jsonResponse(guard.err.status, guard.err.body);
+    const ctx = guard.ctx;
+
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
     const isPdf = (mimeType || "").toLowerCase().includes("pdf");
 
@@ -160,11 +173,13 @@ Deno.serve(async (req) => {
     });
 
     if (aiResp.status === 429) {
+      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "rate_limited_429" });
       return new Response(JSON.stringify({ error: "Limite de requisições da IA excedido." }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (aiResp.status === 402) {
+      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "gateway_402" });
       return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), {
         status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -172,14 +187,17 @@ Deno.serve(async (req) => {
     if (!aiResp.ok) {
       const t = await aiResp.text();
       console.error("AI error:", aiResp.status, t);
+      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: `gateway_${aiResp.status}` });
       return new Response(JSON.stringify({ error: "Falha ao revisar apólice" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await aiResp.json();
+    const usage = extractTokensFromResponse(data);
     const call = data?.choices?.[0]?.message?.tool_calls?.[0];
     if (!call?.function?.arguments) {
+      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "no_tool_call" });
       return new Response(JSON.stringify({ error: "IA não retornou análise." }), {
         status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -188,10 +206,13 @@ Deno.serve(async (req) => {
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(call.function.arguments); }
     catch {
+      await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "invalid_ai_response" });
       return new Response(JSON.stringify({ error: "Resposta da IA inválida" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    await registerAiUsage(ctx, { feature: FEATURE, model: MODEL, tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: true });
 
     return new Response(JSON.stringify({ data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
