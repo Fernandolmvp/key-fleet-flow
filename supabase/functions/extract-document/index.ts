@@ -358,12 +358,14 @@ Deno.serve(async (req) => {
     });
 
     if (aiResp.status === 429) {
+      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "rate_limited_429" });
       return new Response(JSON.stringify({ error: "Limite de requisições da IA excedido. Tente em alguns instantes." }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (aiResp.status === 402) {
+      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: "gateway_402" });
       return new Response(JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos no workspace." }), {
         status: 402,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -372,6 +374,7 @@ Deno.serve(async (req) => {
     if (!aiResp.ok) {
       const t = await aiResp.text();
       console.error("AI error:", aiResp.status, t);
+      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: 0, tokensOutput: 0, tokensTotal: 0, success: false, error: `gateway_${aiResp.status}` });
       return new Response(JSON.stringify({ error: "Falha ao processar documento" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -379,8 +382,10 @@ Deno.serve(async (req) => {
     }
 
     const data = await aiResp.json();
+    const usage = extractTokensFromResponse(data);
     const call = data?.choices?.[0]?.message?.tool_calls?.[0];
     if (!call?.function?.arguments) {
+      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "no_tool_call" });
       return new Response(JSON.stringify({ error: "IA não conseguiu extrair dados deste documento." }), {
         status: 422,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -391,11 +396,15 @@ Deno.serve(async (req) => {
     try {
       parsed = JSON.parse(call.function.arguments);
     } catch {
+      await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: false, error: "invalid_ai_response" });
       return new Response(JSON.stringify({ error: "Resposta da IA inválida" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // ✅ Sucesso: debita os tokens reais consumidos
+    await registerAiUsage(ctx, { feature, model: "google/gemini-2.5-flash", tokensInput: usage.input, tokensOutput: usage.output, tokensTotal: usage.total, success: true });
 
     // Validação de tipo de documento: garante que o arquivo enviado corresponde
     // ao que o usuário está cadastrando (ex.: motorista exige CNH, veículo exige CRLV).
