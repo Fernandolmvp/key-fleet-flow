@@ -208,6 +208,12 @@ export default function InsurancePanel() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
 
+  // Nova navegação por abas
+  const [activeTab, setActiveTab] = useState<"assegurados" | "sem-cobertura">("assegurados");
+  const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
+  const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
+  const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
+
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
