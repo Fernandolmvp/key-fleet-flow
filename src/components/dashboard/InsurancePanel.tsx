@@ -1542,41 +1542,6 @@ export default function InsurancePanel() {
         })}
       </Card>
 
-      {/* RESUMO GERAL DA FROTA */}
-      <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <div className="font-display font-bold">Resumo da frota</div>
-          <div className="text-[10px] text-muted-foreground ml-auto">Clique nos cards para filtrar</div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
-          <button type="button" onClick={() => { setActiveTab("apolices"); setAssuredFilter("all"); }} className="rounded-md p-2 border bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left">
-            <div className="text-xl font-bold text-emerald-400">{fleetSummary.coveredCount}</div>
-            <div className="text-[10px] uppercase text-emerald-400/80">Veículos cobertos</div>
-          </button>
-          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
-            <div className="text-xl font-bold text-amber-400">{fleetSummary.onlyInPolicyCount}</div>
-            <div className="text-[10px] uppercase text-amber-400/80">Na apólice s/ cadastro</div>
-          </div>
-          <button type="button" onClick={() => setActiveTab("sem-cobertura")} className="rounded-md p-2 border bg-destructive/10 border-destructive/30 hover:bg-destructive/20 transition-colors text-left">
-            <div className="text-xl font-bold text-destructive">{fleetSummary.uncoveredCount}</div>
-            <div className="text-[10px] uppercase text-destructive/80">Sem cobertura</div>
-          </button>
-          <button type="button" onClick={() => setActiveTab("apolices")} className="rounded-md p-2 border bg-primary/10 border-primary/30 hover:bg-primary/20 transition-colors text-left">
-            <div className="text-xl font-bold text-primary">{fleetSummary.vigentes}</div>
-            <div className="text-[10px] uppercase text-primary/80">Apólices vigentes</div>
-          </button>
-          <div className="rounded-md p-2 border bg-amber-500/10 border-amber-500/30">
-            <div className="text-xl font-bold text-amber-400">{fleetSummary.vencendo30}</div>
-            <div className="text-[10px] uppercase text-amber-400/80">Vencendo em 30d</div>
-          </div>
-          <div className="rounded-md p-2 border bg-destructive/10 border-destructive/30">
-            <div className="text-xl font-bold text-destructive">{fleetSummary.vencidas}</div>
-            <div className="text-[10px] uppercase text-destructive/80">Vencidas</div>
-          </div>
-        </div>
-      </Card>
-
         {/* ===================== TAB 1 — APÓLICES ===================== */}
         <TabsContent value="apolices" className="space-y-4 mt-0">
       <Card className="p-4 space-y-3">
