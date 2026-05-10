@@ -56,6 +56,7 @@ type Link = {
   inclusion_type: "apolice" | "adendo" | "manual";
   included_at: string;
   endorsement_number: string | null;
+  removed_at?: string | null;
 };
 
 const emptyPolicy: Partial<Policy> = { status: "ativa" };
