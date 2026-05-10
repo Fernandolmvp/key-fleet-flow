@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail, ShieldAlert, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail, ShieldAlert, Filter, ChevronDown, ChevronUp, Activity, CalendarClock, BarChart3 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
@@ -212,7 +213,8 @@ export default function InsurancePanel() {
   const [globalSearchMode, setGlobalSearchMode] = useState<"veiculo" | "apolice" | "seguradora" | "corretora">("veiculo");
 
   // Nova navegação por abas
-  const [activeTab, setActiveTab] = useState<"assegurados" | "sem-cobertura">("assegurados");
+  const [activeTab, setActiveTab] = useState<"overview" | "apolices" | "sem-cobertura">("overview");
+  const [policySearch, setPolicySearch] = useState("");
   const [uncoveredSearch, setUncoveredSearch] = useState("");
   const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
