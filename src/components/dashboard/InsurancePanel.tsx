@@ -211,6 +211,7 @@ export default function InsurancePanel() {
 
   // Nova navegação por abas
   const [activeTab, setActiveTab] = useState<"assegurados" | "sem-cobertura">("assegurados");
+  const [uncoveredSearch, setUncoveredSearch] = useState("");
   const [assuredFilter, setAssuredFilter] = useState<string>("all"); // policy id filter
   const [addToPolicyVehicleId, setAddToPolicyVehicleId] = useState<string | null>(null);
   const [addToPolicyTargetId, setAddToPolicyTargetId] = useState<string>("");
