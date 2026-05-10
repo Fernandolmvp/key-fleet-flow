@@ -207,6 +207,7 @@ export default function InsurancePanel() {
 
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
+  const [globalSearchMode, setGlobalSearchMode] = useState<"veiculo" | "apolice" | "seguradora" | "corretora">("veiculo");
 
   // Nova navegação por abas
   const [activeTab, setActiveTab] = useState<"assegurados" | "sem-cobertura">("assegurados");
@@ -727,12 +728,32 @@ export default function InsurancePanel() {
   // === Busca global por placa ou chassi ===
   const globalSearchResult = useMemo(() => {
     const q = normId(globalSearch);
-    if (!q || q.length < 3) return null;
+    if (!q || q.length < 3 || globalSearchMode !== "veiculo") return null;
     const matches = vehicles.filter(
       (v) => normId(v.plate).includes(q) || normId(v.chassis).includes(q)
     );
     return matches.slice(0, 10);
-  }, [globalSearch, vehicles]);
+  }, [globalSearch, vehicles, globalSearchMode]);
+
+  // === Busca global por apólice / seguradora / corretora ===
+  const globalPolicyResult = useMemo(() => {
+    const q = (globalSearch || "").trim().toLowerCase();
+    if (!q || q.length < 3 || globalSearchMode === "veiculo") return null;
+    const list = policies.filter((p) => {
+      if (globalSearchMode === "apolice") {
+        return normId(p.policy_number || "").includes(normId(globalSearch));
+      }
+      if (globalSearchMode === "seguradora") {
+        return (p.insurer_name || "").toLowerCase().includes(q);
+      }
+      if (globalSearchMode === "corretora") {
+        const broker = brokers.find((b) => b.id === p.broker_id);
+        return (broker?.name || "").toLowerCase().includes(q);
+      }
+      return false;
+    });
+    return list.slice(0, 20);
+  }, [globalSearch, globalSearchMode, policies, brokers]);
 
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
