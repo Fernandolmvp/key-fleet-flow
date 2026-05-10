@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_feature_routing: {
+        Row: {
+          active: boolean
+          created_at: string
+          estimated_tokens: number
+          fallback_model_id: string | null
+          feature: string
+          id: string
+          primary_model_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          estimated_tokens?: number
+          fallback_model_id?: string | null
+          feature: string
+          id?: string
+          primary_model_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          estimated_tokens?: number
+          fallback_model_id?: string | null
+          feature?: string
+          id?: string
+          primary_model_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_feature_routing_fallback_model_id_fkey"
+            columns: ["fallback_model_id"]
+            isOneToOne: false
+            referencedRelation: "ai_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_feature_routing_primary_model_id_fkey"
+            columns: ["primary_model_id"]
+            isOneToOne: false
+            referencedRelation: "ai_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_models: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_name: string
+          id: string
+          input_cost_per_1k_tokens: number
+          max_tokens: number | null
+          model_id: string
+          output_cost_per_1k_tokens: number
+          provider_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_name: string
+          id?: string
+          input_cost_per_1k_tokens?: number
+          max_tokens?: number | null
+          model_id: string
+          output_cost_per_1k_tokens?: number
+          provider_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_name?: string
+          id?: string
+          input_cost_per_1k_tokens?: number
+          max_tokens?: number | null
+          model_id?: string
+          output_cost_per_1k_tokens?: number
+          provider_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_models_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_providers: {
+        Row: {
+          active: boolean
+          api_endpoint: string | null
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          priority: number
+          secret_name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          api_endpoint?: string | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          priority?: number
+          secret_name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          api_endpoint?: string | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          priority?: number
+          secret_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_token_balance: {
         Row: {
           company_id: string
@@ -135,13 +272,17 @@ export type Database = {
           feature: string
           id: string
           model: string | null
+          model_id_used: string | null
+          provider_id: string | null
           request_id: string | null
+          response_time_ms: number | null
           source: string
           success: boolean
           tokens_input: number
           tokens_output: number
           tokens_total: number
           user_id: string | null
+          was_fallback: boolean
         }
         Insert: {
           company_id: string
@@ -150,13 +291,17 @@ export type Database = {
           feature: string
           id?: string
           model?: string | null
+          model_id_used?: string | null
+          provider_id?: string | null
           request_id?: string | null
+          response_time_ms?: number | null
           source?: string
           success?: boolean
           tokens_input?: number
           tokens_output?: number
           tokens_total?: number
           user_id?: string | null
+          was_fallback?: boolean
         }
         Update: {
           company_id?: string
@@ -165,15 +310,34 @@ export type Database = {
           feature?: string
           id?: string
           model?: string | null
+          model_id_used?: string | null
+          provider_id?: string | null
           request_id?: string | null
+          response_time_ms?: number | null
           source?: string
           success?: boolean
           tokens_input?: number
           tokens_output?: number
           tokens_total?: number
           user_id?: string | null
+          was_fallback?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_model_id_used_fkey"
+            columns: ["model_id_used"]
+            isOneToOne: false
+            referencedRelation: "ai_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_logs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
@@ -3490,6 +3654,27 @@ export type Database = {
           has_company: boolean
           is_active: boolean
           subscription_status: string
+        }[]
+      }
+      get_routing_for_feature: {
+        Args: { _feature: string }
+        Returns: {
+          estimated_tokens: number
+          fallback_model_code: string
+          fallback_model_id: string
+          fallback_model_type: string
+          fallback_provider_code: string
+          fallback_provider_endpoint: string
+          fallback_provider_id: string
+          fallback_provider_secret: string
+          feature: string
+          primary_model_code: string
+          primary_model_id: string
+          primary_model_type: string
+          primary_provider_code: string
+          primary_provider_endpoint: string
+          primary_provider_id: string
+          primary_provider_secret: string
         }[]
       }
       has_enough_ai_tokens: {
