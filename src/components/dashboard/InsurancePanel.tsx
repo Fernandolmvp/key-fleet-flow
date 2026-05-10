@@ -585,6 +585,52 @@ export default function InsurancePanel() {
     return vehicles.filter((v) => !coveredIds.has(v.id));
   }, [vehicles, links, policies]);
 
+  // Apólices manuais (para anexar veículo via tab "Sem cobertura")
+  const manualPolicies = useMemo(() => policies.filter((p) => !isAiPolicy(p)), [policies]);
+
+  // Veículos assegurados: lista plana {vehicle, policy, link} para tab 1
+  const assuredVehicles = useMemo(() => {
+    const today = new Date();
+    const isVigente = (p: Policy) => {
+      if (p.status !== "ativa") return false;
+      if (!p.end_date) return true;
+      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
+    };
+    const vigenteMap = new Map(policies.filter(isVigente).map((p) => [p.id, p]));
+    const out: { vehicle: Vehicle; policy: Policy; link: Link }[] = [];
+    links.forEach((l) => {
+      const p = vigenteMap.get(l.policy_id);
+      if (!p) return;
+      const v = vehicles.find((x) => x.id === l.vehicle_id);
+      if (!v) return;
+      if (assuredFilter !== "all" && p.id !== assuredFilter) return;
+      out.push({ vehicle: v, policy: p, link: l });
+    });
+    return out.sort((a, b) => a.vehicle.plate.localeCompare(b.vehicle.plate));
+  }, [policies, links, vehicles, assuredFilter]);
+
+  async function addVehicleToPolicy() {
+    if (!addToPolicyVehicleId || !addToPolicyTargetId || !currentCompanyId) return;
+    const target = policies.find((p) => p.id === addToPolicyTargetId);
+    if (!target || isAiPolicy(target)) {
+      toast.error("Selecione uma apólice manual.");
+      return;
+    }
+    const r = await supabase.from("insurance_policy_vehicles").upsert({
+      company_id: currentCompanyId,
+      policy_id: addToPolicyTargetId,
+      vehicle_id: addToPolicyVehicleId,
+      inclusion_type: "manual",
+      removed_at: null,
+    }, { onConflict: "policy_id,vehicle_id" });
+    if (r.error) { toast.error(r.error.message); return; }
+    await syncVehicleInsuranceFields(currentCompanyId, [addToPolicyVehicleId]);
+    toast.success("Veículo vinculado à apólice");
+    setAddToPolicyVehicleId(null);
+    setAddToPolicyTargetId("");
+    load();
+  }
+
   // === RESUMO GERAL (todas as apólices) ===
   const fleetSummary = useMemo(() => {
     const today = new Date();
