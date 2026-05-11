@@ -2,6 +2,7 @@
 // usuários do portal do posto, gerando hash de senha com PBKDF2.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders, hashPassword } from "../_shared/posto-jwt.ts";
+import { newInvitationToken } from "../_shared/partner-auth.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -35,30 +36,69 @@ Deno.serve(async (req) => {
     if (!canManage) return json({ error: "Sem permissão" }, 403);
 
     if (action === "create") {
-      const { email, name, password, role } = body;
-      if (!email || !name || !password) return json({ error: "Campos obrigatórios" }, 400);
-      if (String(password).length < 6) return json({ error: "Senha precisa de 6+ caracteres" }, 400);
-      const password_hash = await hashPassword(password);
-      const { data, error } = await admin.from("fuel_station_users").insert({
-        station_id, company_id,
-        email: String(email).trim().toLowerCase(),
+      // Novo fluxo: cria CONVITE, parceiro define a própria senha.
+      const { email, name, role } = body;
+      if (!email || !name) return json({ error: "Email e nome são obrigatórios" }, 400);
+      const emailNorm = String(email).trim().toLowerCase();
+
+      const { data: existing } = await admin.from("fuel_station_users")
+        .select("id").eq("station_id", station_id).eq("email", emailNorm).maybeSingle();
+      if (existing) return json({ error: "Já existe usuário com esse email para este posto" }, 409);
+
+      // cancela pendentes anteriores
+      await admin.from("partner_invitations")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("partner_id", station_id).ilike("email", emailNorm).eq("status", "pending");
+
+      const token = newInvitationToken();
+      const { data: inv, error } = await admin.from("partner_invitations").insert({
+        company_id,
+        partner_type: "station",
+        partner_id: station_id,
+        email: emailNorm,
         name: String(name).trim(),
-        password_hash,
         role: role ?? "operador",
+        kind: "invite",
+        token,
         created_by: userId,
-      }).select("id").single();
+      }).select("id, expires_at").single();
       if (error) return json({ error: error.message }, 400);
-      return json({ ok: true, id: data.id });
+
+      const origin = req.headers.get("origin") ?? "";
+      const accept_url = `${origin}/parceiro/convite?token=${token}`;
+      return json({ ok: true, invitation_id: inv.id, accept_url, expires_at: inv.expires_at });
     }
 
     if (action === "reset_password") {
-      const { id, password } = body;
-      if (!id || !password) return json({ error: "Campos obrigatórios" }, 400);
-      const password_hash = await hashPassword(password);
-      const { error } = await admin.from("fuel_station_users")
-        .update({ password_hash }).eq("id", id).eq("company_id", company_id);
+      // Novo fluxo: gera convite kind='reset' para o usuário definir nova senha.
+      const { id } = body;
+      if (!id) return json({ error: "id obrigatório" }, 400);
+      const { data: u } = await admin.from("fuel_station_users")
+        .select("id, email, name, station_id, company_id, role")
+        .eq("id", id).eq("company_id", company_id).maybeSingle();
+      if (!u) return json({ error: "Usuário não encontrado" }, 404);
+
+      await admin.from("partner_invitations")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("partner_id", u.station_id).ilike("email", u.email).eq("status", "pending");
+
+      const token = newInvitationToken();
+      const { data: inv, error } = await admin.from("partner_invitations").insert({
+        company_id: u.company_id,
+        partner_type: "station",
+        partner_id: u.station_id,
+        email: u.email,
+        name: u.name,
+        role: u.role ?? "operador",
+        kind: "reset",
+        token,
+        created_by: userId,
+      }).select("id, expires_at").single();
       if (error) return json({ error: error.message }, 400);
-      return json({ ok: true });
+
+      const origin = req.headers.get("origin") ?? "";
+      const accept_url = `${origin}/parceiro/convite?token=${token}`;
+      return json({ ok: true, invitation_id: inv.id, accept_url, expires_at: inv.expires_at });
     }
 
     if (action === "toggle_active") {
