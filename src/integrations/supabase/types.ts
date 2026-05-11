@@ -2609,6 +2609,84 @@ export type Database = {
           },
         ]
       }
+      partner_invitations: {
+        Row: {
+          accepted_at: string | null
+          attempts: number
+          cancelled_at: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          email: string
+          expires_at: string
+          id: string
+          kind: string
+          name: string
+          partner_id: string
+          partner_type: string
+          resent_count: number
+          role: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          attempts?: number
+          cancelled_at?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          email: string
+          expires_at?: string
+          id?: string
+          kind?: string
+          name: string
+          partner_id: string
+          partner_type: string
+          resent_count?: number
+          role?: string
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          attempts?: number
+          cancelled_at?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          partner_id?: string
+          partner_type?: string
+          resent_count?: number
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           active: boolean
