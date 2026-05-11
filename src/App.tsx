@@ -41,6 +41,7 @@ import RequireJustPaid from "./components/auth/RequireJustPaid";
 import { PostoAuthProvider } from "./contexts/PostoAuthContext";
 import PostoLogin from "./pages/posto/PostoLogin";
 import PostoShell from "./pages/posto/PostoShell";
+import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 
 const queryClient = new QueryClient();
 
