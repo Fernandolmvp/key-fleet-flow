@@ -4,13 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Pencil, Trash2, Loader2, Fuel, MapPin } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, Fuel, MapPin, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTabPermissions } from "@/lib/permissions";
+import PartnerAccessDialog from "@/components/dashboard/PartnerAccessDialog";
 
 interface Station {
   id: string; name: string; cnpj: string | null; brand: string | null;
@@ -38,6 +39,7 @@ export default function FuelStations() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<string>(() => localStorage.getItem("stations:tab") || "ativos");
   useEffect(() => { localStorage.setItem("stations:tab", tab); }, [tab]);
+  const [accessFor, setAccessFor] = useState<Station | null>(null);
 
   const { canViewTab, isVisible, fallback } = useTabPermissions(
     "fuel_stations", ["ativos", "inativos", "todos"], tab,
@@ -177,6 +179,9 @@ export default function FuelStations() {
                 </div>
               )}
               <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
+                <Button size="sm" variant="ghost" title="Acessos do parceiro" onClick={() => setAccessFor(s)}>
+                  <Users className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
                 <Button size="sm" variant="ghost" onClick={() => remove(s)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
@@ -256,6 +261,15 @@ export default function FuelStations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {accessFor && (
+        <PartnerAccessDialog
+          open={!!accessFor}
+          onOpenChange={(v) => !v && setAccessFor(null)}
+          stationId={accessFor.id}
+          stationName={accessFor.name}
+        />
+      )}
     </div>
   );
 }

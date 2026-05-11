@@ -11,6 +11,7 @@ type Ctx = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  setSession: (s: { token: string; user: PostoUser; station: PostoStation }) => void;
   authedFetch: <T = any>(fn: string, init?: RequestInit) => Promise<T>;
 };
 
@@ -51,6 +52,11 @@ export function PostoAuthProvider({ children }: { children: ReactNode }) {
     setToken(null); setUser(null); setStation(null);
   }, []);
 
+  const setSession = useCallback((s: { token: string; user: PostoUser; station: PostoStation }) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    setToken(s.token); setUser(s.user); setStation(s.station);
+  }, []);
+
   const authedFetch = useCallback(async <T,>(fn: string, init?: RequestInit) => {
     if (!token) throw new Error("Sem sessão");
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fn}`;
@@ -72,7 +78,7 @@ export function PostoAuthProvider({ children }: { children: ReactNode }) {
   }, [token, logout]);
 
   return (
-    <PostoAuthContext.Provider value={{ token, user, station, loading, login, logout, authedFetch }}>
+    <PostoAuthContext.Provider value={{ token, user, station, loading, login, logout, setSession, authedFetch }}>
       {children}
     </PostoAuthContext.Provider>
   );

@@ -41,6 +41,7 @@ import RequireJustPaid from "./components/auth/RequireJustPaid";
 import { PostoAuthProvider } from "./contexts/PostoAuthContext";
 import PostoLogin from "./pages/posto/PostoLogin";
 import PostoShell from "./pages/posto/PostoShell";
+import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/posto/login" element={<PostoLogin />} />
             <Route path="/posto" element={<PostoShell />} />
+            <Route path="/parceiro/convite" element={<PartnerInviteAccept />} />
             <Route element={<RequireAuth />}>
               <Route path="/planos" element={<PlanSelection />} />
               <Route element={<RequireJustPaid />}>
