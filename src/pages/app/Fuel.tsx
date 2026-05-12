@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import FuelDialog from "@/components/dashboard/FuelDialog";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ANOMALY_LABEL, SEVERITY_TONE, fmtMoney, fmtNum } from "@/lib/fuel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 
@@ -16,7 +17,7 @@ interface Row {
   fuel_type: string; liters: number; price_per_liter: number; total_value: number;
   km_at_fueling: number; km_per_liter: number | null; cost_per_km: number | null;
   anomalies: string[]; anomaly_severity: string | null;
-  vehicles: { plate: string; brand: string; model: string } | null;
+  vehicles: { plate: string; brand: string; model: string; expected_consumption_kml: number | null; consumption_tolerance_pct: number | null } | null;
   drivers: { full_name: string } | null;
 }
 
@@ -33,7 +34,7 @@ export default function Fuel() {
     setLoading(true);
     const { data, error } = await supabase
       .from("fuel_records")
-      .select("*, vehicles:vehicles!fuel_records_vehicle_id_fkey(plate,brand,model), drivers:drivers!fuel_records_driver_id_fkey(full_name)")
+      .select("*, vehicles:vehicles!fuel_records_vehicle_id_fkey(plate,brand,model,expected_consumption_kml,consumption_tolerance_pct), drivers:drivers!fuel_records_driver_id_fkey(full_name)")
       .eq("company_id", currentCompanyId)
       .order("fueled_at", { ascending: false })
       .limit(500);
@@ -224,11 +225,33 @@ export default function Fuel() {
                     <td className="px-4 py-3 text-right font-mono">{r.km_per_liter ? `${r.km_per_liter}` : "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {r.anomalies?.map((a) => (
-                          <Badge key={a} className={`text-[10px] border ${SEVERITY_TONE[r.anomaly_severity ?? "baixa"]}`}>
-                            {ANOMALY_LABEL[a] ?? a}
-                          </Badge>
-                        ))}
+                        {r.anomalies?.map((a) => {
+                          const badge = (
+                            <Badge key={a} className={`text-[10px] border ${SEVERITY_TONE[r.anomaly_severity ?? "baixa"]}`}>
+                              {ANOMALY_LABEL[a] ?? a}
+                            </Badge>
+                          );
+                          const isExpectedAnom = a === "consumo_acima_esperado" || a === "consumo_abaixo_esperado";
+                          const expected = r.vehicles?.expected_consumption_kml;
+                          if (isExpectedAnom && expected != null && r.km_per_liter != null) {
+                            const real = Number(r.km_per_liter);
+                            const exp = Number(expected);
+                            const dev = exp > 0 ? Math.abs(real - exp) / exp * 100 : 0;
+                            return (
+                              <TooltipProvider key={a} delayDuration={150}>
+                                <UITooltip>
+                                  <TooltipTrigger asChild><span>{badge}</span></TooltipTrigger>
+                                  <TooltipContent className="text-xs">
+                                    <div>Esperado: <strong>{exp.toFixed(1)} km/L</strong></div>
+                                    <div>Real: <strong>{real.toFixed(1)} km/L</strong></div>
+                                    <div>Desvio: <strong>{dev.toFixed(0)}%</strong></div>
+                                  </TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+                            );
+                          }
+                          return badge;
+                        })}
                       </div>
                     </td>
                     <td className="px-4 py-3">

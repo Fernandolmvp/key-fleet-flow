@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Sparkles, FileText, History, Undo2 } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
 const STATUSES = [
@@ -63,6 +65,7 @@ const EMPTY_FORM = {
   sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
   buyer_phone: "", buyer_email: "", buyer_address: "",
   sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
+  expected_consumption_kml: "", consumption_tolerance_pct: "",
 };
 
 const buildFormState = (data?: any) => ({
@@ -422,6 +425,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       owner_doc: form.owner_doc || null,
       crlv_issue_date: form.crlv_issue_date || null,
       crlv_city: form.crlv_city || null,
+      expected_consumption_kml: form.expected_consumption_kml === "" || form.expected_consumption_kml == null
+        ? null : Number(form.expected_consumption_kml),
+      consumption_tolerance_pct: form.consumption_tolerance_pct === "" || form.consumption_tolerance_pct == null
+        ? null : Number(form.consumption_tolerance_pct),
     };
     const salePayload: any = {
       status: finalStatus,
@@ -700,6 +707,49 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
             <Label>Exercício de licenciamento</Label>
             <Input type="number" min="2000" max="2100" value={form.licensing_year} onChange={(e) => setForm({ ...form, licensing_year: e.target.value })} placeholder={String(new Date().getFullYear())} />
             <p className="text-[11px] text-muted-foreground">Se igual ao ano atual, o veículo é considerado licenciado.</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <h4 className="font-display text-sm font-semibold">Parâmetros de consumo</h4>
+            <span className="text-[10px] text-muted-foreground font-normal">(opcional)</span>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground"><HelpCircle className="h-3.5 w-3.5" /></button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  O sistema marca o abastecimento como anômalo quando o km/L real desviar mais que a tolerância configurada do consumo esperado.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Consumo esperado (km/L)</Label>
+              <Input
+                type="number" step="0.1" min="0"
+                placeholder="Ex.: 8.5"
+                value={form.expected_consumption_kml}
+                onChange={(e) => setForm({ ...form, expected_consumption_kml: e.target.value })}
+              />
+              <p className="text-[11px] text-muted-foreground">Deixe em branco para desativar o alerta de consumo neste veículo.</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Tolerância</Label>
+                <span className="text-xs font-mono text-primary">±{Number(form.consumption_tolerance_pct || 20)}%</span>
+              </div>
+              <Slider
+                min={5} max={50} step={1}
+                value={[Number(form.consumption_tolerance_pct || 20)]}
+                onValueChange={(v) => setForm({ ...form, consumption_tolerance_pct: String(v[0]) })}
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>5%</span><span>50%</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -1,256 +1,145 @@
+# TAREFA 2 — Consumo esperado por veículo
 
-# Refatoração Posto + Infra de Convite para Parceiros
+## Contexto verificado
+- `vehicles` **não** tem ainda `expected_consumption_kml` nem `consumption_tolerance_pct` ✅
+- `fuel_records.km_per_liter` é calculado pelo trigger `tg_fuel_compute` (BEFORE INSERT/UPDATE)
+- Enum `fuel_anomaly` atual: `km_regressivo, consumo_alto, consumo_baixo, tanque_excedido, duplicado, valor_atipico, horario_suspeito, cidade_incomum`
+- Severities usadas no código: `alta | media | baixa` (mapeadas em `src/lib/fuel.ts → SEVERITY_TONE`). **Vou manter esse padrão** em vez de "alto/médio" pra não quebrar os badges existentes.
 
-Objetivo: substituir a criação top-down de usuários de parceiros (Posto e futura Oficina) por **convite por email + senha definida pelo parceiro**, sem quebrar o que já funciona.
-
----
-
-## Estado atual (verificado)
-
-- `posto-jwt.ts` faz HS256 + PBKDF2; usado por `posto-login`, `posto-confirm`, `posto-list`, `posto-admin-user`.
-- `posto-admin-user` action `create` recebe senha do gestor (será trocado).
-- Não há integração Resend no projeto. Para emails transacionais usaremos a infraestrutura nativa **Lovable Emails** (`send-transactional-email` + queue), que precisa de domínio configurado.
-- Não existe tabela `partner_invitations`.
-- `fuel_station_users` tem RLS apenas pelo lado do gestor (`is_company_member` / `can_manage_fleet`); o portal do posto opera via JWT próprio (service role).
+## Decisão de arquitetura
+Em vez de criar um **AFTER INSERT** novo (que forçaria um 2º UPDATE no mesmo registro), **estendo o trigger BEFORE existente `tg_fuel_compute`** com mais um bloco. Vantagens: 1 só write, anomalia já entra junto com as outras, severity é combinada pela mesma lógica.
 
 ---
 
-## Etapa 0 — Pré-requisito email
-
-Antes de mandar convite por email é preciso domínio configurado em Lovable Emails.
-Se ainda não houver, abrirei o diálogo de setup de domínio e só depois sigo as etapas 3+.
-Enquanto isso, etapas 1, 2, 4 (parcial), 7 podem ser feitas — o convite ficará gravado e pode ser exibido como link copiável temporário até o email estar ativo.
-
----
-
-## Etapa 1 — Helper compartilhado
-
-Novo arquivo: `supabase/functions/_shared/partner-auth.ts`
-- Tipo `PartnerType = 'station' | 'workshop'`
-- `signPartnerJwt(claims, ttl)` / `verifyPartnerJwt(token)` — assinatura HS256, claim extra `partner_type`, escopo do segredo `"partner::"`.
-- `hashPassword` / `verifyPassword` (PBKDF2, idêntico ao atual).
-- `corsHeaders` reexportado.
-
-Para **não quebrar tokens já emitidos**, `posto-jwt.ts` é mantido como wrapper:
-```ts
-export * from "./partner-auth.ts";
-// signPostoJwt/verifyPostoJwt continuam, internamente delegam ao novo helper
-// usando o mesmo prefixo de segredo "posto::" para não invalidar JWTs antigos.
-```
-→ Login e confirmação atuais do Posto continuam funcionando inalterados.
-
----
-
-## Etapa 2 — Migration `partner_invitations`
+## 1. Migration SQL (completa)
 
 ```sql
-create table public.partner_invitations (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  partner_type text not null check (partner_type in ('station','workshop')),
-  partner_id uuid not null,                 -- fuel_stations.id ou workshops.id
-  email text not null,
-  name text not null,
-  role text not null default 'operador',
-  token text not null unique,               -- 32 bytes random base64url
-  status text not null default 'pending'    -- pending|accepted|expired|cancelled
-    check (status in ('pending','accepted','expired','cancelled')),
-  expires_at timestamptz not null default now() + interval '7 days',
-  accepted_at timestamptz,
-  cancelled_at timestamptz,
-  resent_count int not null default 0,
-  created_by uuid not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index on public.partner_invitations(company_id, status);
-create index on public.partner_invitations(partner_type, partner_id);
+-- 1.1 Schema
+ALTER TABLE public.vehicles
+  ADD COLUMN expected_consumption_kml numeric,
+  ADD COLUMN consumption_tolerance_pct numeric DEFAULT 20;
 
-alter table public.partner_invitations enable row level security;
+ALTER TABLE public.vehicles
+  ADD CONSTRAINT vehicles_expected_kml_positive
+    CHECK (expected_consumption_kml IS NULL OR expected_consumption_kml > 0),
+  ADD CONSTRAINT vehicles_tolerance_range
+    CHECK (consumption_tolerance_pct IS NULL
+           OR (consumption_tolerance_pct >= 5 AND consumption_tolerance_pct <= 50));
 
-create policy "members read invitations"
-  on public.partner_invitations for select to authenticated
-  using (public.is_company_member(auth.uid(), company_id));
+-- 1.2 Novos valores no enum de anomalias
+ALTER TYPE public.fuel_anomaly ADD VALUE IF NOT EXISTS 'consumo_abaixo_esperado';
+ALTER TYPE public.fuel_anomaly ADD VALUE IF NOT EXISTS 'consumo_acima_esperado';
 
-create policy "managers write invitations"
-  on public.partner_invitations for all to authenticated
-  using (public.can_manage_fleet(auth.uid(), company_id))
-  with check (public.can_manage_fleet(auth.uid(), company_id));
+-- 1.3 Estender tg_fuel_compute (REPLACE preservando lógica atual + bloco novo
+--     no fim, antes de NEW.anomalies := anom)
+CREATE OR REPLACE FUNCTION public.tg_fuel_compute()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+DECLARE
+  prev RECORD; v RECORD; hist RECORD;
+  anom public.fuel_anomaly[] := '{}';
+  sev TEXT := NULL; hour_local INT;
+  expected numeric; tol numeric; deviation numeric;
+BEGIN
+  -- [bloco existente intacto: prev, km_driven, km_per_liter, cost_per_km,
+  --  km_regressivo, duplicado, tanque_excedido, consumo_alto/baixo via histórico,
+  --  horario_suspeito, valor_atipico, current_km sync]
+  -- ...
 
-create trigger trg_partner_inv_upd before update on public.partner_invitations
-  for each row execute function public.set_updated_at();
+  -- NOVO: comparação contra consumo esperado configurado no veículo
+  expected := v.expected_consumption_kml;
+  tol := COALESCE(v.consumption_tolerance_pct, 20);
+  IF expected IS NOT NULL AND expected > 0
+     AND NEW.km_per_liter IS NOT NULL AND NEW.km_per_liter > 0 THEN
+    deviation := ABS(NEW.km_per_liter - expected) / expected * 100.0;
+    IF deviation > tol THEN
+      IF NEW.km_per_liter < expected THEN
+        anom := array_append(anom, 'consumo_acima_esperado'::public.fuel_anomaly);
+      ELSE
+        anom := array_append(anom, 'consumo_abaixo_esperado'::public.fuel_anomaly);
+      END IF;
+      IF deviation > 40 THEN sev := 'alta';
+      ELSIF deviation > 20 THEN sev := COALESCE(sev,'media');
+      ELSE sev := COALESCE(sev,'baixa');
+      END IF;
+    END IF;
+  END IF;
+
+  NEW.anomalies := anom;
+  NEW.anomaly_severity := sev;
+  -- ... (current_km sync existente)
+END $function$;
 ```
 
----
+> Nota semântica: **consumo_acima_esperado** = veículo bebendo mais (km/L menor → custo maior). **consumo_abaixo_esperado** = km/L acima do esperado (bom, mas pode indicar erro de leitura). Vou alinhar labels no frontend de acordo.
 
-## Etapa 3 — Edge functions novas
+## 2. Frontend
 
-Todas com `verify_jwt = false` (próprio fluxo) e CORS padrão.
+### 2.1 `src/lib/fuel.ts`
+- Adicionar em `ANOMALY_LABEL`:
+  - `consumo_acima_esperado: "Consumo acima do esperado"`
+  - `consumo_abaixo_esperado: "Consumo abaixo do esperado"`
 
-### `partner-invite`
-- Input: `{ company_id, partner_type, partner_id, email, name, role? }`
-- Auth: JWT do gestor (Supabase Auth) + `can_manage_fleet`.
-- Valida que `partner_id` existe na tabela do tipo (`fuel_stations`/`workshops`) e pertence à `company_id`.
-- Bloqueia se já existe `pending` para esse `(partner_id, email)`; bloqueia se já existe usuário ativo com esse email no parceiro.
-- Gera token (`crypto.getRandomValues(32)` → base64url), insere em `partner_invitations`.
-- Chama `send-transactional-email` com template `partner_invite` e variáveis `{ companyName, partnerName, partnerType, acceptUrl }`.
-- Retorna `{ ok, invitation_id, accept_url }` (URL ajuda durante setup de email).
+### 2.2 `src/components/dashboard/VehicleDialog.tsx`
+Nova seção **"Parâmetros de consumo (opcional)"**:
+- Input numérico **"Consumo esperado (km/L)"** — `step=0.1`, placeholder "Ex.: 8.5"
+- Slider **"Tolerância (%)"** — range 5–50, default 20, label dinâmico "±20%"
+- Tooltip (ícone `?`): *"O sistema marca o abastecimento como anômalo se o km/L real desviar mais que esta tolerância do valor esperado."*
 
-### `partner-accept-invite`
-- Input: `{ token, password }` (público).
-- Busca invite `pending` não expirado; se expirado → marca `expired`, erro.
-- Valida senha ≥ 8 chars.
-- Em transação lógica (admin client):
-  - Se `partner_type='station'` → insere em `fuel_station_users` com `password_hash`.
-  - Se `partner_type='workshop'` → insere em `workshop_users` (futuro).
-- Marca invite `accepted`, `accepted_at = now()`.
-- Emite JWT via `signPartnerJwt` e devolve `{ token, user, partner, redirect: '/posto'|'/oficina' }`.
+### 2.3 `src/pages/app/Fuel.tsx` (já lista anomalias via `Badge` + `SEVERITY_TONE`)
+- Os novos valores entram automaticamente na coluna **Alertas** (loop existente).
+- **Adição:** quando o registro tiver uma das duas anomalias novas, envolver o badge num `<Tooltip>` mostrando: *"Esperado: X km/L · Real: Y km/L · Desvio: Z%"*. Cálculo client-side usando `vehicles.expected_consumption_kml` (vou trazer no select da query — campo já é seguro por RLS de membership).
 
-### `partner-resend-invite`
-- Input: `{ invitation_id }`. Auth gestor.
-- Se `status in ('pending','expired')`: gera novo token, `expires_at = now()+7d`, `status='pending'`, `resent_count++`, reenvia email. Caso contrário erro.
+## 3. Plano de teste (manual + SQL)
 
-### `partner-cancel-invite`
-- Input: `{ invitation_id }`. Auth gestor. Atualiza para `cancelled`.
+| # | Cenário | Setup | Esperado |
+|---|---|---|---|
+| 1 | Veículo sem `expected_consumption_kml` | NULL | Nenhuma anomalia nova, comportamento atual preservado |
+| 2 | `expected=10`, `tol=20`, real=10.5 | desvio 5% | Sem anomalia |
+| 3 | `expected=10`, `tol=20`, real=7.5 | desvio 25% | `consumo_acima_esperado`, severity `media` |
+| 4 | `expected=10`, `tol=20`, real=5.5 | desvio 45% | `consumo_acima_esperado`, severity `alta` |
+| 5 | `expected=10`, `tol=20`, real=13 | desvio 30% | `consumo_abaixo_esperado`, severity `media` |
+| 6 | Primeira abastecida do veículo (sem `prev` → `km_per_liter` NULL) | — | Sem anomalia (guardado por `IF NEW.km_per_liter IS NOT NULL`) |
+| 7 | `tol=5%`, real desviando 6% | — | Anomalia leve, severity `baixa` |
 
-### `posto-admin-user` (refator)
-- `action='create'` agora **redireciona** internamente para `partner-invite` (mantendo o endpoint para a UI), recebendo apenas `email`/`name`/`role`.
-- `reset_password` muda: cria novo `partner_invitations` (com flag interna ou novo `status='reset'`) e envia email — gestor não define senha. (Alternativa: campo `kind in ('invite','reset')` na tabela.)
-- `toggle_active` / `delete` inalterados.
+Testes 2–5 rodo com `INSERT` real num veículo de teste e depois `DELETE`, OU via simulação chamando `tg_fuel_compute` diretamente em transação rolled-back. Vou preferir dry-run em transação.
 
-> Decisão recomendada: adicionar coluna `kind text not null default 'invite' check (kind in ('invite','reset'))` em `partner_invitations` para reaproveitar o fluxo no reset.
-
-`supabase/config.toml` ganha:
-```
-[functions.partner-invite]
-verify_jwt = false
-[functions.partner-accept-invite]
-verify_jwt = false
-[functions.partner-resend-invite]
-verify_jwt = false
-[functions.partner-cancel-invite]
-verify_jwt = false
-```
-
----
-
-## Etapa 4 — UI em `/app` (FuelStations.tsx + nova subseção “Acessos”)
-
-No card de cada posto, novo botão **"Acessos do parceiro"** abrindo dialog com 2 listas:
-- **Usuários ativos** (de `fuel_station_users`): nome, email, último login, ações (desativar / excluir / enviar reset).
-- **Convites** (de `partner_invitations` filtrando `partner_type='station'`, `partner_id=...`): email, status, expira em, ações (reenviar / cancelar / copiar link).
-
-Form "Novo acesso":
-- Campos: **Nome**, **Email**, **Função** (operador/admin do posto).
-- Texto: *"Enviaremos um convite por email. O responsável definirá a própria senha."*
-- Submit → `supabase.functions.invoke('partner-invite', ...)`.
-
-Nada da UI antiga é removido até a transição estar validada — o botão antigo "Criar usuário com senha" some, mas usuários já existentes continuam aparecendo.
-
----
-
-## Etapa 5 — Tela pública `/parceiro/convite`
-
-Rota pública (fora de `RequireAuth`). Componente `PartnerInviteAccept.tsx`:
+## 4. Mockup do alerta visual
 
 ```text
-┌──────────────────────────────────────────────────────┐
-│  Convite para acessar o portal de parceiros          │
-│                                                      │
-│  Empresa: Transportes XYZ Ltda                       │
-│  Parceiro: Posto Shell Centro (CNPJ 12.345.678/...)  │
-│  Para: joao@postoshell.com                           │
-│                                                      │
-│  [ Nova senha           ]                            │
-│  [ Confirmar senha      ]                            │
-│  ☐ Li e aceito os Termos de Uso                      │
-│                                                      │
-│  [   Criar acesso e entrar   ]                       │
-│                                                      │
-│  Convite expira em 5 dias.                           │
-└──────────────────────────────────────────────────────┘
+Tabela Abastecimentos → coluna "Alertas":
+
+┌────────────────────────────────────┐
+│ [⚠ Consumo acima do esperado]      │  ← badge âmbar (bg-warning/20)
+│  hover ▼                            │
+│  ┌──────────────────────────────┐  │
+│  │ Esperado: 10.0 km/L          │  │
+│  │ Real:      7.2 km/L          │  │
+│  │ Desvio:    28%               │  │
+│  └──────────────────────────────┘  │
+└────────────────────────────────────┘
+
+Severidade alta (>40%) → badge vermelho (bg-destructive/20)
+Severidade média (20–40%) → âmbar
+Severidade baixa (≤20%, só quando tol<20) → azul (bg-info/20)
 ```
 
-Fluxo:
-1. `GET ?token=...` → chama `partner-invite-info` (ou `partner-accept-invite` em modo `peek`) para mostrar dados sem aceitar.
-2. Submit → `partner-accept-invite` → grava JWT em `PostoAuthContext` (ou `OficinaAuthContext`) e redireciona para `/posto` ou `/oficina`.
-3. Tratamento de erros: token inválido / expirado / já usado / cancelado.
+VehicleDialog (nova seção):
 
----
+```text
+─── Parâmetros de consumo (opcional) ─────────────────
+Consumo esperado (km/L)   [   8.5   ] (?)
+Tolerância                ●━━━━━━━━━━━━○  ±20%
+                          5%          50%
+─────────────────────────────────────────────────────
+```
 
-## Etapa 6 — Email de convite
+## 5. Casos de exceção tratados
+- `expected_consumption_kml IS NULL` → bloco inteiro pulado (zero impacto em quem não configurar)
+- `km_per_liter IS NULL` (1ª abastecida) → bloco pulado
+- `km_per_liter <= 0` → bloco pulado
+- `consumption_tolerance_pct` NULL → assume 20 via COALESCE
+- CHECK constraints garantem que valores inválidos nunca entram
 
-Template `partner_invite` em `supabase/functions/_shared/email-templates/`:
-
-Assunto: `Você foi convidado para o portal de parceiros — {{companyName}}`
-
-Corpo (resumo):
-> Olá {{partnerName}},
-> A empresa **{{companyName}}** convidou você para acessar o portal de **{{partnerTypeLabel}}** ({{partnerName}}).
-> Clique no botão abaixo para definir sua senha e ativar o acesso. O convite expira em 7 dias.
->
-> [ Aceitar convite ] → `{{acceptUrl}}`
->
-> Se não esperava este convite, ignore este email.
-
-Branding herdado dos tokens do app (background branco, cores via CSS vars).
-
----
-
-## Etapa 7 — RLS reforçado
-
-Migration adicional:
-- `fuel_station_users`: políticas atuais (gestor) ficam; nada do lado portal precisa mudar (continua via service role com filtro por `station_id` do JWT).
-- Confirmar que `fuel_stations` tem SELECT restrito (já tem via `is_company_member`).
-- `partner_invitations` já vem com RLS (etapa 2).
-- Adicionar índice único parcial: `create unique index on partner_invitations(partner_id, lower(email)) where status='pending';` para evitar convites duplicados simultâneos.
-
----
-
-## Backwards compatibility
-
-- `posto-jwt.ts` continua exportando `signPostoJwt` / `verifyPostoJwt` com **mesmo segredo derivado** (`"posto::"`), portanto JWTs já emitidos seguem válidos.
-- `fuel_station_users` criados antes da refatoração continuam logando normalmente em `posto-login`.
-- `posto-admin-user` mantém endpoint e payload — só muda o efeito do `create`.
-- Nada é deletado; apenas adicionado.
-
----
-
-## Plano de rollback
-
-| Mudança | Como reverter |
-|---|---|
-| Migration `partner_invitations` | `drop table public.partner_invitations;` (não referenciada por FKs externas) |
-| Edge functions novas | `supabase--delete_edge_functions(['partner-invite','partner-accept-invite','partner-resend-invite','partner-cancel-invite'])` |
-| `posto-admin-user` refator | Reverter o arquivo para versão anterior (mantida no git) — payload é o mesmo |
-| `partner-auth.ts` | Remover; `posto-jwt.ts` original já segue funcional |
-| UI FuelStations | Reverter componente; usuários antigos seguem inalterados |
-| Rota `/parceiro/convite` | Remover do `App.tsx` |
-
-Como nada destrói dados existentes, rollback é seguro a qualquer momento.
-
----
-
-## Detalhes técnicos para implementação
-
-- Token de convite: 32 bytes random → base64url (43 chars). URL: `${SITE_URL}/parceiro/convite?token=...`.
-- `SITE_URL` derivado de `VITE_SUPABASE_URL` não — usar variável `PUBLIC_APP_URL` ou `req.headers.get('origin')` no `partner-invite`.
-- Rate limit simples no `partner-accept-invite`: máx 5 tentativas por token (coluna `attempts`).
-- Logging em `audit_logs` para `partner_invitations` (insert/accept/cancel) opcional.
-- Nenhuma alteração em `posto-confirm`, `posto-list`, `posto-login`.
-
----
-
-## Ordem de execução proposta
-
-1. Verificar status de domínio de email (Lovable Emails) — bloqueante para email real, não para o resto.
-2. Migration `partner_invitations` (Etapa 2 + índice parcial da 7).
-3. `_shared/partner-auth.ts` + wrapper em `posto-jwt.ts` (Etapa 1).
-4. Edge functions `partner-invite/accept/resend/cancel` + entradas em `config.toml` (Etapa 3).
-5. Refator `posto-admin-user` (Etapa 3 final).
-6. UI em `FuelStations.tsx` + dialog de acessos (Etapa 4).
-7. Rota pública `/parceiro/convite` (Etapa 5).
-8. Template de email + deploy (Etapa 6).
-9. Teste end-to-end com um posto real.
-
-Aguardo sua aprovação para executar.
+## Aguardando aprovação
+Confirma e eu executo nesta ordem: (a) migration → (b) `src/lib/fuel.ts` → (c) `VehicleDialog.tsx` → (d) `Fuel.tsx` com tooltip → (e) testes dry-run dos 7 cenários.
