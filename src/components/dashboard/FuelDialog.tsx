@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { Loader2, Upload, X, Camera, Gauge, ShieldCheck, ShieldAlert } from "lucide-react";
 import { FUELS, PAYMENTS } from "@/lib/fuel";
 import { extractDocument } from "@/lib/ai-extract";
+import { getMaxVehicleKm, friendlyKmError } from "@/lib/km-validation";
+import KmOverrideField from "@/components/dashboard/KmOverrideField";
 
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
@@ -23,7 +25,7 @@ const blank = () => ({
 });
 
 export default function FuelDialog({ open, onOpenChange, record, onSaved }: Props) {
-  const { currentCompanyId, user } = useAuth();
+  const { currentCompanyId, user, isManager } = useAuth();
   const [busy, setBusy] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -32,10 +34,14 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const [uploading, setUploading] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState<"plate" | "odometer" | null>(null);
   const [plateCheck, setPlateCheck] = useState<{ plate: string; ok: boolean; vehicleId?: string } | null>(null);
+  const [maxKm, setMaxKm] = useState<number>(0);
+  const [kmOverrideReason, setKmOverrideReason] = useState<string>("");
 
   useEffect(() => {
     if (!open || !currentCompanyId) return;
     setPlateCheck(null);
+    setKmOverrideReason("");
+    setMaxKm(0);
     (async () => {
       const [{ data: v }, { data: d }, { data: s }] = await Promise.all([
         supabase.from("vehicles").select("id,plate,brand,model,current_km,fuel_type,tank_capacity").eq("company_id", currentCompanyId).in("status", ["ativo","manutencao"]).order("plate"),
@@ -51,6 +57,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
         driver_id: record.driver_id ?? "",
         fuel_station_id: record.fuel_station_id ?? "",
       });
+      setKmOverrideReason(record.km_override_reason ?? "");
     } else setForm(blank());
   }, [open, record, currentCompanyId]);
 
@@ -64,13 +71,14 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   }, [form.liters, form.price_per_liter]);
 
   // Quando seleciona veículo, preenche fuel_type e KM atual
-  const onVehicleChange = (id: string) => {
+  const onVehicleChange = async (id: string) => {
     const v = vehicles.find((x) => x.id === id);
     setForm((f: any) => ({
       ...f, vehicle_id: id,
       fuel_type: v?.fuel_type ?? f.fuel_type,
       km_at_fueling: v?.current_km ? String(v.current_km) : f.km_at_fueling,
     }));
+    if (id) setMaxKm(await getMaxVehicleKm(id));
   };
 
   const onStationChange = (id: string) => {
@@ -147,6 +155,13 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     if (!form.vehicle_id) return toast.error("Selecione um veículo");
     if (plateCheck && !plateCheck.ok) return toast.error("Placa não autorizada — abastecimento bloqueado");
     if (!form.liters || !form.price_per_liter || !form.km_at_fueling) return toast.error("Litros, valor/L e KM são obrigatórios");
+    const kmNum = Number(form.km_at_fueling);
+    if (maxKm > 0 && kmNum < maxKm && !kmOverrideReason.trim()) {
+      return toast.error(`KM (${kmNum.toLocaleString("pt-BR")}) é menor que o último registrado (${maxKm.toLocaleString("pt-BR")}). ${isManager ? "Preencha a justificativa de gestor." : "Peça a um gestor para corrigir."}`);
+    }
+    if (kmOverrideReason && kmOverrideReason.trim().length < 10) {
+      return toast.error("A justificativa do override de KM precisa ter pelo menos 10 caracteres.");
+    }
     setBusy(true);
     const payload: any = {
       ...form,
@@ -159,6 +174,8 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       total_value: Number(form.total_value),
       km_at_fueling: Number(form.km_at_fueling),
       fueled_at: new Date(form.fueled_at).toISOString(),
+      km_override_reason: kmOverrideReason.trim() || null,
+      km_override_by: kmOverrideReason.trim() ? user?.id : null,
     };
     delete payload.id; delete payload.created_at; delete payload.updated_at;
     delete payload.km_driven; delete payload.km_per_liter; delete payload.cost_per_km;
@@ -169,7 +186,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       : supabase.from("fuel_records").insert(payload);
     const { error } = await op;
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(friendlyKmError(error.message) ?? error.message);
     toast.success(record ? "Abastecimento atualizado" : "Abastecimento registrado");
     onOpenChange(false); onSaved();
   };
@@ -288,6 +305,8 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
           </div>
           <div className="space-y-2"><Label>KM no abastecimento *</Label>
             <Input type="number" value={form.km_at_fueling} onChange={(e) => setForm({ ...form, km_at_fueling: e.target.value })} />
+            <KmOverrideField km={form.km_at_fueling} maxKm={maxKm} isManager={isManager}
+              reason={kmOverrideReason} onReasonChange={setKmOverrideReason} context="abastecimento" />
           </div>
           <div className="space-y-2"><Label>Litros *</Label>
             <Input type="number" step="0.01" value={form.liters} onChange={(e) => setForm({ ...form, liters: e.target.value })} />

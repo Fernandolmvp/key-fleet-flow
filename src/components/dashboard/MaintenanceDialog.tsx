@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { Loader2, Upload, Sparkles, Plus, Trash2, FileText } from "lucide-react";
 import { MAINT_TYPES, MAINT_STATUS, MAINT_CATEGORIES } from "@/lib/maintenance";
 import { extractDocument } from "@/lib/ai-extract";
+import { getMaxVehicleKm, friendlyKmError } from "@/lib/km-validation";
+import KmOverrideField from "@/components/dashboard/KmOverrideField";
 
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
@@ -28,12 +30,14 @@ const blank = () => ({
 });
 
 export default function MaintenanceDialog({ open, onOpenChange, record, onSaved }: Props) {
-  const { currentCompanyId, user } = useAuth();
+  const { currentCompanyId, user, isManager } = useAuth();
   const [busy, setBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [form, setForm] = useState<any>(blank());
+  const [maxKm, setMaxKm] = useState<number>(0);
+  const [kmOverrideReason, setKmOverrideReason] = useState<string>("");
 
   useEffect(() => {
     if (!open || !currentCompanyId) return;
@@ -55,7 +59,8 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
         parts_value: String(record.parts_value ?? "0"),
         total_value: String(record.total_value ?? "0"),
       });
-    } else setForm(blank());
+      setKmOverrideReason(record.km_override_reason ?? "");
+    } else { setForm(blank()); setKmOverrideReason(""); setMaxKm(0); }
   }, [open, record, currentCompanyId]);
 
   // total = labor + parts (recompute)
@@ -66,12 +71,13 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.labor_value, form.parts_value]);
 
-  const onVehicleChange = (id: string) => {
+  const onVehicleChange = async (id: string) => {
     const v = vehicles.find((x) => x.id === id);
     setForm((f: any) => ({
       ...f, vehicle_id: id,
       km_at_service: v?.current_km ? String(v.current_km) : f.km_at_service,
     }));
+    if (id) setMaxKm(await getMaxVehicleKm(id));
   };
 
   const normalizePlate = (s: string) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -154,6 +160,15 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
     if (!currentCompanyId) return toast.error("Selecione uma empresa");
     if (!form.vehicle_id) return toast.error("Selecione o veículo");
     if (!form.type) return toast.error("Tipo obrigatório");
+    if (form.km_at_service) {
+      const kmNum = Number(form.km_at_service);
+      if (maxKm > 0 && kmNum < maxKm && !kmOverrideReason.trim()) {
+        return toast.error(`KM (${kmNum.toLocaleString("pt-BR")}) é menor que o último registrado (${maxKm.toLocaleString("pt-BR")}). ${isManager ? "Preencha a justificativa de gestor." : "Peça a um gestor para corrigir."}`);
+      }
+      if (kmOverrideReason && kmOverrideReason.trim().length < 10) {
+        return toast.error("A justificativa do override de KM precisa ter pelo menos 10 caracteres.");
+      }
+    }
 
     setBusy(true);
     const payload: any = {
@@ -180,6 +195,8 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
       invoice_url: form.invoice_url || null,
       attachments: form.attachments ?? [],
       created_by: user?.id ?? null,
+      km_override_reason: kmOverrideReason.trim() || null,
+      km_override_by: kmOverrideReason.trim() ? user?.id : null,
     };
 
     const op = record?.id
@@ -187,7 +204,7 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
       : supabase.from("maintenance_records").insert(payload);
     const { error } = await op;
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(friendlyKmError(error.message) ?? error.message);
 
     // If next service scheduled and not editing existing schedule, create one
     if (!record?.id && (payload.next_service_km || payload.next_service_at)) {
@@ -302,6 +319,10 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
           <div>
             <Label>KM no serviço</Label>
             <Input type="number" value={form.km_at_service} onChange={(e) => setForm((f: any) => ({ ...f, km_at_service: e.target.value }))} />
+            <div className="mt-1">
+              <KmOverrideField km={form.km_at_service} maxKm={maxKm} isManager={isManager}
+                reason={kmOverrideReason} onReasonChange={setKmOverrideReason} context="manutenção" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
