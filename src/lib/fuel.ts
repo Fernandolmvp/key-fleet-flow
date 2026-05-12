@@ -7,6 +7,8 @@ export const ANOMALY_LABEL: Record<string, string> = {
   valor_atipico: "Valor/litro atípico",
   horario_suspeito: "Horário suspeito (00h-05h)",
   cidade_incomum: "Cidade incomum",
+  consumo_acima_esperado: "Consumo acima do esperado",
+  consumo_abaixo_esperado: "Consumo abaixo do esperado",
 };
 
 export const SEVERITY_TONE: Record<string, string> = {
