@@ -667,6 +667,8 @@ export type Database = {
           generated_maintenance_id: string | null
           id: string
           km_at_check: number | null
+          km_override_by: string | null
+          km_override_reason: string | null
           na_items: number
           non_conform_items: number
           notes: string | null
@@ -692,6 +694,8 @@ export type Database = {
           generated_maintenance_id?: string | null
           id?: string
           km_at_check?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           na_items?: number
           non_conform_items?: number
           notes?: string | null
@@ -717,6 +721,8 @@ export type Database = {
           generated_maintenance_id?: string | null
           id?: string
           km_at_check?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           na_items?: number
           non_conform_items?: number
           notes?: string | null
@@ -1615,6 +1621,8 @@ export type Database = {
           fuel_type: string | null
           id: string
           km_at_request: number | null
+          km_override_by: string | null
+          km_override_reason: string | null
           km_photo_url: string | null
           notes: string | null
           plate_photo_url: string | null
@@ -1649,6 +1657,8 @@ export type Database = {
           fuel_type?: string | null
           id?: string
           km_at_request?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           km_photo_url?: string | null
           notes?: string | null
           plate_photo_url?: string | null
@@ -1683,6 +1693,8 @@ export type Database = {
           fuel_type?: string | null
           id?: string
           km_at_request?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           km_photo_url?: string | null
           notes?: string | null
           plate_photo_url?: string | null
@@ -1809,6 +1821,8 @@ export type Database = {
           invoice_url: string | null
           km_at_fueling: number
           km_driven: number | null
+          km_override_by: string | null
+          km_override_reason: string | null
           km_per_liter: number | null
           latitude: number | null
           liters: number
@@ -1848,6 +1862,8 @@ export type Database = {
           invoice_url?: string | null
           km_at_fueling: number
           km_driven?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           km_per_liter?: number | null
           latitude?: number | null
           liters: number
@@ -1887,6 +1903,8 @@ export type Database = {
           invoice_url?: string | null
           km_at_fueling?: number
           km_driven?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           km_per_liter?: number | null
           latitude?: number | null
           liters?: number
@@ -2494,6 +2512,8 @@ export type Database = {
           id: string
           invoice_url: string | null
           km_at_service: number | null
+          km_override_by: string | null
+          km_override_reason: string | null
           labor_value: number
           next_service_at: string | null
           next_service_km: number | null
@@ -2523,6 +2543,8 @@ export type Database = {
           id?: string
           invoice_url?: string | null
           km_at_service?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           labor_value?: number
           next_service_at?: string | null
           next_service_km?: number | null
@@ -2552,6 +2574,8 @@ export type Database = {
           id?: string
           invoice_url?: string | null
           km_at_service?: number | null
+          km_override_by?: string | null
+          km_override_reason?: string | null
           labor_value?: number
           next_service_at?: string | null
           next_service_km?: number | null
@@ -3931,6 +3955,18 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      log_km_override: {
+        Args: {
+          _company_id: string
+          _km_new: number
+          _km_old: number
+          _reason: string
+          _record_id: string
+          _table: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -3973,6 +4009,16 @@ export type Database = {
       sync_vehicle_insurance_fields: {
         Args: { _vehicle_ids: string[] }
         Returns: undefined
+      }
+      validate_vehicle_km: {
+        Args: {
+          _new_km: number
+          _override: boolean
+          _override_reason: string
+          _source: string
+          _vehicle_id: string
+        }
+        Returns: number
       }
     }
     Enums: {
