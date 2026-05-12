@@ -43,15 +43,11 @@ async function sendInviteEmail(opts: {
         <p style="font-size:12px;color:#666">Ou copie e cole este link no navegador:<br>${opts.acceptUrl}</p>
         <p style="font-size:12px;color:#666">Este link expira em 7 dias. Se você não esperava este email, ignore-o.</p>
       </div>`;
-    const r = await admin.functions.invoke("send-transactional-email", {
-      body: {
-        to: opts.to,
-        subject,
-        html,
-        purpose: "transactional",
-      },
+    const r = await admin.functions.invoke("send-partner-email", {
+      body: { to: opts.to, subject, html },
     });
     if (r.error) console.warn("[partner-invite] email send failed:", r.error.message);
+    else console.log("[partner-invite] email enviado:", (r.data as any)?.id);
   } catch (e) {
     console.warn("[partner-invite] email skipped:", (e as Error).message);
   }
