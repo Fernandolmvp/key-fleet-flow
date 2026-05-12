@@ -34,6 +34,12 @@ export default function Login() {
   const [resetMaskedEmail, setResetMaskedEmail] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
 
+  // Reset senha empresa
+  const [resetCoOpen, setResetCoOpen] = useState(false);
+  const [resetCoEmail, setResetCoEmail] = useState("");
+  const [resetCoBusy, setResetCoBusy] = useState(false);
+  const [resetCoSent, setResetCoSent] = useState(false);
+
   if (!loading && user) return <Navigate to="/app" replace />;
 
   const routeAfterLogin = async () => {
@@ -100,6 +106,27 @@ export default function Login() {
     setResetMaskedEmail(data.masked_email || "");
     setResetStep("sent");
     toast.success("Email de redefinição enviado");
+  };
+
+  const openResetCompany = () => {
+    setResetCoEmail(email || "");
+    setResetCoSent(false);
+    setResetCoOpen(true);
+  };
+
+  const sendCompanyResetEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = resetCoEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return toast.error("Email inválido");
+    setResetCoBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(value, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetCoBusy(false);
+    // Mensagem neutra (não revela existência da conta)
+    setResetCoSent(true);
+    if (error) console.warn("[reset-empresa]", error.message);
+    toast.success("Se o email existir, enviaremos instruções em alguns minutos");
   };
 
   return (
@@ -171,6 +198,13 @@ export default function Login() {
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
                 </Button>
               </form>
+              <button
+                type="button"
+                onClick={openResetCompany}
+                className="text-sm text-primary hover:underline w-full text-center"
+              >
+                Esqueci minha senha
+              </button>
               <p className="text-sm text-center text-muted-foreground">
                 Primeiro acesso? <Link to="/signup" className="text-primary hover:underline">Criar conta da empresa</Link>
               </p>
@@ -245,6 +279,39 @@ export default function Login() {
               <div>
                 Caso não receba em alguns minutos, verifique a caixa de spam. O link expira após o uso.
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetCoOpen} onOpenChange={setResetCoOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              Redefinir senha da empresa
+            </DialogTitle>
+            <DialogDescription>
+              {resetCoSent
+                ? "Se o email existir em nossa base, enviamos instruções em alguns minutos. Verifique também a caixa de spam."
+                : "Informe o email corporativo cadastrado. Enviaremos um link para definir uma nova senha."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!resetCoSent ? (
+            <form onSubmit={sendCompanyResetEmail} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Email corporativo</Label>
+                <Input type="email" value={resetCoEmail} onChange={(e) => setResetCoEmail(e.target.value)} placeholder="voce@empresa.com" required />
+              </div>
+              <Button type="submit" disabled={resetCoBusy} className="w-full bg-gradient-primary text-primary-foreground h-11">
+                {resetCoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4" /> Enviar link por email</>}
+              </Button>
+            </form>
+          ) : (
+            <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 p-4 text-sm text-emerald-200 flex gap-2">
+              <Check className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>O link expira em 1 hora e só pode ser usado uma vez.</div>
             </div>
           )}
         </DialogContent>
