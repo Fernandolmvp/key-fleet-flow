@@ -3556,12 +3556,14 @@ export type Database = {
           chassis: string | null
           color: string | null
           company_id: string
+          consumption_tolerance_pct: number | null
           cost_center_id: string | null
           created_at: string
           crlv_city: string | null
           crlv_issue_date: string | null
           current_km: number
           documents: string[]
+          expected_consumption_kml: number | null
           fipe_value: number | null
           fuel_type: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker: boolean
@@ -3608,12 +3610,14 @@ export type Database = {
           chassis?: string | null
           color?: string | null
           company_id: string
+          consumption_tolerance_pct?: number | null
           cost_center_id?: string | null
           created_at?: string
           crlv_city?: string | null
           crlv_issue_date?: string | null
           current_km?: number
           documents?: string[]
+          expected_consumption_kml?: number | null
           fipe_value?: number | null
           fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker?: boolean
@@ -3660,12 +3664,14 @@ export type Database = {
           chassis?: string | null
           color?: string | null
           company_id?: string
+          consumption_tolerance_pct?: number | null
           cost_center_id?: string | null
           created_at?: string
           crlv_city?: string | null
           crlv_issue_date?: string | null
           current_km?: number
           documents?: string[]
+          expected_consumption_kml?: number | null
           fipe_value?: number | null
           fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker?: boolean
@@ -4096,6 +4102,8 @@ export type Database = {
         | "valor_atipico"
         | "horario_suspeito"
         | "cidade_incomum"
+        | "consumo_abaixo_esperado"
+        | "consumo_acima_esperado"
       fuel_auth_status:
         | "pendente"
         | "aprovada"
@@ -4370,6 +4378,8 @@ export const Constants = {
         "valor_atipico",
         "horario_suspeito",
         "cidade_incomum",
+        "consumo_abaixo_esperado",
+        "consumo_acima_esperado",
       ],
       fuel_auth_status: [
         "pendente",
