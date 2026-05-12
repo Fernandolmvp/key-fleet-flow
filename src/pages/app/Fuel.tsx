@@ -225,11 +225,33 @@ export default function Fuel() {
                     <td className="px-4 py-3 text-right font-mono">{r.km_per_liter ? `${r.km_per_liter}` : "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {r.anomalies?.map((a) => (
-                          <Badge key={a} className={`text-[10px] border ${SEVERITY_TONE[r.anomaly_severity ?? "baixa"]}`}>
-                            {ANOMALY_LABEL[a] ?? a}
-                          </Badge>
-                        ))}
+                        {r.anomalies?.map((a) => {
+                          const badge = (
+                            <Badge key={a} className={`text-[10px] border ${SEVERITY_TONE[r.anomaly_severity ?? "baixa"]}`}>
+                              {ANOMALY_LABEL[a] ?? a}
+                            </Badge>
+                          );
+                          const isExpectedAnom = a === "consumo_acima_esperado" || a === "consumo_abaixo_esperado";
+                          const expected = r.vehicles?.expected_consumption_kml;
+                          if (isExpectedAnom && expected != null && r.km_per_liter != null) {
+                            const real = Number(r.km_per_liter);
+                            const exp = Number(expected);
+                            const dev = exp > 0 ? Math.abs(real - exp) / exp * 100 : 0;
+                            return (
+                              <TooltipProvider key={a} delayDuration={150}>
+                                <UITooltip>
+                                  <TooltipTrigger asChild><span>{badge}</span></TooltipTrigger>
+                                  <TooltipContent className="text-xs">
+                                    <div>Esperado: <strong>{exp.toFixed(1)} km/L</strong></div>
+                                    <div>Real: <strong>{real.toFixed(1)} km/L</strong></div>
+                                    <div>Desvio: <strong>{dev.toFixed(0)}%</strong></div>
+                                  </TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+                            );
+                          }
+                          return badge;
+                        })}
                       </div>
                     </td>
                     <td className="px-4 py-3">
