@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePostoAuth } from "@/contexts/PostoAuthContext";
+import { friendlyKmError } from "@/lib/km-validation";
 
 type AuthInfo = {
   id: string;
@@ -95,7 +96,7 @@ export default function PostoConfirmar() {
       toast.success("Abastecimento confirmado");
       reset();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(friendlyKmError(e?.message ?? "") ?? e.message);
     } finally {
       setBusy(false);
     }
