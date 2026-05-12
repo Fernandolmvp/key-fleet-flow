@@ -710,6 +710,49 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
           </div>
         </div>
 
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <h4 className="font-display text-sm font-semibold">Parâmetros de consumo</h4>
+            <span className="text-[10px] text-muted-foreground font-normal">(opcional)</span>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground"><HelpCircle className="h-3.5 w-3.5" /></button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  O sistema marca o abastecimento como anômalo quando o km/L real desviar mais que a tolerância configurada do consumo esperado.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Consumo esperado (km/L)</Label>
+              <Input
+                type="number" step="0.1" min="0"
+                placeholder="Ex.: 8.5"
+                value={form.expected_consumption_kml}
+                onChange={(e) => setForm({ ...form, expected_consumption_kml: e.target.value })}
+              />
+              <p className="text-[11px] text-muted-foreground">Deixe em branco para desativar o alerta de consumo neste veículo.</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Tolerância</Label>
+                <span className="text-xs font-mono text-primary">±{Number(form.consumption_tolerance_pct || 20)}%</span>
+              </div>
+              <Slider
+                min={5} max={50} step={1}
+                value={[Number(form.consumption_tolerance_pct || 20)]}
+                onValueChange={(v) => setForm({ ...form, consumption_tolerance_pct: String(v[0]) })}
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>5%</span><span>50%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label>Fotos do veículo</Label>
           <div className="flex flex-wrap gap-3">
