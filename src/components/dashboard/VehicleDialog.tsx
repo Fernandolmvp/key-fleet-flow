@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Sparkles, FileText, History, Undo2 } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
 const STATUSES = [
@@ -63,6 +65,7 @@ const EMPTY_FORM = {
   sale_date: "", sale_value: "", buyer_name: "", buyer_doc: "",
   buyer_phone: "", buyer_email: "", buyer_address: "",
   sale_notary: "", sale_city: "", sale_state: "", sale_payment_method: "", sale_notes: "", sale_contract_url: "",
+  expected_consumption_kml: "", consumption_tolerance_pct: "",
 };
 
 const buildFormState = (data?: any) => ({
@@ -422,6 +425,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
       owner_doc: form.owner_doc || null,
       crlv_issue_date: form.crlv_issue_date || null,
       crlv_city: form.crlv_city || null,
+      expected_consumption_kml: form.expected_consumption_kml === "" || form.expected_consumption_kml == null
+        ? null : Number(form.expected_consumption_kml),
+      consumption_tolerance_pct: form.consumption_tolerance_pct === "" || form.consumption_tolerance_pct == null
+        ? null : Number(form.consumption_tolerance_pct),
     };
     const salePayload: any = {
       status: finalStatus,
