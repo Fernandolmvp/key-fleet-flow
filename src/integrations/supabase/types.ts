@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _km_test_results: {
+        Row: {
+          detail: string | null
+          result: string | null
+          step: string | null
+          ts: string | null
+        }
+        Insert: {
+          detail?: string | null
+          result?: string | null
+          step?: string | null
+          ts?: string | null
+        }
+        Update: {
+          detail?: string | null
+          result?: string | null
+          step?: string | null
+          ts?: string | null
+        }
+        Relationships: []
+      }
       ai_feature_routing: {
         Row: {
           active: boolean
