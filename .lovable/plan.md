@@ -1,145 +1,132 @@
-# TAREFA 2 — Consumo esperado por veículo
+# Migração de Auth Emails para Resend
 
-## Contexto verificado
-- `vehicles` **não** tem ainda `expected_consumption_kml` nem `consumption_tolerance_pct` ✅
-- `fuel_records.km_per_liter` é calculado pelo trigger `tg_fuel_compute` (BEFORE INSERT/UPDATE)
-- Enum `fuel_anomaly` atual: `km_regressivo, consumo_alto, consumo_baixo, tanque_excedido, duplicado, valor_atipico, horario_suspeito, cidade_incomum`
-- Severities usadas no código: `alta | media | baixa` (mapeadas em `src/lib/fuel.ts → SEVERITY_TONE`). **Vou manter esse padrão** em vez de "alto/médio" pra não quebrar os badges existentes.
+## Visão geral
 
-## Decisão de arquitetura
-Em vez de criar um **AFTER INSERT** novo (que forçaria um 2º UPDATE no mesmo registro), **estendo o trigger BEFORE existente `tg_fuel_compute`** com mais um bloco. Vantagens: 1 só write, anomalia já entra junto com as outras, severity é combinada pela mesma lógica.
+Vou criar um **Auth Email Hook** customizado que intercepta os 4 tipos de email do Supabase Auth e envia via **Resend** (mesmo gateway já usado em `send-partner-email`). Lovable Emails permanece desabilitado.
+
+> ⚠️ Importante: NÃO vou usar o tooling `scaffold_auth_email_templates` (que é o caminho gerenciado Lovable Emails). Vou criar manualmente porque você optou explicitamente por Resend.
 
 ---
 
-## 1. Migration SQL (completa)
+## ETAPA 1 — Limpeza preliminar
 
-```sql
--- 1.1 Schema
-ALTER TABLE public.vehicles
-  ADD COLUMN expected_consumption_kml numeric,
-  ADD COLUMN consumption_tolerance_pct numeric DEFAULT 20;
+- Deletar usuário órfão `flvcontabilidade@hotmail.com` da `auth.users` via migration (`DELETE FROM auth.users WHERE email = ...`).
+- Verificar se existe registro em `profiles`/`company_members` ligado a esse user_id e limpar se necessário.
 
-ALTER TABLE public.vehicles
-  ADD CONSTRAINT vehicles_expected_kml_positive
-    CHECK (expected_consumption_kml IS NULL OR expected_consumption_kml > 0),
-  ADD CONSTRAINT vehicles_tolerance_range
-    CHECK (consumption_tolerance_pct IS NULL
-           OR (consumption_tolerance_pct >= 5 AND consumption_tolerance_pct <= 50));
+## ETAPA 2 — Generalizar email sender
 
--- 1.2 Novos valores no enum de anomalias
-ALTER TYPE public.fuel_anomaly ADD VALUE IF NOT EXISTS 'consumo_abaixo_esperado';
-ALTER TYPE public.fuel_anomaly ADD VALUE IF NOT EXISTS 'consumo_acima_esperado';
+Refatorar `send-partner-email` em **`send-transactional-email`** mantendo retrocompatibilidade:
 
--- 1.3 Estender tg_fuel_compute (REPLACE preservando lógica atual + bloco novo
---     no fim, antes de NEW.anomalies := anom)
-CREATE OR REPLACE FUNCTION public.tg_fuel_compute()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
-AS $function$
-DECLARE
-  prev RECORD; v RECORD; hist RECORD;
-  anom public.fuel_anomaly[] := '{}';
-  sev TEXT := NULL; hour_local INT;
-  expected numeric; tol numeric; deviation numeric;
-BEGIN
-  -- [bloco existente intacto: prev, km_driven, km_per_liter, cost_per_km,
-  --  km_regressivo, duplicado, tanque_excedido, consumo_alto/baixo via histórico,
-  --  horario_suspeito, valor_atipico, current_km sync]
-  -- ...
+- Aceita `type`: `'partner_invite' | 'partner_reset' | 'auth_signup' | 'auth_recovery' | 'auth_email_change' | 'auth_magiclink' | 'raw'`
+- Para `raw`: usa `{to, subject, html}` (compatível com chamadas atuais)
+- Para tipos auth: recebe `{to, data: { confirmation_url, token, ... }}` e renderiza template internamente
+- Mantém endpoint `send-partner-email` como **alias** que redireciona internamente para evitar quebrar `partner-invite` e `driver-onboarding`
 
-  -- NOVO: comparação contra consumo esperado configurado no veículo
-  expected := v.expected_consumption_kml;
-  tol := COALESCE(v.consumption_tolerance_pct, 20);
-  IF expected IS NOT NULL AND expected > 0
-     AND NEW.km_per_liter IS NOT NULL AND NEW.km_per_liter > 0 THEN
-    deviation := ABS(NEW.km_per_liter - expected) / expected * 100.0;
-    IF deviation > tol THEN
-      IF NEW.km_per_liter < expected THEN
-        anom := array_append(anom, 'consumo_acima_esperado'::public.fuel_anomaly);
-      ELSE
-        anom := array_append(anom, 'consumo_abaixo_esperado'::public.fuel_anomaly);
-      END IF;
-      IF deviation > 40 THEN sev := 'alta';
-      ELSIF deviation > 20 THEN sev := COALESCE(sev,'media');
-      ELSE sev := COALESCE(sev,'baixa');
-      END IF;
-    END IF;
-  END IF;
+## ETAPA 3 — Auth Email Hook
 
-  NEW.anomalies := anom;
-  NEW.anomaly_severity := sev;
-  -- ... (current_km sync existente)
-END $function$;
+Criar **`supabase/functions/auth-email-hook/index.ts`**:
+
+```
+POST /auth-email-hook
+Headers: webhook-id, webhook-timestamp, webhook-signature (HMAC SHA-256)
+Body: { user: {...}, email_data: { token, token_hash, redirect_to, email_action_type, site_url } }
 ```
 
-> Nota semântica: **consumo_acima_esperado** = veículo bebendo mais (km/L menor → custo maior). **consumo_abaixo_esperado** = km/L acima do esperado (bom, mas pode indicar erro de leitura). Vou alinhar labels no frontend de acordo.
+Fluxo:
+1. Validar assinatura HMAC com `SEND_EMAIL_HOOK_SECRET` (gerado pelo Supabase ao registrar o webhook)
+2. Mapear `email_action_type` → template:
+   - `signup` → auth_signup
+   - `recovery` → auth_recovery
+   - `email_change` / `email_change_new` → auth_email_change
+   - `magiclink` → auth_magiclink
+   - `invite` → tratar como signup
+3. Construir `confirmation_url` = `{site_url}/auth/v1/verify?token={token_hash}&type={action}&redirect_to={redirect_to}`
+4. Chamar `send-transactional-email` internamente
+5. Retornar `200 {}` em sucesso, `4xx/5xx` em erro
 
-## 2. Frontend
-
-### 2.1 `src/lib/fuel.ts`
-- Adicionar em `ANOMALY_LABEL`:
-  - `consumo_acima_esperado: "Consumo acima do esperado"`
-  - `consumo_abaixo_esperado: "Consumo abaixo do esperado"`
-
-### 2.2 `src/components/dashboard/VehicleDialog.tsx`
-Nova seção **"Parâmetros de consumo (opcional)"**:
-- Input numérico **"Consumo esperado (km/L)"** — `step=0.1`, placeholder "Ex.: 8.5"
-- Slider **"Tolerância (%)"** — range 5–50, default 20, label dinâmico "±20%"
-- Tooltip (ícone `?`): *"O sistema marca o abastecimento como anômalo se o km/L real desviar mais que esta tolerância do valor esperado."*
-
-### 2.3 `src/pages/app/Fuel.tsx` (já lista anomalias via `Badge` + `SEVERITY_TONE`)
-- Os novos valores entram automaticamente na coluna **Alertas** (loop existente).
-- **Adição:** quando o registro tiver uma das duas anomalias novas, envolver o badge num `<Tooltip>` mostrando: *"Esperado: X km/L · Real: Y km/L · Desvio: Z%"*. Cálculo client-side usando `vehicles.expected_consumption_kml` (vou trazer no select da query — campo já é seguro por RLS de membership).
-
-## 3. Plano de teste (manual + SQL)
-
-| # | Cenário | Setup | Esperado |
-|---|---|---|---|
-| 1 | Veículo sem `expected_consumption_kml` | NULL | Nenhuma anomalia nova, comportamento atual preservado |
-| 2 | `expected=10`, `tol=20`, real=10.5 | desvio 5% | Sem anomalia |
-| 3 | `expected=10`, `tol=20`, real=7.5 | desvio 25% | `consumo_acima_esperado`, severity `media` |
-| 4 | `expected=10`, `tol=20`, real=5.5 | desvio 45% | `consumo_acima_esperado`, severity `alta` |
-| 5 | `expected=10`, `tol=20`, real=13 | desvio 30% | `consumo_abaixo_esperado`, severity `media` |
-| 6 | Primeira abastecida do veículo (sem `prev` → `km_per_liter` NULL) | — | Sem anomalia (guardado por `IF NEW.km_per_liter IS NOT NULL`) |
-| 7 | `tol=5%`, real desviando 6% | — | Anomalia leve, severity `baixa` |
-
-Testes 2–5 rodo com `INSERT` real num veículo de teste e depois `DELETE`, OU via simulação chamando `tg_fuel_compute` diretamente em transação rolled-back. Vou preferir dry-run em transação.
-
-## 4. Mockup do alerta visual
-
-```text
-Tabela Abastecimentos → coluna "Alertas":
-
-┌────────────────────────────────────┐
-│ [⚠ Consumo acima do esperado]      │  ← badge âmbar (bg-warning/20)
-│  hover ▼                            │
-│  ┌──────────────────────────────┐  │
-│  │ Esperado: 10.0 km/L          │  │
-│  │ Real:      7.2 km/L          │  │
-│  │ Desvio:    28%               │  │
-│  └──────────────────────────────┘  │
-└────────────────────────────────────┘
-
-Severidade alta (>40%) → badge vermelho (bg-destructive/20)
-Severidade média (20–40%) → âmbar
-Severidade baixa (≤20%, só quando tol<20) → azul (bg-info/20)
+Configurar em `supabase/config.toml`:
+```toml
+[functions.auth-email-hook]
+verify_jwt = false
 ```
 
-VehicleDialog (nova seção):
+**Registro do webhook no Supabase Auth**: Será necessário rodar uma migration ou solicitar via tooling para apontar Auth → `https://<project>.supabase.co/functions/v1/auth-email-hook` e gerar o `SEND_EMAIL_HOOK_SECRET`. Vou tentar via SQL no `auth.config` / `supabase_auth_admin`. Se não for possível via SQL gerenciado, te mostro o passo manual no painel **Cloud → Auth Hooks**.
 
-```text
-─── Parâmetros de consumo (opcional) ─────────────────
-Consumo esperado (km/L)   [   8.5   ] (?)
-Tolerância                ●━━━━━━━━━━━━○  ±20%
-                          5%          50%
-─────────────────────────────────────────────────────
+## ETAPA 4 — Templates HTML (visual FrotaOps escuro)
+
+Estrutura comum:
+```
+[Header: bg #0a0e1a, logo FrotaOps em gradient azul]
+[Body: bg #0f1420, card #151b2e, texto #e5e7eb]
+  Olá!
+  <Mensagem específica>
+  [Botão CTA: gradient azul→roxo, sombra glow]
+  Ou copie este link: <url>
+[Footer: bg #0a0e1a, "Precisa de ajuda? contato@frotaops.com.br" + LGPD]
 ```
 
-## 5. Casos de exceção tratados
-- `expected_consumption_kml IS NULL` → bloco inteiro pulado (zero impacto em quem não configurar)
-- `km_per_liter IS NULL` (1ª abastecida) → bloco pulado
-- `km_per_liter <= 0` → bloco pulado
-- `consumption_tolerance_pct` NULL → assume 20 via COALESCE
-- CHECK constraints garantem que valores inválidos nunca entram
+Conteúdo por tipo:
+| Type | Subject | Heading | CTA |
+|------|---------|---------|-----|
+| signup | "Confirme seu email · FrotaOps" | "Bem-vindo à FrotaOps" | "Confirmar email" |
+| recovery | "Redefinir sua senha · FrotaOps" | "Vamos redefinir sua senha" | "Redefinir senha" |
+| email_change | "Confirme seu novo email · FrotaOps" | "Confirmação de novo email" | "Confirmar novo email" |
+| magiclink | "Seu link de acesso · FrotaOps" | "Acesse sua conta" | "Entrar agora" |
 
-## Aguardando aprovação
-Confirma e eu executo nesta ordem: (a) migration → (b) `src/lib/fuel.ts` → (c) `VehicleDialog.tsx` → (d) `Fuel.tsx` com tooltip → (e) testes dry-run dos 7 cenários.
+Templates como funções TS retornando string HTML (sem React Email — mais simples e leve).
+
+## ETAPA 5 — "Esqueci minha senha" (empresa)
+
+Atualmente o reset existe apenas para **motorista** (via `driver-onboarding`). Vou adicionar para conta empresa:
+
+- No `Login.tsx` aba **Empresa**, adicionar link "Esqueci minha senha"
+- Modal pede email → `supabase.auth.resetPasswordForEmail(email, { redirectTo: '${origin}/reset-password' })`
+- Mensagem neutra: "Se o email existir, enviaremos instruções em alguns minutos"
+- `/reset-password` já existe e funciona com o token PKCE
+
+## ETAPA 6 — Teste end-to-end
+
+1. Após deploy, criar conta com `nandovolpi.jb@gmail.com`
+2. Verificar logs em `auth-email-hook` e `send-transactional-email`
+3. Confirmar email chega via Resend (vou ler logs `email_send_log` se existir, ou apenas logs da function)
+4. Clicar no link → deve cair em `/welcome` ou rota equivalente
+5. Testar "esqueci senha" da empresa
+6. Te mostrar status final + IDs Resend
+
+## Rollback
+
+Se algo falhar:
+1. Reverter migration que registra o webhook (Auth volta a usar default Lovable)
+2. Manter `send-transactional-email` (não quebra nada — é aditivo)
+3. Hook fica deployed mas inativo (sem webhook configurado, não é chamado)
+
+---
+
+## Estrutura de arquivos
+
+```
+supabase/functions/
+  auth-email-hook/
+    index.ts              [novo]
+  send-transactional-email/
+    index.ts              [novo - generalização]
+    templates.ts          [novo - 4 templates auth + partner]
+  send-partner-email/
+    index.ts              [mantido como alias retrocompatível]
+
+src/pages/auth/Login.tsx  [adicionar reset senha empresa]
+
+supabase/migrations/
+  YYYYMMDD_delete_orphan_user.sql
+  YYYYMMDD_register_auth_email_hook.sql  [se possível via SQL]
+```
+
+## Secrets
+
+- `RESEND_API_KEY` ✅ já existe
+- `LOVABLE_API_KEY` ✅ já existe
+- `SEND_EMAIL_HOOK_SECRET` ⚠️ será gerado quando registrar o webhook — vou pedir pra você adicionar via tooling de secrets se necessário
+
+---
+
+**Confirma que posso executar?** Vou mostrar resultado de cada etapa antes da próxima (limpeza → hook+templates → reset empresa → teste).
