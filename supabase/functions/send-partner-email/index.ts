@@ -3,7 +3,7 @@
 import { corsHeaders } from "../_shared/partner-auth.ts";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
-const FROM = "FrotaOps <noreply@send.frotaops.com.br>";
+const FROM = "FrotaOps <noreply@frotaops.com.br>";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
