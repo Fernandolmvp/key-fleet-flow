@@ -43,6 +43,8 @@ import { PostoAuthProvider } from "./contexts/PostoAuthContext";
 import PostoLogin from "./pages/posto/PostoLogin";
 import PostoShell from "./pages/posto/PostoShell";
 import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
+import Termos from "./pages/legal/Termos";
+import Privacidade from "./pages/legal/Privacidade";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +58,8 @@ const App = () => (
          <PostoAuthProvider>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/termos" element={<Termos />} />
+            <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />

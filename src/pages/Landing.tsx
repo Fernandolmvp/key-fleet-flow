@@ -290,6 +290,8 @@ export default function Landing() {
           <div className="flex items-center gap-5">
             <Link to="/login" className="hover:text-foreground">Entrar</Link>
             <Link to="/signup" className="hover:text-foreground">Criar conta</Link>
+            <Link to="/termos" className="hover:text-foreground">Termos</Link>
+            <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>
             <a href="mailto:contato@frotaops.com.br" className="hover:text-foreground">contato@frotaops.com.br</a>
           </div>
         </div>
