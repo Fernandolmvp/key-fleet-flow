@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ListChecks, Camera, X, Check, AlertTriangle, MinusCircle, FileSignature, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { ANSWER_STATUS_LABEL, ANSWER_STATUS_TONE } from "@/lib/checklists";
+import { getMaxVehicleKm, friendlyKmError } from "@/lib/km-validation";
+import KmOverrideField from "@/components/dashboard/KmOverrideField";
 
 interface Props {
   open: boolean;
@@ -40,12 +42,14 @@ interface Answer {
 }
 
 export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved }: Props) {
-  const { currentCompanyId, user } = useAuth();
+  const { currentCompanyId, user, isManager } = useAuth();
   const [run, setRun] = useState<any>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [maxKm, setMaxKm] = useState<number>(0);
+  const [kmOverrideReason, setKmOverrideReason] = useState<string>("");
 
   const load = async () => {
     if (!runId) return;
@@ -55,6 +59,8 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
       supabase.from("checklist_answers").select("*, question:checklist_questions(options,required,require_photo_when_fail,require_note_when_fail)").eq("run_id", runId).order("created_at"),
     ]);
     setRun(r);
+    setKmOverrideReason((r as any)?.km_override_reason ?? "");
+    if ((r as any)?.vehicle_id) setMaxKm(await getMaxVehicleKm((r as any).vehicle_id));
     setAnswers(
       (a ?? []).map((x: any) => ({
         id: x.id,
@@ -290,8 +296,28 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
                     type="number"
                     value={run?.km_at_check ?? ""}
                     onChange={(e) => setRun({ ...run, km_at_check: e.target.value === "" ? null : Number(e.target.value) })}
-                    onBlur={() => supabase.from("checklist_runs").update({ km_at_check: run.km_at_check }).eq("id", runId!)}
+                    onBlur={async () => {
+                      const k = run.km_at_check;
+                      if (k != null && maxKm > 0 && Number(k) < maxKm && !kmOverrideReason.trim()) {
+                        toast.error(`KM (${Number(k).toLocaleString("pt-BR")}) é menor que o último registrado (${maxKm.toLocaleString("pt-BR")}). ${isManager ? "Preencha a justificativa de gestor antes de salvar." : "Peça a um gestor para corrigir."}`);
+                        return;
+                      }
+                      if (kmOverrideReason && kmOverrideReason.trim().length < 10) {
+                        toast.error("A justificativa do override de KM precisa ter pelo menos 10 caracteres.");
+                        return;
+                      }
+                      const { error } = await supabase.from("checklist_runs").update({
+                        km_at_check: k,
+                        km_override_reason: kmOverrideReason.trim() || null,
+                        km_override_by: kmOverrideReason.trim() ? user?.id : null,
+                      }).eq("id", runId!);
+                      if (error) toast.error(friendlyKmError(error.message) ?? error.message);
+                    }}
                   />
+                  <div className="mt-1">
+                    <KmOverrideField km={run?.km_at_check} maxKm={maxKm} isManager={isManager}
+                      reason={kmOverrideReason} onReasonChange={setKmOverrideReason} context="checklist" />
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">Responsável (assinante)</Label>
