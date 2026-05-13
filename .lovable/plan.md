@@ -1,103 +1,180 @@
-
 ## Objetivo
-Adicionar busca automática de endereço por CEP (ViaCEP) em todos os formulários do sistema que têm campos de endereço, com hook + componente reutilizáveis.
 
-## Estado atual
-Hoje **nenhum** formulário possui campo CEP. Os formulários de endereço usam apenas:
-- `address` (texto livre, "Rua, número, bairro")
-- `city`, `state` (separados em alguns)
+Melhorar a busca por placa/chassi na aba "Visão Geral" de `/app/insurance` para cobrir 4 cenários (cadastrado+coberto, cadastrado sem cobertura, **placa em apólice mas não cadastrada**, e nada encontrado), expor "placas órfãs" como KPI/alerta e criar uma tela dedicada para cadastrá-las (em lote ou individual).
 
-Tabelas afetadas no banco:
-- `companies` (address, city, state) — usado em `CompanyTab.tsx`
-- `drivers` (address) — usado em `Drivers.tsx`
-- `fuel_stations` (address, city, state) — usado em `FuelStations.tsx`
-- `insurance_brokers` (address) — usado em `Brokers.tsx`
-- `branches` (a confirmar — tabela ainda não está em formulário ativo)
+## Mockups
 
-Não existe coluna `cep` em nenhuma dessas tabelas.
-
-## Etapa 1 — Migration (ADD COLUMN nullable)
-```sql
-ALTER TABLE public.companies          ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS neighborhood text;
-ALTER TABLE public.drivers            ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text, ADD COLUMN IF NOT EXISTS neighborhood text;
-ALTER TABLE public.fuel_stations      ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS neighborhood text;
-ALTER TABLE public.insurance_brokers  ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text, ADD COLUMN IF NOT EXISTS neighborhood text;
--- branches só se a tabela existir
-```
-Tudo nullable, nada destrutivo. Campos existentes continuam funcionando inalterados.
-
-## Etapa 2 — Hook `src/hooks/useCepLookup.ts`
-- `lookup(cep: string)` → valida 8 dígitos numéricos
-- Cache em memória (`Map<string, ViaCepResult>`)
-- Timeout 3s via `AbortController`
-- Retorno: `{ data, loading, error, lookup }`
-- Tipo: `{ logradouro, bairro, localidade, uf, cep }` (campos da ViaCEP)
-- Trata: CEP inválido, `{erro: true}`, falha de rede
-
-## Etapa 3 — Componente `src/components/forms/CepInput.tsx`
-Props:
-```ts
-{
-  value: string;
-  onChange: (cep: string) => void;
-  onAddressFound?: (a: { street: string; neighborhood: string; city: string; uf: string }) => void;
-  nextFieldRef?: React.RefObject<HTMLInputElement>; // foco no número
-  label?: string;
-}
-```
-Comportamento:
-- Máscara `00000-000` automática
-- Debounce 500ms
-- Busca automática quando completa 8 dígitos
-- Estados visuais: idle / loading (spinner à direita) / success (✓ verde) / error (✕ destrutivo + tooltip)
-- `toast.success("Endereço encontrado")` discreto
-- Foco automático em `nextFieldRef` após sucesso
-- Campos preenchidos permanecem editáveis (componente só dispara callback)
+### Cards do resultado de busca (4 cenários)
 
 ```text
-┌─────────────────────────────┐
-│ CEP                         │
-│ [01310-100        ] [✓]     │  ← sucesso
-│ [01310-1          ] [⟳]     │  ← buscando (8 dígitos)
-│ [00000-000        ] [✕]     │  ← não encontrado
-└─────────────────────────────┘
+┌─ CENÁRIO 1 — verde ────────────────────────────────────────┐
+│ ✅ ABC1D23 — Honda Civic 2020                              │
+│    Coberto por: Porto Seguro · Apólice 12345               │
+│    Vigência: 01/01/2026 → 31/12/2026 · Cobertura: Compreensivo│
+│    [Ver detalhes da apólice]                               │
+└────────────────────────────────────────────────────────────┘
+
+┌─ CENÁRIO 2 — âmbar ────────────────────────────────────────┐
+│ ⚠️ ABC1D23 — Honda Civic 2020                              │
+│    SEM COBERTURA ATIVA                                     │
+│    [Adicionar a uma apólice]   [Importar nova apólice]     │
+└────────────────────────────────────────────────────────────┘
+
+┌─ CENÁRIO 3 — azul informativo (NOVO) ──────────────────────┐
+│ 💡 Veículo NÃO cadastrado no sistema                       │
+│    Placa identificada na apólice: ABC1D23                  │
+│    Modelo (apólice): Honda Civic                           │
+│    Apólice: Porto Seguro 12345 · Vigência 01/01–31/12/2026 │
+│    [★ Cadastrar este veículo na frota]   [Ver apólice]     │
+│    (se houver mais de uma apólice cobrindo a placa, lista) │
+└────────────────────────────────────────────────────────────┘
+
+┌─ CENÁRIO 4 — vermelho ─────────────────────────────────────┐
+│ ❌ Nenhum veículo nem apólice para "XXX"                   │
+│    [Cadastrar veículo novo]   [Importar nova apólice]      │
+└────────────────────────────────────────────────────────────┘
 ```
 
-## Etapa 4 — Integração nos formulários
-Em cada um: adicionar `<CepInput>` antes do bloco de endereço; o `onAddressFound` preenche `street/neighborhood/city/state` no estado local; campos seguem editáveis.
+### Card "Cobertura da Frota" atualizado
 
-| Formulário | Arquivo | Campos preenchidos |
-|---|---|---|
-| Empresa | `pages/app/configuracoes/CompanyTab.tsx` | address (rua), neighborhood, city, state |
-| Motorista | `pages/app/Drivers.tsx` (form principal) | address, neighborhood, city, state |
-| Posto | `pages/app/FuelStations.tsx` (dialog) | address, neighborhood, city, state |
-| Corretora | `pages/app/Brokers.tsx` (dialog) | address, neighborhood, city, state |
+```text
+┌─ Cobertura da Frota ───────────────────────────────────────┐
+│  ✅ 47   COM apólice (verde)                               │
+│  ❌ 52   SEM apólice (vermelho)                            │
+│  💡  X   Em apólice mas SEM cadastro  →  [Ver placas órfãs]│
+└────────────────────────────────────────────────────────────┘
+```
 
-`address` continua sendo um único campo livre — pré-preenchemos com `logradouro` da ViaCEP e o usuário acrescenta número manualmente. Adicionamos um campo separado **Bairro** (novo) ao lado.
+### "Alertas Críticos" — novo item
 
-Filiais (branches) e proprietário do veículo: hoje não há formulário ativo desses no UI; ficam fora do escopo desta entrega (o componente já estará pronto para reuso quando essas telas existirem).
+```text
+• X placa(s) coberta(s) por apólice mas SEM cadastro no sistema
+  [Abrir lista]
+```
 
-## Etapa 5 — Testes manuais
-- 01310-100 → preenche Av. Paulista, Bela Vista, São Paulo, SP
-- 13075-000 → preenche Campinas
-- 00000-000 → erro "CEP não encontrado"
-- 0131 → não dispara busca
-- 01310100 (sem hífen) → aceita e busca
+### Tela `/app/insurance/orphans`
+
+```text
+☐ Placa     Modelo (apólice)   Apólice   Seguradora    Vigência              Ação
+☐ ABC1D23   Honda Civic        12345     Porto Seguro  01/01/26 → 31/12/26   [Cadastrar]
+☐ DEF4G56   Fiat Strada        12345     Porto Seguro  01/01/26 → 31/12/26   [Cadastrar]
+
+[Cadastrar selecionados em lote]
+```
+
+## Detalhes técnicos
+
+### Busca paralela (frontend, sem migration)
+
+Toda a busca acontece no cliente sobre dados que já são carregados em `InsurancePanel.load()` (`policies`, `vehicles`, `links`). Para o Cenário 3, o lookup usa as placas/veículos extraídos pela IA na apólice (`ai_extracted.plates`, `ai_extracted.vehicles`) — fonte de verdade já presente.
+
+Pseudo-código do hook de busca:
+
+```ts
+const term = normId(input);                     // upper, sem hífen, A-Z0-9
+const last8 = term.slice(-8);
+
+// 1. veículos cadastrados
+const vehiclesHit = vehicles.filter(v =>
+  normId(v.plate).includes(term) ||
+  (v.chassis && normId(v.chassis).includes(last8))
+);
+
+// 2. placas presentes em apólices (independe de vehicles)
+const today = new Date().toISOString().slice(0,10);
+const policyHits: { policy: Policy; aiVehicle: AiVehicle }[] = [];
+for (const p of policies) {
+  if (p.status !== "ativa") continue;
+  if (p.end_date && p.end_date < today) continue;
+  const ex = p.ai_extracted || {};
+  const list: AiVehicle[] = ex.vehicles?.length
+     ? ex.vehicles
+     : (ex.plates || []).map((pl: string) => ({ plate: pl }));
+  for (const a of list) {
+    const ap = normId(a.plate);
+    const ac = normId(a.chassis);
+    if (ap.includes(term) || (ac && ac.includes(last8))) {
+      policyHits.push({ policy: p, aiVehicle: a });
+    }
+  }
+}
+
+// 3. correlação → 4 cenários
+//    - vehiclesHit.length>0 && coberto(v.id) → Cenário 1
+//    - vehiclesHit.length>0 && !coberto       → Cenário 2
+//    - !vehiclesHit.length && policyHits      → Cenário 3 (lista todas)
+//    - nada                                   → Cenário 4
+```
+
+`coberto(v.id)` = existe `link` ativo apontando para uma `policy` `ativa` com `end_date >= hoje`.
+
+Normalização aceita: `ABC-1234`, `ABC1234`, `ABC1D23` (Mercosul), chassi parcial (últimos 8), case insensitive.
+
+### Cálculo de "placas órfãs" (KPI + alerta + tela)
+
+```ts
+const registeredPlates = new Set(vehicles.map(v => normId(v.plate)));
+const orphanMap = new Map<string, OrphanRow>();      // chave = placa normalizada
+for (const p of activeAiPolicies) {
+  for (const a of aiVehiclesOf(p)) {
+    const key = normId(a.plate);
+    if (!key || registeredPlates.has(key)) continue;
+    if (!orphanMap.has(key)) orphanMap.set(key, { plate: a.plate, entries: [] });
+    orphanMap.get(key)!.entries.push({ policy: p, ai: a });
+  }
+}
+```
+
+`orphanMap.size` alimenta:
+- terceiro número do card "Cobertura da Frota"
+- novo item de "Alertas Críticos" (se > 0)
+- tela `/app/insurance/orphans`
+
+### Cadastro a partir do Cenário 3 / tela órfãs
+
+Reutiliza `VehicleDialog` com props pré-preenchidas:
+
+```ts
+{
+  plate: ai.plate,
+  brand: ai.brand,
+  model: ai.model,
+  year: ai.year,
+  chassis: ai.chassis,
+}
+```
+
+Após salvar:
+1. Não toca na apólice (regra IA imutável preservada).
+2. Dispara `autoLinkAiPolicies(...)` (já existente em `InsurancePanel`) → cria `insurance_policy_vehicles` com `inclusion_type='apolice'` e roda `sync_vehicle_insurance_fields`.
+3. Toast "Veículo cadastrado e vinculado à apólice X".
+
+Cadastro em lote: itera sobre seleção, chama o mesmo fluxo, e ao final um único `autoLinkAiPolicies`.
+
+### Arquivos afetados
+
+- `src/components/dashboard/InsurancePanel.tsx`
+  - Novo componente interno `<SmartSearchResults/>` para os 4 cards.
+  - Novo helper `useOrphanPlates(policies, vehicles)`.
+  - Card "Cobertura da Frota" atualizado com 3ª métrica.
+  - "Alertas Críticos" recebe novo item.
+- `src/pages/app/insurance/Orphans.tsx` *(novo)* — tabela com seleção múltipla, integração com `VehicleDialog`.
+- `src/App.tsx` — nova rota `/app/insurance/orphans` dentro de `RequireActiveSubscription`.
+- `src/components/dashboard/VehicleDialog.tsx` — aceitar prop opcional `prefill?: Partial<Vehicle>` (se ainda não existir).
+- Sem migrations: nenhuma mudança de schema.
+
+### Regras críticas respeitadas
+
+1. Sem duplicação: vínculos só via `insurance_policy_vehicles`.
+2. Apólices `ai_extracted` continuam imutáveis (trigger `tg_ip_block_ai_field_changes`).
+3. Nenhum INSERT/UPDATE/DELETE direto em `insurance_policy_vehicles` para apólices IA fora do fluxo `autoLinkAiPolicies` (já valida placa via `tg_ipv_block_ai_changes`).
+4. Veículo cadastrado no Cenário 3 só passa a "Coberto" pela auto-vinculação, sem alterar a apólice.
 
 ## Plano de rollback
-1. Reverter integrações nos 4 formulários (pequenas seções de JSX/state)
-2. Remover `src/hooks/useCepLookup.ts` e `src/components/forms/CepInput.tsx`
-3. Migration reversa opcional (colunas são nullable, podem permanecer sem efeito):
-   ```sql
-   ALTER TABLE public.companies         DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
-   ALTER TABLE public.drivers           DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
-   ALTER TABLE public.fuel_stations     DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
-   ALTER TABLE public.insurance_brokers DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
-   ```
 
-## Garantias de não-quebra
-- Migration apenas ADD COLUMN nullable
-- Nenhum campo obrigatório novo
-- API ViaCEP sem chave, sem custo, sem secrets
-- Falha de rede não bloqueia formulário (catch + toast)
-- Formulários continuam salvando mesmo se usuário ignorar o CEP
+- Mudanças são só frontend e adição de uma rota. Reverter = remover:
+  - novo componente `<SmartSearchResults/>` e novo bloco do card de cobertura em `InsurancePanel.tsx` (substituir pelo bloco atual);
+  - `src/pages/app/insurance/Orphans.tsx`;
+  - rota `/app/insurance/orphans` em `App.tsx`;
+  - prop `prefill` em `VehicleDialog`.
+- Nenhum dado do banco é tocado por essas mudanças, então rollback é puramente de código (revert do commit).
