@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Upload, Sparkles, Pencil, Trash2, FileText, ExternalLink, Phone, Search, Truck, ShieldCheck, AlertTriangle, Loader2, Link2, Lock, Mail, ShieldAlert, Filter, ChevronDown, ChevronUp, Activity, CalendarClock, BarChart3 } from "lucide-react";
+import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
@@ -222,6 +224,22 @@ export default function InsurancePanel() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<any | null>(null);
+
+  // Cadastro rápido de veículo (Cenário 3 / placa órfã)
+  const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
+  const [vehiclePrefill, setVehiclePrefill] = useState<any | null>(null);
+
+  function openRegisterFromPolicy(ai: AiVehicle) {
+    setVehiclePrefill({
+      plate: (ai.plate || "").toUpperCase(),
+      brand: ai.brand || "",
+      model: ai.model || "",
+      year_manufacture: ai.year || "",
+      year_model: ai.year || "",
+      chassis: ai.chassis || "",
+    });
+    setVehicleDialogOpen(true);
+  }
 
   async function runAiReview() {
     if (!selectedPolicy?.file_url) {
@@ -919,6 +937,88 @@ export default function InsurancePanel() {
     return list.slice(0, 20);
   }, [globalSearch, globalSearchMode, policies, brokers]);
 
+  // === Mapa de placas órfãs (em apólice vigente, sem cadastro de veículo) ===
+  const orphanPlates = useMemo(() => {
+    const today = new Date();
+    const isVigente = (p: Policy) =>
+      p.status === "ativa" &&
+      (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
+    const registered = new Set(vehicles.map((v) => normId(v.plate)));
+    const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
+    for (const p of policies.filter(isVigente)) {
+      const ex: any = p.ai_extracted || {};
+      const list: AiVehicle[] = Array.isArray(ex.vehicles) && ex.vehicles.length
+        ? ex.vehicles
+        : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
+      for (const a of list) {
+        const key = normId(a.plate);
+        if (!key || registered.has(key)) continue;
+        if (!map.has(key)) map.set(key, { plate: (a.plate || key).toUpperCase(), entries: [] });
+        map.get(key)!.entries.push({ policy: p, ai: a });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.plate.localeCompare(b.plate));
+  }, [policies, vehicles]);
+
+  // === Resultado da busca por placa/chassi cobrindo os 4 cenários ===
+  type SearchResult =
+    | { kind: "scenario1"; vehicle: Vehicle; policies: Policy[] }
+    | { kind: "scenario2"; vehicle: Vehicle }
+    | { kind: "scenario3"; plate: string; entries: { policy: Policy; ai: AiVehicle }[] }
+    | { kind: "scenario4"; term: string };
+
+  const smartSearchResults = useMemo<SearchResult[] | null>(() => {
+    if (globalSearchMode !== "veiculo") return null;
+    const term = normId(globalSearch);
+    if (!term || term.length < 3) return null;
+    const today = new Date();
+    const isVigente = (p: Policy) =>
+      p.status === "ativa" &&
+      (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
+
+    const matchedVehicles = vehicles.filter(
+      (v) => normId(v.plate).includes(term) || (v.chassis && normId(v.chassis).includes(term))
+    );
+    const matchedPlates = new Set(matchedVehicles.map((v) => normId(v.plate)));
+
+    const policyHits = new Map<string, { policy: Policy; ai: AiVehicle }[]>();
+    for (const p of policies.filter(isVigente)) {
+      const ex: any = p.ai_extracted || {};
+      const list: AiVehicle[] = Array.isArray(ex.vehicles) && ex.vehicles.length
+        ? ex.vehicles
+        : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
+      for (const a of list) {
+        const ap = normId(a.plate);
+        const ac = normId(a.chassis);
+        const hit = (ap && ap.includes(term)) || (ac && ac.includes(term));
+        if (!hit) continue;
+        const key = ap || ac;
+        if (!key) continue;
+        if (!policyHits.has(key)) policyHits.set(key, []);
+        policyHits.get(key)!.push({ policy: p, ai: a });
+      }
+    }
+
+    const results: SearchResult[] = [];
+    for (const v of matchedVehicles.slice(0, 10)) {
+      const pols = activePoliciesForVehicle(v.id);
+      results.push(pols.length > 0
+        ? { kind: "scenario1", vehicle: v, policies: pols }
+        : { kind: "scenario2", vehicle: v });
+    }
+    for (const [key, entries] of policyHits) {
+      // se a placa exata já corresponde a um veículo cadastrado, foi tratada acima
+      if (matchedPlates.has(key)) continue;
+      const isRegistered = vehicles.some((v) => normId(v.plate) === key);
+      if (isRegistered) continue;
+      const ai0 = entries[0].ai;
+      results.push({ kind: "scenario3", plate: (ai0.plate || key).toUpperCase(), entries });
+    }
+    if (results.length === 0) results.push({ kind: "scenario4", term: globalSearch });
+    return results;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSearch, globalSearchMode, vehicles, policies, links]);
+
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
     const v = vehicles.find((x) => x.id === vehicleId);
@@ -1223,95 +1323,150 @@ export default function InsurancePanel() {
                 onChange={(e) => { setGlobalSearchMode("veiculo"); setGlobalSearch(e.target.value); }}
               />
             </div>
-            {globalSearchResult && globalSearchResult.length === 0 && (
-              <div className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
-                Nenhum veículo encontrado para "{globalSearch}".
-              </div>
-            )}
-            {globalSearchResult && globalSearchResult.length > 0 && (
+            {smartSearchResults && (
               <div className="space-y-3">
-                {globalSearchResult.map((v) => {
-                  const vehiclePolicies = activePoliciesForVehicle(v.id);
-                  return (
-                    <div key={v.id} className="rounded-lg border border-border bg-muted/10 overflow-hidden">
-                      <div className="flex items-center gap-3 p-3 bg-muted/30 border-b border-border flex-wrap">
-                        <Truck className="h-4 w-4 text-primary" />
-                        <span className="font-mono font-bold text-primary">{v.plate}</span>
-                        <span className="text-sm text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
-                        {v.chassis && <span className="text-[11px] font-mono text-muted-foreground">Chassi: {v.chassis}</span>}
-                        <Badge variant="outline" className={vehiclePolicies.length > 0
-                          ? "ml-auto bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                          : "ml-auto bg-destructive/15 text-destructive border-destructive/30"}>
-                          {vehiclePolicies.length > 0 ? `${vehiclePolicies.length} apólice(s) ativa(s)` : "Sem apólice ativa"}
-                        </Badge>
-                      </div>
-                      {vehiclePolicies.length === 0 ? (
-                        <div className="p-4 text-sm text-muted-foreground text-center">
-                          Veículo sem apólice ativa.
+                {smartSearchResults.map((r, idx) => {
+                  if (r.kind === "scenario1") {
+                    const v = r.vehicle;
+                    return (
+                      <div key={`s1-${v.id}`} className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 overflow-hidden">
+                        <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border-b border-emerald-500/30 flex-wrap">
+                          <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                          <span className="font-mono font-bold text-emerald-400">{v.plate}</span>
+                          <span className="text-sm text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                          {v.chassis && <span className="text-[11px] font-mono text-muted-foreground">Chassi: {v.chassis}</span>}
+                          <Badge variant="outline" className="ml-auto bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                            {r.policies.length} apólice(s) ativa(s)
+                          </Badge>
                         </div>
-                      ) : (
                         <div className="divide-y divide-border">
-                          {vehiclePolicies.map((p) => {
+                          {r.policies.map((p) => {
                             const broker = brokers.find((b) => b.id === p.broker_id);
                             const st = policyStatus(p);
                             return (
-                              <button
-                                key={p.id}
-                                type="button"
+                              <button key={p.id} type="button"
                                 onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}
-                                className="w-full text-left p-3 space-y-2 hover:bg-muted/30 transition-colors"
-                              >
+                                className="w-full text-left p-3 space-y-2 hover:bg-muted/30 transition-colors">
                                 <div className="flex items-start justify-between gap-2 flex-wrap">
                                   <div className="min-w-0">
                                     <div className="font-display font-bold flex items-center gap-2">
-                                      <ShieldCheck className="h-4 w-4 text-primary" />
-                                      {p.insurer_name}
+                                      <ShieldCheck className="h-4 w-4 text-primary" /> {p.insurer_name}
                                     </div>
                                     <div className="text-[11px] text-muted-foreground font-mono">Apólice #{p.policy_number}</div>
                                   </div>
                                   <Badge variant="outline" className={st.cls + " whitespace-nowrap"}>{st.label}</Badge>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                  <div>
-                                    <div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
-                                    <div className="font-medium">{p.start_date || "—"} → {p.end_date || "—"}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-[10px] uppercase text-muted-foreground">Tipo</div>
-                                    <div className="font-medium">{coverageTypeLabel(p.coverage_type) || "—"}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
-                                    <div className="font-medium">{fmtBRL(p.deductible)}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-[10px] uppercase text-muted-foreground">Status</div>
-                                    <div className="font-medium capitalize">{p.status}</div>
-                                  </div>
+                                  <div><div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
+                                    <div className="font-medium">{p.start_date || "—"} → {p.end_date || "—"}</div></div>
+                                  <div><div className="text-[10px] uppercase text-muted-foreground">Tipo</div>
+                                    <div className="font-medium">{coverageTypeLabel(p.coverage_type) || "—"}</div></div>
+                                  <div><div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
+                                    <div className="font-medium">{fmtBRL(p.deductible)}</div></div>
+                                  <div><div className="text-[10px] uppercase text-muted-foreground">Corretor</div>
+                                    <div className="font-medium truncate">{broker?.name || "—"}</div></div>
                                 </div>
-                                <div className="rounded-md border border-border bg-background/40 p-2 space-y-1">
-                                  <div className="text-[10px] uppercase text-muted-foreground">Corretor</div>
-                                  <div className="text-sm font-medium">{broker?.name || "—"}</div>
-                                  {(broker?.phone || broker?.email) && (
-                                    <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-                                      {broker?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{broker.phone}</span>}
-                                      {broker?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{broker.email}</span>}
-                                    </div>
-                                  )}
-                                </div>
-                                {(p.coverage_summary || (p.ai_extracted as any)?.coverage_summary) && (
-                                  <div>
-                                    <div className="text-[10px] uppercase text-muted-foreground">Resumo de cobertura</div>
-                                    <div className="text-xs whitespace-pre-wrap line-clamp-3">
-                                      {p.coverage_summary || (p.ai_extracted as any)?.coverage_summary}
-                                    </div>
-                                  </div>
-                                )}
                               </button>
                             );
                           })}
                         </div>
-                      )}
+                      </div>
+                    );
+                  }
+                  if (r.kind === "scenario2") {
+                    const v = r.vehicle;
+                    return (
+                      <div key={`s2-${v.id}`} className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <AlertTriangle className="h-4 w-4 text-amber-400" />
+                          <span className="font-mono font-bold text-amber-400">{v.plate}</span>
+                          <span className="text-sm text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                          <Badge variant="outline" className="ml-auto bg-amber-500/15 text-amber-400 border-amber-500/30">SEM COBERTURA ATIVA</Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">Veículo cadastrado, mas nenhuma apólice vigente cobre esta placa.</div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline"
+                            onClick={() => { setAddToPolicyVehicleId(v.id); setActiveTab("sem-cobertura"); }}>
+                            <Link2 className="h-3.5 w-3.5" /> Adicionar a uma apólice
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setActiveTab("apolices"); openNew(); }}>
+                            <Plus className="h-3.5 w-3.5" /> Importar nova apólice
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (r.kind === "scenario3") {
+                    return (
+                      <div key={`s3-${r.plate}-${idx}`} className="rounded-lg border border-sky-500/40 bg-sky-500/5 overflow-hidden">
+                        <div className="flex items-center gap-3 p-3 bg-sky-500/10 border-b border-sky-500/30 flex-wrap">
+                          <Sparkles className="h-4 w-4 text-sky-400" />
+                          <span className="font-mono font-bold text-sky-400">{r.plate}</span>
+                          <span className="text-sm text-muted-foreground">Placa identificada na apólice</span>
+                          <Badge variant="outline" className="ml-auto bg-sky-500/15 text-sky-400 border-sky-500/30">
+                            Veículo NÃO cadastrado
+                          </Badge>
+                        </div>
+                        <div className="p-3 space-y-3">
+                          <div className="text-xs text-muted-foreground">
+                            Esta placa aparece em {r.entries.length} apólice(s) ativa(s) mas não está cadastrada na sua frota.
+                          </div>
+                          <div className="space-y-2">
+                            {r.entries.map(({ policy: p, ai }, i) => {
+                              const st = policyStatus(p);
+                              return (
+                                <div key={`${p.id}-${i}`} className="rounded-md border border-border bg-background/40 p-3 space-y-1">
+                                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                                    <div className="min-w-0">
+                                      <div className="font-display font-bold flex items-center gap-2">
+                                        <ShieldCheck className="h-4 w-4 text-primary" /> {p.insurer_name}
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground font-mono">Apólice #{p.policy_number}</div>
+                                    </div>
+                                    <Badge variant="outline" className={st.cls + " whitespace-nowrap"}>{st.label}</Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs pt-1">
+                                    <div><div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
+                                      <div className="font-medium">{p.start_date || "—"} → {p.end_date || "—"}</div></div>
+                                    <div><div className="text-[10px] uppercase text-muted-foreground">Modelo (apólice)</div>
+                                      <div className="font-medium truncate">{[ai.brand, ai.model].filter(Boolean).join(" ") || "—"}{ai.year ? ` ${ai.year}` : ""}</div></div>
+                                    <div><div className="text-[10px] uppercase text-muted-foreground">Cobertura</div>
+                                      <div className="font-medium">{coverageTypeLabel(p.coverage_type) || "—"}</div></div>
+                                  </div>
+                                  <div className="pt-2">
+                                    <Button size="sm" variant="ghost"
+                                      onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}>
+                                      <ExternalLink className="h-3.5 w-3.5" /> Ver apólice
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <Button size="sm" onClick={() => openRegisterFromPolicy(r.entries[0].ai)}>
+                              <Plus className="h-3.5 w-3.5" /> Cadastrar este veículo na frota
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // scenario 4
+                  return (
+                    <div key={`s4-${idx}`} className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3 text-center">
+                      <div className="flex items-center justify-center gap-2 text-destructive">
+                        <ShieldAlert className="h-4 w-4" />
+                        <span className="font-medium">Nenhum veículo nem apólice para "{r.term}"</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <Button size="sm" onClick={() => openRegisterFromPolicy({ plate: r.term } as AiVehicle)}>
+                          <Plus className="h-3.5 w-3.5" /> Cadastrar veículo novo
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { setActiveTab("apolices"); openNew(); }}>
+                          <Upload className="h-3.5 w-3.5" /> Importar nova apólice
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1419,9 +1574,13 @@ export default function InsurancePanel() {
                         <span>{fleetSummary.uncoveredCount} sem cobertura</span>
                       </div>
                       {fleetSummary.onlyInPolicyCount > 0 && (
-                        <div className="text-xs text-amber-400 mt-2">
-                          + {fleetSummary.onlyInPolicyCount} placa(s) na apólice sem cadastro na frota
-                        </div>
+                        <RouterLink
+                          to="/app/insurance/orphans"
+                          className="mt-2 flex items-center gap-2 text-xs text-sky-400 hover:underline"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {fleetSummary.onlyInPolicyCount} placa(s) em apólice sem cadastro · ver lista
+                        </RouterLink>
                       )}
                     </div>
                   </div>
@@ -1463,6 +1622,17 @@ export default function InsurancePanel() {
                     </span>
                     <ExternalLink className="h-3 w-3 text-destructive" />
                   </button>
+                )}
+                {orphanPlates.length > 0 && (
+                  <RouterLink
+                    to="/app/insurance/orphans"
+                    className="w-full flex items-center justify-between p-2 rounded border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-colors text-left"
+                  >
+                    <span className="flex items-center gap-2 text-sky-400">
+                      <Sparkles className="h-4 w-4" /> {orphanPlates.length} placa(s) coberta(s) por apólice mas SEM cadastro
+                    </span>
+                    <ExternalLink className="h-3 w-3 text-sky-400" />
+                  </RouterLink>
                 )}
               </div>
             </Card>
@@ -2186,6 +2356,22 @@ export default function InsurancePanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VehicleDialog
+        open={vehicleDialogOpen}
+        onOpenChange={(o: boolean) => {
+          setVehicleDialogOpen(o);
+          if (!o) setVehiclePrefill(null);
+        }}
+        vehicle={null}
+        prefill={vehiclePrefill}
+        onSaved={async () => {
+          setVehicleDialogOpen(false);
+          setVehiclePrefill(null);
+          toast.success("Veículo cadastrado. Vinculando à apólice…");
+          await load();
+        }}
+      />
     </div>
   );
 }
