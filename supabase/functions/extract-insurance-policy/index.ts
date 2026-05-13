@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
       ],
       tools: [TOOL],
       toolChoice: { type: "function", function: { name: "extract_insurance_policy" } },
+      timeoutMs: isPdf ? 60_000 : undefined,
     });
 
     if (!result.success) {
