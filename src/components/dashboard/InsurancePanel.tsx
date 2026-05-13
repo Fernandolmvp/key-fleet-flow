@@ -838,7 +838,6 @@ export default function InsurancePanel() {
     manualMatches.forEach((m) => {
       if (activeIds.has(m.policy_id)) coveredVehicleIds.add(m.vehicle_id);
     });
-    const onlyInPolicy = new Set<string>();
     activePolicies.forEach((p) => {
       const ex: any = p.ai_extracted || {};
       const plates: string[] = Array.isArray(ex.plates)
@@ -849,7 +848,6 @@ export default function InsurancePanel() {
         if (!n) return;
         const vid = plateToVehicleId.get(n);
         if (vid) coveredVehicleIds.add(vid);
-        else onlyInPolicy.add(n);
       });
     });
     let vencidas = 0, vencendo30 = 0, vigentes = 0;
@@ -863,7 +861,6 @@ export default function InsurancePanel() {
     });
     return {
       coveredCount: coveredVehicleIds.size,
-      onlyInPolicyCount: onlyInPolicy.size,
       uncoveredCount: vehicles.filter((v) => !coveredVehicleIds.has(v.id)).length,
       vigentes,
       vencendo30,
