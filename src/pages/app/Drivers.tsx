@@ -71,6 +71,7 @@ export default function Drivers() {
   const [archivedDoc, setArchivedDoc] = useState<{ url: string; name: string; mime: string } | null>(null);
   const [form, setForm] = useState<any>(blank());
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("drivers:view") as "grid" | "list") || "grid");
+  const driverAddressRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
@@ -565,7 +566,16 @@ export default function Drivers() {
                 <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                <div className="space-y-2"><CepInput
+                  value={form.cep || ""}
+                  onChange={(v) => setForm({ ...form, cep: v })}
+                  nextFieldRef={driverAddressRef}
+                  onAddressFound={(a) => setForm({ ...form, cep: a.cep, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf })}
+                /></div>
+                <div className="space-y-2"><Label>Endereço</Label><Input ref={driverAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" /></div>
+                <div className="space-y-2"><Label>Bairro</Label><Input value={form.neighborhood || ""} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Cidade</Label><Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+                <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} /></div>
               </div>
             </TabsContent>
 
