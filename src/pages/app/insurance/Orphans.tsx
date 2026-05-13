@@ -36,6 +36,7 @@ export default function InsuranceOrphans() {
   const [loading, setLoading] = useState(true);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [registeredPlates, setRegisteredPlates] = useState<Set<string>>(new Set());
+  const [vehiclesData, setVehiclesData] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
