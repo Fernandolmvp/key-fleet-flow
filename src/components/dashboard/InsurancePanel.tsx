@@ -225,6 +225,22 @@ export default function InsurancePanel() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<any | null>(null);
 
+  // Cadastro rápido de veículo (Cenário 3 / placa órfã)
+  const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
+  const [vehiclePrefill, setVehiclePrefill] = useState<any | null>(null);
+
+  function openRegisterFromPolicy(ai: AiVehicle) {
+    setVehiclePrefill({
+      plate: (ai.plate || "").toUpperCase(),
+      brand: ai.brand || "",
+      model: ai.model || "",
+      year_manufacture: ai.year || "",
+      year_model: ai.year || "",
+      chassis: ai.chassis || "",
+    });
+    setVehicleDialogOpen(true);
+  }
+
   async function runAiReview() {
     if (!selectedPolicy?.file_url) {
       toast.error("Apólice sem PDF anexado para revisar.");
