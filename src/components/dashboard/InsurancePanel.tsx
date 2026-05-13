@@ -937,6 +937,88 @@ export default function InsurancePanel() {
     return list.slice(0, 20);
   }, [globalSearch, globalSearchMode, policies, brokers]);
 
+  // === Mapa de placas órfãs (em apólice vigente, sem cadastro de veículo) ===
+  const orphanPlates = useMemo(() => {
+    const today = new Date();
+    const isVigente = (p: Policy) =>
+      p.status === "ativa" &&
+      (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
+    const registered = new Set(vehicles.map((v) => normId(v.plate)));
+    const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
+    for (const p of policies.filter(isVigente)) {
+      const ex: any = p.ai_extracted || {};
+      const list: AiVehicle[] = Array.isArray(ex.vehicles) && ex.vehicles.length
+        ? ex.vehicles
+        : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
+      for (const a of list) {
+        const key = normId(a.plate);
+        if (!key || registered.has(key)) continue;
+        if (!map.has(key)) map.set(key, { plate: (a.plate || key).toUpperCase(), entries: [] });
+        map.get(key)!.entries.push({ policy: p, ai: a });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.plate.localeCompare(b.plate));
+  }, [policies, vehicles]);
+
+  // === Resultado da busca por placa/chassi cobrindo os 4 cenários ===
+  type SearchResult =
+    | { kind: "scenario1"; vehicle: Vehicle; policies: Policy[] }
+    | { kind: "scenario2"; vehicle: Vehicle }
+    | { kind: "scenario3"; plate: string; entries: { policy: Policy; ai: AiVehicle }[] }
+    | { kind: "scenario4"; term: string };
+
+  const smartSearchResults = useMemo<SearchResult[] | null>(() => {
+    if (globalSearchMode !== "veiculo") return null;
+    const term = normId(globalSearch);
+    if (!term || term.length < 3) return null;
+    const today = new Date();
+    const isVigente = (p: Policy) =>
+      p.status === "ativa" &&
+      (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
+
+    const matchedVehicles = vehicles.filter(
+      (v) => normId(v.plate).includes(term) || (v.chassis && normId(v.chassis).includes(term))
+    );
+    const matchedPlates = new Set(matchedVehicles.map((v) => normId(v.plate)));
+
+    const policyHits = new Map<string, { policy: Policy; ai: AiVehicle }[]>();
+    for (const p of policies.filter(isVigente)) {
+      const ex: any = p.ai_extracted || {};
+      const list: AiVehicle[] = Array.isArray(ex.vehicles) && ex.vehicles.length
+        ? ex.vehicles
+        : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
+      for (const a of list) {
+        const ap = normId(a.plate);
+        const ac = normId(a.chassis);
+        const hit = (ap && ap.includes(term)) || (ac && ac.includes(term));
+        if (!hit) continue;
+        const key = ap || ac;
+        if (!key) continue;
+        if (!policyHits.has(key)) policyHits.set(key, []);
+        policyHits.get(key)!.push({ policy: p, ai: a });
+      }
+    }
+
+    const results: SearchResult[] = [];
+    for (const v of matchedVehicles.slice(0, 10)) {
+      const pols = activePoliciesForVehicle(v.id);
+      results.push(pols.length > 0
+        ? { kind: "scenario1", vehicle: v, policies: pols }
+        : { kind: "scenario2", vehicle: v });
+    }
+    for (const [key, entries] of policyHits) {
+      // se a placa exata já corresponde a um veículo cadastrado, foi tratada acima
+      if (matchedPlates.has(key)) continue;
+      const isRegistered = vehicles.some((v) => normId(v.plate) === key);
+      if (isRegistered) continue;
+      const ai0 = entries[0].ai;
+      results.push({ kind: "scenario3", plate: (ai0.plate || key).toUpperCase(), entries });
+    }
+    if (results.length === 0) results.push({ kind: "scenario4", term: globalSearch });
+    return results;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSearch, globalSearchMode, vehicles, policies, links]);
+
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
     const v = vehicles.find((x) => x.id === vehicleId);
