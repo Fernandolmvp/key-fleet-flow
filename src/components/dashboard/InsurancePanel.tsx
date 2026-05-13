@@ -1008,9 +1008,13 @@ export default function InsurancePanel() {
         ? ex.vehicles
         : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
       for (const a of list) {
-        const ap = normId(a.plate);
-        const ac = normId(a.chassis);
-        const hit = (ap && ap.includes(term)) || (ac && ac.includes(term));
+        const ap = normPlate(a.plate);
+        const ac = normChassis(a.chassis);
+        const ar = normRenavam((a as any).renavam);
+        const hit =
+          (ap && (ap.includes(term) || (termPlate && ap === termPlate))) ||
+          (ac && ac.includes(term)) ||
+          (!!termRen && ar === termRen);
         if (!hit) continue;
         const key = ap || ac;
         if (!key) continue;
