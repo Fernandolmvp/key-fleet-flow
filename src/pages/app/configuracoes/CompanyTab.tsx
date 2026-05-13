@@ -26,6 +26,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   const [state, setState] = useState("");
   const [status, setStatus] = useState<"ativa" | "suspensa" | "cancelada">("ativa");
   const [fuelAuthTtl, setFuelAuthTtl] = useState<number>(30);
+  const addressRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -79,8 +80,6 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   };
 
   if (loading) return <div className="grid place-items-center py-12"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
-
-  const addressRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="surface-card rounded-xl p-6 max-w-2xl space-y-4">
