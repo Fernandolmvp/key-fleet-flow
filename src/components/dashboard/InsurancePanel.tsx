@@ -1355,6 +1355,31 @@ export default function InsurancePanel() {
 
         {/* ===================== TAB 0 — VISÃO GERAL ===================== */}
         <TabsContent value="overview" className="space-y-4 mt-0">
+          {orphanPlates.length > 0 && (
+            <RouterLink
+              to="/app/insurance/review-matches"
+              className="flex items-center justify-between gap-3 p-4 rounded-xl border-2 border-amber-500/50 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/20 grid place-items-center text-amber-400 group-hover:scale-110 transition-transform">
+                  <Search className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="font-display font-bold text-amber-400 flex items-center gap-2">
+                    🔍 Revisar Vinculações Pendentes
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/40">
+                      {orphanPlates.length}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Placas em apólice que não foram cruzadas automaticamente — revise manualmente.
+                  </div>
+                </div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-amber-400" />
+            </RouterLink>
+          )}
+
           {/* Consulta de seguro por placa ou chassi */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2">
