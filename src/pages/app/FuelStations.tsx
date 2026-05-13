@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTabPermissions } from "@/lib/permissions";
 import PartnerAccessDialog from "@/components/dashboard/PartnerAccessDialog";
 import CepInput from "@/components/forms/CepInput";
-import { useRef } from "react";
 
 interface Station {
   id: string; name: string; cnpj: string | null; brand: string | null;
