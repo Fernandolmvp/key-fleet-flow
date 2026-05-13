@@ -65,7 +65,7 @@ function adaptTools(tools?: any[], toolChoice?: any) {
     .map((t) => ({
       name: t.function.name,
       description: t.function.description,
-      parameters: normalizeSchemaForGemini(t.function.parameters),
+      parametersJsonSchema: normalizeSchemaForGemini(t.function.parameters),
     }));
   const out: any = { tools: [{ functionDeclarations }] };
   if (toolChoice?.type === "function" && toolChoice.function?.name) {
