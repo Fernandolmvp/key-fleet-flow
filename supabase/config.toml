@@ -13,6 +13,8 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.extract-insurance-policy]
     verify_jwt = false
+  [functions.extract-traffic-fine]
+    verify_jwt = false
   [functions.partner-accept-invite]
     verify_jwt = false
   [functions.partner-invite]

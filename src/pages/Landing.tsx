@@ -29,7 +29,7 @@ const features = [
   { icon: BarChart3, title: "BI Executivo", desc: "Custo/km, KPIs em tempo real e exportação para a diretoria." },
   { icon: AlertOctagon, title: "Gestão de Sinistros", desc: "Registro de ocorrências, fotos, BO e custo de reparo por veículo.", soon: true },
   { icon: Receipt, title: "Despesas Operacionais", desc: "IPVA, licenciamento, lavagem, pedágio e estacionamento centralizados.", soon: true },
-  { icon: AlertTriangle, title: "Controle de Multas", desc: "Multas, pontos na CNH, recursos e ranking de motoristas.", soon: true },
+  { icon: AlertTriangle, title: "Gestão Completa de Multas e Avisos", desc: "Cadastro via foto com IA, controle de prazos, indicação de motorista, recursos, alertas e relatórios por motorista e veículo." },
   { icon: History, title: "Histórico Completo do Veículo", desc: "Linha do tempo 360°: manutenções, combustível, sinistros e indicadores.", soon: true },
 ];
 

@@ -3411,60 +3411,159 @@ export type Database = {
       }
       traffic_fines: {
         Row: {
-          amount: number
+          additional_photos_urls: string[] | null
+          ai_confidence: number | null
+          ai_extracted: Json
+          amount: number | null
+          aviso_photo_url: string | null
+          city: string | null
           company_id: string
           created_at: string
           created_by: string | null
           description: string | null
+          discount_amount: number | null
           driver_id: string | null
+          driver_indicated_at: string | null
+          driver_indication_deadline: string | null
+          driver_indication_method: string | null
+          driver_responsibility_signed: boolean
+          driver_responsibility_signed_at: string | null
           due_date: string | null
-          fine_date: string
-          fine_type: string
+          equipment: string | null
+          external_id: string | null
+          external_source: string
+          fine_code: string | null
+          fine_type: string | null
           id: string
+          infraction_date: string
+          infraction_time: string | null
+          last_sync_at: string | null
           license_points: number
+          location: string | null
+          notes: string | null
           notification_number: string | null
+          notification_photo_url: string | null
+          notification_received_date: string | null
+          paid_amount: number | null
           paid_at: string | null
-          photo_url: string | null
+          payment_method: string | null
+          payment_receipt_url: string | null
+          record_type: string
+          recourse_deadline: string | null
+          recourse_document_url: string | null
+          recourse_filed_at: string | null
+          recourse_notes: string | null
+          recourse_result: string | null
+          recourse_result_date: string | null
+          severity: string | null
+          state: string | null
           status: string
           updated_at: string
+          updated_by: string | null
           vehicle_id: string
         }
         Insert: {
-          amount?: number
+          additional_photos_urls?: string[] | null
+          ai_confidence?: number | null
+          ai_extracted?: Json
+          amount?: number | null
+          aviso_photo_url?: string | null
+          city?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
           description?: string | null
+          discount_amount?: number | null
           driver_id?: string | null
+          driver_indicated_at?: string | null
+          driver_indication_deadline?: string | null
+          driver_indication_method?: string | null
+          driver_responsibility_signed?: boolean
+          driver_responsibility_signed_at?: string | null
           due_date?: string | null
-          fine_date?: string
-          fine_type: string
+          equipment?: string | null
+          external_id?: string | null
+          external_source?: string
+          fine_code?: string | null
+          fine_type?: string | null
           id?: string
+          infraction_date?: string
+          infraction_time?: string | null
+          last_sync_at?: string | null
           license_points?: number
+          location?: string | null
+          notes?: string | null
           notification_number?: string | null
+          notification_photo_url?: string | null
+          notification_received_date?: string | null
+          paid_amount?: number | null
           paid_at?: string | null
-          photo_url?: string | null
+          payment_method?: string | null
+          payment_receipt_url?: string | null
+          record_type?: string
+          recourse_deadline?: string | null
+          recourse_document_url?: string | null
+          recourse_filed_at?: string | null
+          recourse_notes?: string | null
+          recourse_result?: string | null
+          recourse_result_date?: string | null
+          severity?: string | null
+          state?: string | null
           status?: string
           updated_at?: string
+          updated_by?: string | null
           vehicle_id: string
         }
         Update: {
-          amount?: number
+          additional_photos_urls?: string[] | null
+          ai_confidence?: number | null
+          ai_extracted?: Json
+          amount?: number | null
+          aviso_photo_url?: string | null
+          city?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
           description?: string | null
+          discount_amount?: number | null
           driver_id?: string | null
+          driver_indicated_at?: string | null
+          driver_indication_deadline?: string | null
+          driver_indication_method?: string | null
+          driver_responsibility_signed?: boolean
+          driver_responsibility_signed_at?: string | null
           due_date?: string | null
-          fine_date?: string
-          fine_type?: string
+          equipment?: string | null
+          external_id?: string | null
+          external_source?: string
+          fine_code?: string | null
+          fine_type?: string | null
           id?: string
+          infraction_date?: string
+          infraction_time?: string | null
+          last_sync_at?: string | null
           license_points?: number
+          location?: string | null
+          notes?: string | null
           notification_number?: string | null
+          notification_photo_url?: string | null
+          notification_received_date?: string | null
+          paid_amount?: number | null
           paid_at?: string | null
-          photo_url?: string | null
+          payment_method?: string | null
+          payment_receipt_url?: string | null
+          record_type?: string
+          recourse_deadline?: string | null
+          recourse_document_url?: string | null
+          recourse_filed_at?: string | null
+          recourse_notes?: string | null
+          recourse_result?: string | null
+          recourse_result_date?: string | null
+          severity?: string | null
+          state?: string | null
           status?: string
           updated_at?: string
+          updated_by?: string | null
           vehicle_id?: string
         }
         Relationships: []
@@ -4193,6 +4292,7 @@ export type Database = {
         Args: { _vehicle_ids: string[] }
         Returns: undefined
       }
+      update_fines_auto_status: { Args: never; Returns: undefined }
       validate_vehicle_km: {
         Args: {
           _new_km: number
