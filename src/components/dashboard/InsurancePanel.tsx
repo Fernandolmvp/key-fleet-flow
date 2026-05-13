@@ -921,11 +921,25 @@ export default function InsurancePanel() {
 
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
-    const ids = links
+    const v = vehicles.find((x) => x.id === vehicleId);
+    const plateN = normId(v?.plate);
+    const chassisN = normId(v?.chassis);
+    const ids = new Set<string>(links
       .filter((l) => l.vehicle_id === vehicleId)
-      .map((l) => l.policy_id);
+      .map((l) => l.policy_id));
+    // também considera apólices que listam a placa/chassi via IA
+    policies.forEach((p) => {
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((x: any) => x?.plate).filter(Boolean) : [];
+      const chassisList: string[] = Array.isArray(ex.vehicles)
+        ? ex.vehicles.map((x: any) => x?.chassis).filter(Boolean) : [];
+      if (plateN && plates.some((pl) => normId(pl) === plateN)) ids.add(p.id);
+      if (chassisN && chassisList.some((c) => normId(c) === chassisN)) ids.add(p.id);
+    });
     return policies.filter((p) => {
-      if (!ids.includes(p.id)) return false;
+      if (!ids.has(p.id)) return false;
       if (p.status !== "ativa") return false;
       if (!p.end_date) return true;
       return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
@@ -1191,6 +1205,120 @@ export default function InsurancePanel() {
 
         {/* ===================== TAB 0 — VISÃO GERAL ===================== */}
         <TabsContent value="overview" className="space-y-4 mt-0">
+          {/* Consulta de seguro por placa ou chassi */}
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" />
+              <div>
+                <div className="font-display font-bold">Consultar seguro do veículo</div>
+                <div className="text-xs text-muted-foreground">Busque por placa ou chassi para ver todas as apólices vigentes que cobrem o veículo.</div>
+              </div>
+            </div>
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9 h-9"
+                placeholder="Digite a placa ou chassi (mín. 3 caracteres)..."
+                value={globalSearchMode === "veiculo" ? globalSearch : ""}
+                onChange={(e) => { setGlobalSearchMode("veiculo"); setGlobalSearch(e.target.value); }}
+              />
+            </div>
+            {globalSearchResult && globalSearchResult.length === 0 && (
+              <div className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
+                Nenhum veículo encontrado para "{globalSearch}".
+              </div>
+            )}
+            {globalSearchResult && globalSearchResult.length > 0 && (
+              <div className="space-y-3">
+                {globalSearchResult.map((v) => {
+                  const vehiclePolicies = activePoliciesForVehicle(v.id);
+                  return (
+                    <div key={v.id} className="rounded-lg border border-border bg-muted/10 overflow-hidden">
+                      <div className="flex items-center gap-3 p-3 bg-muted/30 border-b border-border flex-wrap">
+                        <Truck className="h-4 w-4 text-primary" />
+                        <span className="font-mono font-bold text-primary">{v.plate}</span>
+                        <span className="text-sm text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</span>
+                        {v.chassis && <span className="text-[11px] font-mono text-muted-foreground">Chassi: {v.chassis}</span>}
+                        <Badge variant="outline" className={vehiclePolicies.length > 0
+                          ? "ml-auto bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                          : "ml-auto bg-destructive/15 text-destructive border-destructive/30"}>
+                          {vehiclePolicies.length > 0 ? `${vehiclePolicies.length} apólice(s) ativa(s)` : "Sem apólice ativa"}
+                        </Badge>
+                      </div>
+                      {vehiclePolicies.length === 0 ? (
+                        <div className="p-4 text-sm text-muted-foreground text-center">
+                          Veículo sem apólice ativa.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-border">
+                          {vehiclePolicies.map((p) => {
+                            const broker = brokers.find((b) => b.id === p.broker_id);
+                            const st = policyStatus(p);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => { setActiveTab("apolices"); setSelectedPolicyId(p.id); }}
+                                className="w-full text-left p-3 space-y-2 hover:bg-muted/30 transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-2 flex-wrap">
+                                  <div className="min-w-0">
+                                    <div className="font-display font-bold flex items-center gap-2">
+                                      <ShieldCheck className="h-4 w-4 text-primary" />
+                                      {p.insurer_name}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground font-mono">Apólice #{p.policy_number}</div>
+                                  </div>
+                                  <Badge variant="outline" className={st.cls + " whitespace-nowrap"}>{st.label}</Badge>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                  <div>
+                                    <div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
+                                    <div className="font-medium">{p.start_date || "—"} → {p.end_date || "—"}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] uppercase text-muted-foreground">Tipo</div>
+                                    <div className="font-medium">{coverageTypeLabel(p.coverage_type) || "—"}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
+                                    <div className="font-medium">{fmtBRL(p.deductible)}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] uppercase text-muted-foreground">Status</div>
+                                    <div className="font-medium capitalize">{p.status}</div>
+                                  </div>
+                                </div>
+                                <div className="rounded-md border border-border bg-background/40 p-2 space-y-1">
+                                  <div className="text-[10px] uppercase text-muted-foreground">Corretor</div>
+                                  <div className="text-sm font-medium">{broker?.name || "—"}</div>
+                                  {(broker?.phone || broker?.email) && (
+                                    <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+                                      {broker?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{broker.phone}</span>}
+                                      {broker?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{broker.email}</span>}
+                                    </div>
+                                  )}
+                                </div>
+                                {(p.coverage_summary || (p.ai_extracted as any)?.coverage_summary) && (
+                                  <div>
+                                    <div className="text-[10px] uppercase text-muted-foreground">Resumo de cobertura</div>
+                                    <div className="text-xs whitespace-pre-wrap line-clamp-3">
+                                      {p.coverage_summary || (p.ai_extracted as any)?.coverage_summary}
+                                    </div>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
           {/* 3 KPIs grandes */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <button
