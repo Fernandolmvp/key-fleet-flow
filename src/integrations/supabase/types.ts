@@ -4246,6 +4246,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_link_ai_policies: {
+        Args: { _company_id: string }
+        Returns: {
+          linked_count: number
+          synced_vehicles: string[]
+        }[]
+      }
       bootstrap_company: {
         Args: { _company_name: string; _full_name: string }
         Returns: string
