@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import DriverHistoryTab from "@/components/dashboard/DriverHistoryTab";
 import { useTabPermissions } from "@/lib/permissions";
+import CepInput from "@/components/forms/CepInput";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -70,11 +71,12 @@ export default function Drivers() {
   const [archivedDoc, setArchivedDoc] = useState<{ url: string; name: string; mime: string } | null>(null);
   const [form, setForm] = useState<any>(blank());
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("drivers:view") as "grid" | "list") || "grid");
+  const driverAddressRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
-    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", address: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "", has_assigned_vehicle: false, assigned_vehicle_id: "" };
+    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", cep: "", address: "", neighborhood: "", city: "", state: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "", has_assigned_vehicle: false, assigned_vehicle_id: "" };
   }
 
   const load = async () => {
@@ -564,7 +566,16 @@ export default function Drivers() {
                 <div className="space-y-2"><Label>Validade CNH</Label><Input type="date" value={form.cnh_expires_at} onChange={(e) => setForm({ ...form, cnh_expires_at: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Validade exames</Label><Input type="date" value={form.medical_exam_expires_at} onChange={(e) => setForm({ ...form, medical_exam_expires_at: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                <div className="space-y-2"><CepInput
+                  value={form.cep || ""}
+                  onChange={(v) => setForm({ ...form, cep: v })}
+                  nextFieldRef={driverAddressRef}
+                  onAddressFound={(a) => setForm({ ...form, cep: a.cep, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf })}
+                /></div>
+                <div className="space-y-2"><Label>Endereço</Label><Input ref={driverAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" /></div>
+                <div className="space-y-2"><Label>Bairro</Label><Input value={form.neighborhood || ""} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Cidade</Label><Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+                <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} /></div>
               </div>
             </TabsContent>
 

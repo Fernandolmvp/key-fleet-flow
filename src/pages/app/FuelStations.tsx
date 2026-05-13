@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,12 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTabPermissions } from "@/lib/permissions";
 import PartnerAccessDialog from "@/components/dashboard/PartnerAccessDialog";
+import CepInput from "@/components/forms/CepInput";
 
 interface Station {
   id: string; name: string; cnpj: string | null; brand: string | null;
-  address: string | null; city: string | null; state: string | null;
+  address: string | null; cep: string | null; neighborhood: string | null;
+  city: string | null; state: string | null;
   phone: string | null; contact_name: string | null; fuel_types: string[];
   notes: string | null; active: boolean;
   inactivated_at: string | null; inactive_reason: string | null;
@@ -24,7 +26,7 @@ interface Station {
 const FUEL_TYPES = ["gasolina", "etanol", "diesel_s10", "diesel_s500", "gnv", "flex"];
 
 const blank = () => ({
-  name: "", cnpj: "", brand: "", address: "", city: "", state: "",
+  name: "", cnpj: "", brand: "", cep: "", address: "", neighborhood: "", city: "", state: "",
   phone: "", contact_name: "", fuel_types: [] as string[], notes: "", active: true,
   inactivated_at: "", inactive_reason: "",
 });
@@ -40,6 +42,7 @@ export default function FuelStations() {
   const [tab, setTab] = useState<string>(() => localStorage.getItem("stations:tab") || "ativos");
   useEffect(() => { localStorage.setItem("stations:tab", tab); }, [tab]);
   const [accessFor, setAccessFor] = useState<Station | null>(null);
+  const stationAddressRef = useRef<HTMLInputElement>(null);
 
   const { canViewTab, isVisible, fallback } = useTabPermissions(
     "fuel_stations", ["ativos", "inativos", "todos"], tab,
@@ -203,8 +206,20 @@ export default function FuelStations() {
             <div className="space-y-2"><Label>Bandeira</Label>
               <Input placeholder="Ex.: Petrobras, Shell, Ipiranga" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
             </div>
-            <div className="space-y-2 sm:col-span-2"><Label>Endereço</Label>
-              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            <div>
+              <CepInput
+                value={form.cep || ""}
+                onChange={(v) => setForm({ ...form, cep: v })}
+                nextFieldRef={stationAddressRef}
+                onAddressFound={(a) => setForm((p: any) => ({ ...p, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf }))}
+                label="CEP"
+              />
+            </div>
+            <div className="space-y-2"><Label>Endereço</Label>
+              <Input ref={stationAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" />
+            </div>
+            <div className="space-y-2"><Label>Bairro</Label>
+              <Input value={form.neighborhood || ""} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} />
             </div>
             <div className="space-y-2"><Label>Cidade</Label>
               <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />

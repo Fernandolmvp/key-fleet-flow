@@ -1,0 +1,4 @@
+ALTER TABLE public.companies         ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.drivers           ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text, ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.fuel_stations     ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.insurance_brokers ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text, ADD COLUMN IF NOT EXISTS neighborhood text;

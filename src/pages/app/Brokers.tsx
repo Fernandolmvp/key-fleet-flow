@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Pencil, Trash2, Phone, Mail, Briefcase } from "lucide-react";
 import { toast } from "sonner";
+import CepInput from "@/components/forms/CepInput";
 
 type Broker = {
   id: string;
@@ -21,6 +22,10 @@ type Broker = {
   phone: string | null;
   email: string | null;
   address: string | null;
+  cep: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
   notes: string | null;
   active: boolean;
 };
@@ -34,6 +39,7 @@ export default function Brokers() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Broker>>(empty);
+  const brokerAddressRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     if (!currentCompanyId) return;
@@ -66,6 +72,10 @@ export default function Brokers() {
       phone: form.phone || null,
       email: form.email || null,
       address: form.address || null,
+      cep: form.cep || null,
+      neighborhood: form.neighborhood || null,
+      city: form.city || null,
+      state: form.state ? form.state.toUpperCase() : null,
       notes: form.notes || null,
       active: form.active ?? true,
     };
@@ -187,9 +197,31 @@ export default function Brokers() {
               <Label>Email</Label>
               <Input value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
-            <div className="col-span-2">
+            <div>
+              <CepInput
+                value={form.cep || ""}
+                onChange={(v) => setForm({ ...form, cep: v })}
+                nextFieldRef={brokerAddressRef}
+                onAddressFound={(a) => setForm((p) => ({ ...p, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf }))}
+              />
+            </div>
+            <div>
               <Label>Endereço</Label>
-              <Input value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <Input ref={brokerAddressRef} value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" />
+            </div>
+            <div>
+              <Label>Bairro</Label>
+              <Input value={form.neighborhood || ""} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <Label>Cidade</Label>
+                <Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div>
+                <Label>UF</Label>
+                <Input maxLength={2} value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} />
+              </div>
             </div>
             <div className="col-span-2">
               <Label>Observações</Label>

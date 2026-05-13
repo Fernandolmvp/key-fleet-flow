@@ -849,6 +849,7 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          cep: string | null
           city: string | null
           cnpj: string | null
           contact_name: string | null
@@ -859,6 +860,7 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          neighborhood: string | null
           phone: string | null
           state: string | null
           status: string
@@ -866,6 +868,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          cep?: string | null
           city?: string | null
           cnpj?: string | null
           contact_name?: string | null
@@ -876,6 +879,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          neighborhood?: string | null
           phone?: string | null
           state?: string | null
           status?: string
@@ -883,6 +887,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          cep?: string | null
           city?: string | null
           cnpj?: string | null
           contact_name?: string | null
@@ -893,6 +898,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          neighborhood?: string | null
           phone?: string | null
           state?: string | null
           status?: string
@@ -1287,6 +1293,8 @@ export type Database = {
           auto_fuel_authorized: boolean
           birth_date: string | null
           branch_id: string | null
+          cep: string | null
+          city: string | null
           cnh_category: string | null
           cnh_expires_at: string | null
           cnh_number: string | null
@@ -1302,11 +1310,13 @@ export type Database = {
           inactive_reason: string | null
           manager_user_id: string | null
           medical_exam_expires_at: string | null
+          neighborhood: string | null
           notes: string | null
           onboarded_at: string | null
           phone: string | null
           phone_verified_at: string | null
           photo_url: string | null
+          state: string | null
           status: Database["public"]["Enums"]["driver_status"]
           termination_date: string | null
           updated_at: string
@@ -1318,6 +1328,8 @@ export type Database = {
           auto_fuel_authorized?: boolean
           birth_date?: string | null
           branch_id?: string | null
+          cep?: string | null
+          city?: string | null
           cnh_category?: string | null
           cnh_expires_at?: string | null
           cnh_number?: string | null
@@ -1333,11 +1345,13 @@ export type Database = {
           inactive_reason?: string | null
           manager_user_id?: string | null
           medical_exam_expires_at?: string | null
+          neighborhood?: string | null
           notes?: string | null
           onboarded_at?: string | null
           phone?: string | null
           phone_verified_at?: string | null
           photo_url?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
           termination_date?: string | null
           updated_at?: string
@@ -1349,6 +1363,8 @@ export type Database = {
           auto_fuel_authorized?: boolean
           birth_date?: string | null
           branch_id?: string | null
+          cep?: string | null
+          city?: string | null
           cnh_category?: string | null
           cnh_expires_at?: string | null
           cnh_number?: string | null
@@ -1364,11 +1380,13 @@ export type Database = {
           inactive_reason?: string | null
           manager_user_id?: string | null
           medical_exam_expires_at?: string | null
+          neighborhood?: string | null
           notes?: string | null
           onboarded_at?: string | null
           phone?: string | null
           phone_verified_at?: string | null
           photo_url?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
           termination_date?: string | null
           updated_at?: string
@@ -2116,6 +2134,7 @@ export type Database = {
           active: boolean
           address: string | null
           brand: string | null
+          cep: string | null
           city: string | null
           cnpj: string | null
           company_id: string
@@ -2127,6 +2146,7 @@ export type Database = {
           inactivated_at: string | null
           inactive_reason: string | null
           name: string
+          neighborhood: string | null
           notes: string | null
           phone: string | null
           state: string | null
@@ -2136,6 +2156,7 @@ export type Database = {
           active?: boolean
           address?: string | null
           brand?: string | null
+          cep?: string | null
           city?: string | null
           cnpj?: string | null
           company_id: string
@@ -2147,6 +2168,7 @@ export type Database = {
           inactivated_at?: string | null
           inactive_reason?: string | null
           name: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           state?: string | null
@@ -2156,6 +2178,7 @@ export type Database = {
           active?: boolean
           address?: string | null
           brand?: string | null
+          cep?: string | null
           city?: string | null
           cnpj?: string | null
           company_id?: string
@@ -2167,6 +2190,7 @@ export type Database = {
           inactivated_at?: string | null
           inactive_reason?: string | null
           name?: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           state?: string | null
@@ -2193,6 +2217,8 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          cep: string | null
+          city: string | null
           company_id: string
           contact_name: string | null
           created_at: string
@@ -2202,14 +2228,18 @@ export type Database = {
           id: string
           legal_name: string | null
           name: string
+          neighborhood: string | null
           notes: string | null
           phone: string | null
+          state: string | null
           susep: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           address?: string | null
+          cep?: string | null
+          city?: string | null
           company_id: string
           contact_name?: string | null
           created_at?: string
@@ -2219,14 +2249,18 @@ export type Database = {
           id?: string
           legal_name?: string | null
           name: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          state?: string | null
           susep?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
           address?: string | null
+          cep?: string | null
+          city?: string | null
           company_id?: string
           contact_name?: string | null
           created_at?: string
@@ -2236,8 +2270,10 @@ export type Database = {
           id?: string
           legal_name?: string | null
           name?: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          state?: string | null
           susep?: string | null
           updated_at?: string
         }

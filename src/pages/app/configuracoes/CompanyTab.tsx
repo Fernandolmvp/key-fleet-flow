@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import CepInput from "@/components/forms/CepInput";
 
 export default function CompanyTab({ companyId }: { companyId: string }) {
   const { refreshCompanies } = useAuth();
@@ -19,16 +20,19 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   const [phone, setPhone] = useState("");
   const [contactName, setContactName] = useState("");
   const [address, setAddress] = useState("");
+  const [cep, setCep] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [status, setStatus] = useState<"ativa" | "suspensa" | "cancelada">("ativa");
   const [fuelAuthTtl, setFuelAuthTtl] = useState<number>(30);
+  const addressRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase.from("companies")
-        .select("name, cnpj, logo_url, email, phone, contact_name, address, city, state, status, fuel_auth_code_ttl_minutes")
+        .select("name, cnpj, logo_url, email, phone, contact_name, address, cep, neighborhood, city, state, status, fuel_auth_code_ttl_minutes")
         .eq("id", companyId).maybeSingle();
       setName(data?.name ?? "");
       setCnpj(data?.cnpj ?? "");
@@ -37,6 +41,8 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
       setPhone((data as any)?.phone ?? "");
       setContactName((data as any)?.contact_name ?? "");
       setAddress((data as any)?.address ?? "");
+      setCep((data as any)?.cep ?? "");
+      setNeighborhood((data as any)?.neighborhood ?? "");
       setCity((data as any)?.city ?? "");
       setState((data as any)?.state ?? "");
       setStatus(((data as any)?.status as any) ?? "ativa");
@@ -56,6 +62,8 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         phone: phone.trim() || null,
         contact_name: contactName.trim() || null,
         address: address.trim() || null,
+        cep: cep.trim() || null,
+        neighborhood: neighborhood.trim() || null,
         city: city.trim() || null,
         state: state.trim() || null,
         status,
@@ -117,11 +125,28 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
           </Select>
         </div>
       </div>
-      <div className="space-y-2">
-        <Label>Endereço</Label>
-        <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número, bairro" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CepInput
+          value={cep}
+          onChange={setCep}
+          nextFieldRef={addressRef}
+          onAddressFound={(a) => {
+            setAddress(a.street);
+            setNeighborhood(a.neighborhood);
+            setCity(a.city);
+            setState(a.uf);
+          }}
+        />
+        <div className="space-y-2 md:col-span-2">
+          <Label>Endereço</Label>
+          <Input ref={addressRef} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número" />
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>Bairro</Label>
+          <Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
+        </div>
         <div className="space-y-2">
           <Label>Cidade</Label>
           <Input value={city} onChange={(e) => setCity(e.target.value)} />

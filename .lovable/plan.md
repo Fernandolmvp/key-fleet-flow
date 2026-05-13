@@ -1,132 +1,103 @@
-## Módulo Completo de Multas — Plano de Implementação
 
-Vou implementar o sistema completo de gestão de multas em 10 etapas sequenciais conforme especificado, em uma única execução.
+## Objetivo
+Adicionar busca automática de endereço por CEP (ViaCEP) em todos os formulários do sistema que têm campos de endereço, com hook + componente reutilizáveis.
 
-### ETAPA 1 — Migration `traffic_fines` (recriar tabela)
+## Estado atual
+Hoje **nenhum** formulário possui campo CEP. Os formulários de endereço usam apenas:
+- `address` (texto livre, "Rua, número, bairro")
+- `city`, `state` (separados em alguns)
 
-A tabela atual `traffic_fines` é mínima (do placeholder). Como ainda não tem dados em produção, vou:
-- `DROP TABLE IF EXISTS public.traffic_fines CASCADE`
-- Criar novamente com TODOS os campos do escopo (record_type, status expandido, dados infração, notificação, indicação, recurso, pagamento, anexos, IA, audit)
-- RLS: `is_company_member` SELECT, `can_manage_fleet` ALL
-- Trigger `update_updated_at_column`
-- Trigger de audit log para todas mudanças
-- Índices em (company_id, vehicle_id), (status), (driver_id)
+Tabelas afetadas no banco:
+- `companies` (address, city, state) — usado em `CompanyTab.tsx`
+- `drivers` (address) — usado em `Drivers.tsx`
+- `fuel_stations` (address, city, state) — usado em `FuelStations.tsx`
+- `insurance_brokers` (address) — usado em `Brokers.tsx`
+- `branches` (a confirmar — tabela ainda não está em formulário ativo)
 
-### ETAPA 2 — Edge Function `extract-traffic-fine`
+Não existe coluna `cep` em nenhuma dessas tabelas.
 
-- Nova função em `supabase/functions/extract-traffic-fine/index.ts`
-- Recebe `{ fileBase64, mimeType }`
-- Chama Lovable AI (`google/gemini-2.5-flash` via gateway)
-- Tool calling para JSON estruturado: tipo (aviso/notificacao), placa, datas, local, infração, AIT, valor, pontos, prazos, confiança
-- Trata 429/402
-- `verify_jwt = false` em config.toml (segue padrão das outras extract-*)
+## Etapa 1 — Migration (ADD COLUMN nullable)
+```sql
+ALTER TABLE public.companies          ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.drivers            ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text, ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.fuel_stations      ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.insurance_brokers  ADD COLUMN IF NOT EXISTS cep text, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text, ADD COLUMN IF NOT EXISTS neighborhood text;
+-- branches só se a tabela existir
+```
+Tudo nullable, nada destrutivo. Campos existentes continuam funcionando inalterados.
 
-### ETAPA 3 — UI principal `/app/multas`
+## Etapa 2 — Hook `src/hooks/useCepLookup.ts`
+- `lookup(cep: string)` → valida 8 dígitos numéricos
+- Cache em memória (`Map<string, ViaCepResult>`)
+- Timeout 3s via `AbortController`
+- Retorno: `{ data, loading, error, lookup }`
+- Tipo: `{ logradouro, bairro, localidade, uf, cep }` (campos da ViaCEP)
+- Trata: CEP inválido, `{erro: true}`, falha de rede
 
-Substitui placeholder por:
-- **Header KPIs (5 cards)**: Avisos aguardando notif (azul), Multas a vencer 7d (vermelho), Em recurso (laranja), Total pendente R$, Pontos em risco
-- **Filtros**: tipo registro, status, motorista, veículo, período (Select + DatePicker)
-- **Botões**: 🤖 "Cadastrar via Foto" (primary), ✏️ "Cadastrar Manualmente"
-- **Lista de cards**: visual diferenciado AVISO (azul claro) vs MULTA (cor por status), ações contextuais
+## Etapa 3 — Componente `src/components/forms/CepInput.tsx`
+Props:
+```ts
+{
+  value: string;
+  onChange: (cep: string) => void;
+  onAddressFound?: (a: { street: string; neighborhood: string; city: string; uf: string }) => void;
+  nextFieldRef?: React.RefObject<HTMLInputElement>; // foco no número
+  label?: string;
+}
+```
+Comportamento:
+- Máscara `00000-000` automática
+- Debounce 500ms
+- Busca automática quando completa 8 dígitos
+- Estados visuais: idle / loading (spinner à direita) / success (✓ verde) / error (✕ destrutivo + tooltip)
+- `toast.success("Endereço encontrado")` discreto
+- Foco automático em `nextFieldRef` após sucesso
+- Campos preenchidos permanecem editáveis (componente só dispara callback)
 
-Arquivo principal: `src/pages/app/Multas.tsx` (rewrite completo).
+```text
+┌─────────────────────────────┐
+│ CEP                         │
+│ [01310-100        ] [✓]     │  ← sucesso
+│ [01310-1          ] [⟳]     │  ← buscando (8 dígitos)
+│ [00000-000        ] [✕]     │  ← não encontrado
+└─────────────────────────────┘
+```
 
-Componentes:
-- `src/components/fines/FinesKpis.tsx`
-- `src/components/fines/FineCard.tsx`
-- `src/components/fines/FineFiltersBar.tsx`
-- `src/components/fines/FinePhotoUploadDialog.tsx` (etapa principal IA)
-- `src/components/fines/FineFormDialog.tsx` (manual + edição, abas Aviso/Notificação)
-- `src/components/fines/FineDetailsDialog.tsx` (timeline + ações)
-- `src/components/fines/ConvertAvisoDialog.tsx` (etapa 4)
-- `src/components/fines/IndicateDriverDialog.tsx` (etapa 5)
-- `src/components/fines/RecourseDialog.tsx` (etapa 6 — abrir + atualizar resultado)
-- `src/components/fines/PaymentDialog.tsx` (etapa 7)
+## Etapa 4 — Integração nos formulários
+Em cada um: adicionar `<CepInput>` antes do bloco de endereço; o `onAddressFound` preenche `street/neighborhood/city/state` no estado local; campos seguem editáveis.
 
-Helper: `src/lib/fines.ts` — tipos, status labels/cores, severity labels, fluxo de transição.
+| Formulário | Arquivo | Campos preenchidos |
+|---|---|---|
+| Empresa | `pages/app/configuracoes/CompanyTab.tsx` | address (rua), neighborhood, city, state |
+| Motorista | `pages/app/Drivers.tsx` (form principal) | address, neighborhood, city, state |
+| Posto | `pages/app/FuelStations.tsx` (dialog) | address, neighborhood, city, state |
+| Corretora | `pages/app/Brokers.tsx` (dialog) | address, neighborhood, city, state |
 
-### ETAPA 4 — Conversão AVISO → MULTA
+`address` continua sendo um único campo livre — pré-preenchemos com `logradouro` da ViaCEP e o usuário acrescenta número manualmente. Adicionamos um campo separado **Bairro** (novo) ao lado.
 
-Botão "Converter em Multa" no card de aviso → abre `ConvertAvisoDialog`:
-1. Mantém dados da infração já preenchidos
-2. Solicita upload da notificação oficial (chama `extract-traffic-fine`)
-3. Preenche campos da notificação
-4. Update: `record_type='multa'`, `status='multa_autuada'`, dados de notificação
-5. Audit log automático via trigger
+Filiais (branches) e proprietário do veículo: hoje não há formulário ativo desses no UI; ficam fora do escopo desta entrega (o componente já estará pronto para reuso quando essas telas existirem).
 
-### ETAPA 5 — Indicação de Motorista
+## Etapa 5 — Testes manuais
+- 01310-100 → preenche Av. Paulista, Bela Vista, São Paulo, SP
+- 13075-000 → preenche Campinas
+- 00000-000 → erro "CEP não encontrado"
+- 0131 → não dispara busca
+- 01310100 (sem hífen) → aceita e busca
 
-`IndicateDriverDialog`:
-- Select de motorista (lista de `drivers` da empresa)
-- Mostra dados (CNH, validade)
-- Radio: "Indicação manual" vs "Solicitar confirmação no app" (placeholder)
-- Update: `driver_id`, `driver_indicated_at`, `driver_indication_method`, `status='motorista_indicado'`
+## Plano de rollback
+1. Reverter integrações nos 4 formulários (pequenas seções de JSX/state)
+2. Remover `src/hooks/useCepLookup.ts` e `src/components/forms/CepInput.tsx`
+3. Migration reversa opcional (colunas são nullable, podem permanecer sem efeito):
+   ```sql
+   ALTER TABLE public.companies         DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
+   ALTER TABLE public.drivers           DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
+   ALTER TABLE public.fuel_stations     DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
+   ALTER TABLE public.insurance_brokers DROP COLUMN IF EXISTS cep, DROP COLUMN IF EXISTS neighborhood;
+   ```
 
-### ETAPA 6 — Recurso
-
-`RecourseDialog` (modo "abrir"):
-- Tipo defesa (defesa_previa/jari/cetran) → salvo em `recourse_notes`
-- Argumentos (textarea)
-- Upload documento (storage `fines-attachments`)
-- Data protocolo
-- Update: `recourse_filed_at`, `recourse_document_url`, `status='em_recurso'`
-
-`RecourseDialog` (modo "resultado"):
-- Radio deferido/indeferido
-- Data resultado
-- Notas
-- Update: `recourse_result`, `recourse_result_date`, status condicional
-
-### ETAPA 7 — Pagamento
-
-`PaymentDialog`:
-- Data, valor, método, upload comprovante
-- Detecção automática: `paid_amount === discount_amount` → `paga_com_desconto`, senão `paga_integral`
-- Update: `paid_at`, `paid_amount`, `payment_method`, `payment_receipt_url`, `status`
-
-### ETAPA 8 — Alertas Automáticos
-
-Função SQL `update_fines_auto_status()`:
-- Avisos com >60 dias sem `notification_received_date` → `arquivada` + nota
-- Multas com `due_date < CURRENT_DATE` e não pagas → `vencida`
-
-Cron schedule diário via `pg_cron` + edge function `fines-daily-check` (ou só SQL function se for tudo no banco). Vou usar SQL function + pg_cron direto.
-
-Alertas visuais (vencimento 7d, prazo recurso, pontos CNH) calculados no frontend em tempo real (já refletidos nos KPIs + badges nos cards).
-
-### ETAPA 9 — Relatórios
-
-Aba "Relatórios" dentro de `/app/multas` (Tabs no topo: Lista | Relatórios):
-- **Por motorista**: tabela com qtd, pontos, valor total, ranking, badge "próximo de 20 pontos"
-- **Por veículo**: tabela com histórico, custo total, locais mais comuns
-- **Por período**: gráfico mensal (recharts), top infrações, top locais
-
-Componente: `src/components/fines/FinesReports.tsx`.
-
-### ETAPA 10 — Landing Page
-
-`src/pages/Landing.tsx`: localizar feature card "Controle de Multas" e atualizar descrição com bullets do escopo. Remover badge "Em breve" deste item.
-
-### Storage
-
-Bucket `fines-attachments` (privado, scoped por company_id). Migration cria bucket + policies.
-
-### Sidebar
-
-`AppLayout.tsx`: remover badge "Soon" do item "Multas".
-
-### Garantias
-- Migration aditiva (DROP só da tabela placeholder vazia + recriação)
-- Outras tabelas/fluxos intocados
-- IA opcional (botão manual sempre disponível)
-- PT-BR em toda UI
-- Audit log via trigger genérico
-
-### Plano de Rollback
-- DROP TABLE traffic_fines + recriar versão simples do placeholder
-- Restaurar `Multas.tsx` para `ModulePlaceholder`
-- Remover componentes em `src/components/fines/`
-- Remover edge function `extract-traffic-fine`
-- Remover bucket `fines-attachments`
-
-Confirma para eu executar tudo de uma vez?
+## Garantias de não-quebra
+- Migration apenas ADD COLUMN nullable
+- Nenhum campo obrigatório novo
+- API ViaCEP sem chave, sem custo, sem secrets
+- Falha de rede não bloqueia formulário (catch + toast)
+- Formulários continuam salvando mesmo se usuário ignorar o CEP
