@@ -1051,8 +1051,8 @@ export default function InsurancePanel() {
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
     const v = vehicles.find((x) => x.id === vehicleId);
-    const plateN = normId(v?.plate);
-    const chassisN = normId(v?.chassis);
+    const plateN = normPlate(v?.plate);
+    const renavamN = normRenavam(v?.renavam);
     const ids = new Set<string>(links
       .filter((l) => l.vehicle_id === vehicleId)
       .map((l) => l.policy_id));
@@ -1064,8 +1064,11 @@ export default function InsurancePanel() {
         : Array.isArray(ex.vehicles) ? ex.vehicles.map((x: any) => x?.plate).filter(Boolean) : [];
       const chassisList: string[] = Array.isArray(ex.vehicles)
         ? ex.vehicles.map((x: any) => x?.chassis).filter(Boolean) : [];
-      if (plateN && plates.some((pl) => normId(pl) === plateN)) ids.add(p.id);
-      if (chassisN && chassisList.some((c) => normId(c) === chassisN)) ids.add(p.id);
+      const renavamList: string[] = Array.isArray(ex.vehicles)
+        ? ex.vehicles.map((x: any) => x?.renavam).filter(Boolean) : [];
+      if (plateN && plates.some((pl) => normPlate(pl) === plateN)) ids.add(p.id);
+      if (v?.chassis && chassisList.some((c) => chassisMatch(c, v.chassis))) ids.add(p.id);
+      if (renavamN && renavamList.some((r) => renavamEq(r, renavamN))) ids.add(p.id);
     });
     return policies.filter((p) => {
       if (!ids.has(p.id)) return false;
