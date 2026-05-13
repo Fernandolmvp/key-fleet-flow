@@ -301,11 +301,13 @@ export default function InsurancePanel() {
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
-    const [p, b, v, l] = await Promise.all([
+    const [p, b, v, l, mm, ep] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
       supabase.from("vehicles").select("id,plate,brand,model,status,chassis,renavam,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
+      supabase.from("vehicle_policy_manual_matches" as any).select("id,vehicle_id,policy_id,normalized_plate").eq("company_id", currentCompanyId).is("revoked_at", null),
+      supabase.from("policy_external_plates" as any).select("policy_id,normalized_plate").eq("company_id", currentCompanyId),
     ]);
     if (p.error) toast.error(p.error.message);
     const policiesData = (p.data as any[]) || [];
@@ -315,6 +317,8 @@ export default function InsurancePanel() {
     setBrokers((b.data as any[]) || []);
     setVehicles(vehiclesData);
     setLinks(linksData);
+    setManualMatches(((mm as any)?.data as any[]) || []);
+    setExternalPlates(((ep as any)?.data as any[]) || []);
     setLoading(false);
     // Auto-vincula novos veículos cadastrados às apólices de IA já importadas
     autoLinkAiPolicies(policiesData, vehiclesData, linksData).catch((e) =>
