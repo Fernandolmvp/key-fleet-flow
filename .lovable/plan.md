@@ -1,132 +1,180 @@
-# Migração de Auth Emails para Resend
-
-## Visão geral
-
-Vou criar um **Auth Email Hook** customizado que intercepta os 4 tipos de email do Supabase Auth e envia via **Resend** (mesmo gateway já usado em `send-partner-email`). Lovable Emails permanece desabilitado.
-
-> ⚠️ Importante: NÃO vou usar o tooling `scaffold_auth_email_templates` (que é o caminho gerenciado Lovable Emails). Vou criar manualmente porque você optou explicitamente por Resend.
+## Objetivo
+Criar base (tabelas + UI placeholder) para Sinistros, Despesas, Multas e Histórico de Vida. Tudo aditivo, zero breaking change.
 
 ---
 
-## ETAPA 1 — Limpeza preliminar
+## ETAPA 1 — Migration SQL (uma migration única, tudo `CREATE`/`ADD COLUMN`)
 
-- Deletar usuário órfão `flvcontabilidade@hotmail.com` da `auth.users` via migration (`DELETE FROM auth.users WHERE email = ...`).
-- Verificar se existe registro em `profiles`/`company_members` ligado a esse user_id e limpar se necessário.
+```sql
+-- A) vehicle_incidents
+CREATE TABLE public.vehicle_incidents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  vehicle_id uuid NOT NULL,
+  driver_id uuid,
+  incident_date timestamptz NOT NULL DEFAULT now(),
+  incident_type text NOT NULL,         -- colisao|raspao|perda_total|furto|vandalismo|outro
+  description text,
+  km_at_incident integer,
+  location text,
+  repair_cost numeric,
+  insurance_claimed boolean NOT NULL DEFAULT false,
+  police_report_number text,
+  photos_urls text[] DEFAULT '{}',
+  status text NOT NULL DEFAULT 'aberto', -- aberto|em_reparo|resolvido|perda_total
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.vehicle_incidents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "members view incidents" ON public.vehicle_incidents
+  FOR SELECT USING (is_company_member(auth.uid(), company_id));
+CREATE POLICY "managers write incidents" ON public.vehicle_incidents
+  FOR ALL USING (can_manage_fleet(auth.uid(), company_id))
+  WITH CHECK (can_manage_fleet(auth.uid(), company_id));
+CREATE TRIGGER trg_vehicle_incidents_updated
+  BEFORE UPDATE ON public.vehicle_incidents
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-## ETAPA 2 — Generalizar email sender
+-- B) vehicle_expenses
+CREATE TABLE public.vehicle_expenses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  vehicle_id uuid NOT NULL,
+  expense_date date NOT NULL DEFAULT CURRENT_DATE,
+  expense_category text NOT NULL,       -- ipva|licenciamento|lavagem|pedagio|estacionamento|adesivacao|multa_paga|outro
+  amount numeric NOT NULL DEFAULT 0,
+  description text,
+  receipt_url text,
+  paid boolean NOT NULL DEFAULT true,
+  due_date date,
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.vehicle_expenses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "members view expenses" ON public.vehicle_expenses
+  FOR SELECT USING (is_company_member(auth.uid(), company_id));
+CREATE POLICY "managers write expenses" ON public.vehicle_expenses
+  FOR ALL USING (can_manage_fleet(auth.uid(), company_id))
+  WITH CHECK (can_manage_fleet(auth.uid(), company_id));
+CREATE TRIGGER trg_vehicle_expenses_updated
+  BEFORE UPDATE ON public.vehicle_expenses
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-Refatorar `send-partner-email` em **`send-transactional-email`** mantendo retrocompatibilidade:
+-- C) traffic_fines
+CREATE TABLE public.traffic_fines (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  vehicle_id uuid NOT NULL,
+  driver_id uuid,
+  fine_date date NOT NULL DEFAULT CURRENT_DATE,
+  fine_type text NOT NULL,              -- velocidade|estacionamento|sem_cinto|celular|alcool|outro
+  amount numeric NOT NULL DEFAULT 0,
+  license_points integer NOT NULL DEFAULT 0,
+  description text,
+  status text NOT NULL DEFAULT 'pendente', -- pendente|paga|em_recurso|arquivada
+  notification_number text,
+  due_date date,
+  paid_at date,
+  photo_url text,
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.traffic_fines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "members view fines" ON public.traffic_fines
+  FOR SELECT USING (is_company_member(auth.uid(), company_id));
+CREATE POLICY "managers write fines" ON public.traffic_fines
+  FOR ALL USING (can_manage_fleet(auth.uid(), company_id))
+  WITH CHECK (can_manage_fleet(auth.uid(), company_id));
+CREATE TRIGGER trg_traffic_fines_updated
+  BEFORE UPDATE ON public.traffic_fines
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-- Aceita `type`: `'partner_invite' | 'partner_reset' | 'auth_signup' | 'auth_recovery' | 'auth_email_change' | 'auth_magiclink' | 'raw'`
-- Para `raw`: usa `{to, subject, html}` (compatível com chamadas atuais)
-- Para tipos auth: recebe `{to, data: { confirmation_url, token, ... }}` e renderiza template internamente
-- Mantém endpoint `send-partner-email` como **alias** que redireciona internamente para evitar quebrar `partner-invite` e `driver-onboarding`
+-- D) maintenance_records — apenas ADD COLUMN (todas nullable)
+ALTER TABLE public.maintenance_records
+  ADD COLUMN IF NOT EXISTS maintenance_category text,
+  ADD COLUMN IF NOT EXISTS service_provider_rating integer
+    CHECK (service_provider_rating IS NULL OR (service_provider_rating BETWEEN 1 AND 5)),
+  ADD COLUMN IF NOT EXISTS warranty_until date;
 
-## ETAPA 3 — Auth Email Hook
-
-Criar **`supabase/functions/auth-email-hook/index.ts`**:
-
+-- Índices úteis
+CREATE INDEX idx_incidents_company_vehicle ON public.vehicle_incidents(company_id, vehicle_id);
+CREATE INDEX idx_expenses_company_vehicle  ON public.vehicle_expenses(company_id, vehicle_id);
+CREATE INDEX idx_fines_company_vehicle     ON public.traffic_fines(company_id, vehicle_id);
 ```
-POST /auth-email-hook
-Headers: webhook-id, webhook-timestamp, webhook-signature (HMAC SHA-256)
-Body: { user: {...}, email_data: { token, token_hash, redirect_to, email_action_type, site_url } }
-```
 
-Fluxo:
-1. Validar assinatura HMAC com `SEND_EMAIL_HOOK_SECRET` (gerado pelo Supabase ao registrar o webhook)
-2. Mapear `email_action_type` → template:
-   - `signup` → auth_signup
-   - `recovery` → auth_recovery
-   - `email_change` / `email_change_new` → auth_email_change
-   - `magiclink` → auth_magiclink
-   - `invite` → tratar como signup
-3. Construir `confirmation_url` = `{site_url}/auth/v1/verify?token={token_hash}&type={action}&redirect_to={redirect_to}`
-4. Chamar `send-transactional-email` internamente
-5. Retornar `200 {}` em sucesso, `4xx/5xx` em erro
-
-Configurar em `supabase/config.toml`:
-```toml
-[functions.auth-email-hook]
-verify_jwt = false
-```
-
-**Registro do webhook no Supabase Auth**: Será necessário rodar uma migration ou solicitar via tooling para apontar Auth → `https://<project>.supabase.co/functions/v1/auth-email-hook` e gerar o `SEND_EMAIL_HOOK_SECRET`. Vou tentar via SQL no `auth.config` / `supabase_auth_admin`. Se não for possível via SQL gerenciado, te mostro o passo manual no painel **Cloud → Auth Hooks**.
-
-## ETAPA 4 — Templates HTML (visual FrotaOps escuro)
-
-Estrutura comum:
-```
-[Header: bg #0a0e1a, logo FrotaOps em gradient azul]
-[Body: bg #0f1420, card #151b2e, texto #e5e7eb]
-  Olá!
-  <Mensagem específica>
-  [Botão CTA: gradient azul→roxo, sombra glow]
-  Ou copie este link: <url>
-[Footer: bg #0a0e1a, "Precisa de ajuda? contato@frotaops.com.br" + LGPD]
-```
-
-Conteúdo por tipo:
-| Type | Subject | Heading | CTA |
-|------|---------|---------|-----|
-| signup | "Confirme seu email · FrotaOps" | "Bem-vindo à FrotaOps" | "Confirmar email" |
-| recovery | "Redefinir sua senha · FrotaOps" | "Vamos redefinir sua senha" | "Redefinir senha" |
-| email_change | "Confirme seu novo email · FrotaOps" | "Confirmação de novo email" | "Confirmar novo email" |
-| magiclink | "Seu link de acesso · FrotaOps" | "Acesse sua conta" | "Entrar agora" |
-
-Templates como funções TS retornando string HTML (sem React Email — mais simples e leve).
-
-## ETAPA 5 — "Esqueci minha senha" (empresa)
-
-Atualmente o reset existe apenas para **motorista** (via `driver-onboarding`). Vou adicionar para conta empresa:
-
-- No `Login.tsx` aba **Empresa**, adicionar link "Esqueci minha senha"
-- Modal pede email → `supabase.auth.resetPasswordForEmail(email, { redirectTo: '${origin}/reset-password' })`
-- Mensagem neutra: "Se o email existir, enviaremos instruções em alguns minutos"
-- `/reset-password` já existe e funciona com o token PKCE
-
-## ETAPA 6 — Teste end-to-end
-
-1. Após deploy, criar conta com `nandovolpi.jb@gmail.com`
-2. Verificar logs em `auth-email-hook` e `send-transactional-email`
-3. Confirmar email chega via Resend (vou ler logs `email_send_log` se existir, ou apenas logs da function)
-4. Clicar no link → deve cair em `/welcome` ou rota equivalente
-5. Testar "esqueci senha" da empresa
-6. Te mostrar status final + IDs Resend
-
-## Rollback
-
-Se algo falhar:
-1. Reverter migration que registra o webhook (Auth volta a usar default Lovable)
-2. Manter `send-transactional-email` (não quebra nada — é aditivo)
-3. Hook fica deployed mas inativo (sem webhook configurado, não é chamado)
+**Sem FK explícita** para `companies/vehicles/drivers` — segue padrão do schema atual (que usa RLS via `is_company_member` em vez de FKs declaradas).
 
 ---
 
-## Estrutura de arquivos
+## ETAPA 2 — UI Placeholder (3 abas novas)
 
+**Componente compartilhado:** `src/components/placeholder/ModulePlaceholder.tsx`
+- Props: `icon`, `title`, `subtitle`, `features: string[]`
+- Layout: card centralizado, ícone grande em `bg-primary/10`, badge "Disponível em breve", botão ghost "Receber notificação quando lançar" (sem handler).
+
+**Páginas novas:**
+- `src/pages/app/Sinistros.tsx` (ícone `CarFront` ou `AlertOctagon`)
+- `src/pages/app/Despesas.tsx` (ícone `Receipt`)
+- `src/pages/app/Multas.tsx` (ícone `AlertTriangle`)
+
+**Rotas em `App.tsx`** (dentro de `/app` protegido):
 ```
-supabase/functions/
-  auth-email-hook/
-    index.ts              [novo]
-  send-transactional-email/
-    index.ts              [novo - generalização]
-    templates.ts          [novo - 4 templates auth + partner]
-  send-partner-email/
-    index.ts              [mantido como alias retrocompatível]
-
-src/pages/auth/Login.tsx  [adicionar reset senha empresa]
-
-supabase/migrations/
-  YYYYMMDD_delete_orphan_user.sql
-  YYYYMMDD_register_auth_email_hook.sql  [se possível via SQL]
+<Route path="sinistros" element={<Sinistros />} />
+<Route path="despesas" element={<Despesas />} />
+<Route path="multas" element={<Multas />} />
 ```
 
-## Secrets
+**Sidebar (`AppLayout.tsx`):** inserir 3 itens logo após "Manutenção" com mesmo padrão visual dos demais. Cada item leva à respectiva rota.
 
-- `RESEND_API_KEY` ✅ já existe
-- `LOVABLE_API_KEY` ✅ já existe
-- `SEND_EMAIL_HOOK_SECRET` ⚠️ será gerado quando registrar o webhook — vou pedir pra você adicionar via tooling de secrets se necessário
+Funcionalidades planejadas (bullets) por módulo:
+- **Sinistros**: registro de ocorrência, fotos, custo de reparo, vínculo com apólice, status do reparo, relatório consolidado.
+- **Despesas**: IPVA/licenciamento com vencimentos, pedágio/lavagem/estacionamento, comprovantes, custo total por veículo, alertas de vencimento.
+- **Multas**: cadastro com pontos na CNH, vínculo com motorista, status (pendente/paga/recurso), upload da notificação, alerta de vencimento.
 
 ---
 
-**Confirma que posso executar?** Vou mostrar resultado de cada etapa antes da próxima (limpeza → hook+templates → reset empresa → teste).
+## ETAPA 3 — Histórico de Vida (placeholder)
+
+- **Botão em `VehicleDialog.tsx`**: aparece só em modo edição (veículo já existente). Texto: "📊 Ver Histórico Completo". Navega para `/app/veiculos/:id/historico`.
+- **Página nova**: `src/pages/app/VehicleHistory.tsx` em rota `vehicles/:id/historico`.
+  - Cabeçalho com placa do veículo (busca rápida por id).
+  - Grid de cards-mockup das abas planejadas (Identificação, Timeline, Manutenções, Combustível, Pneus, Documentos, Sinistros, Checklists, Indicadores Financeiros, Motoristas, Exportar) — apenas título + ícone, todos `disabled` visualmente.
+  - Badge "Em desenvolvimento — disponível em breve".
+
+---
+
+## ETAPA 4 — Landing Page
+
+Em `src/pages/Landing.tsx`, no array `features`, adicionar 4 itens novos com flag `comingSoon: true`. Render: badge "Em breve" no canto do card.
+- 🚨 Gestão de Sinistros
+- 💰 Despesas Operacionais
+- 🚓 Controle de Multas
+- 📊 Histórico Completo do Veículo
+
+---
+
+## Garantia de não-quebra
+- Migrations: 100% aditivas (`CREATE TABLE`, `ADD COLUMN ... nullable`). Nenhum `DROP`/`ALTER COLUMN`/`RENAME`. RLS habilitada já no `CREATE`.
+- `maintenance_records`: novas colunas todas nullable → INSERTs/SELECTs existentes seguem funcionando.
+- Frontend: só adiciona arquivos e 3 rotas + 3 itens de sidebar + 1 botão no `VehicleDialog`. Nenhuma página/rota existente alterada.
+- Tipos do Supabase regeneram automaticamente após migration; código existente não referencia as novas colunas.
+
+## Plano de Rollback
+- **DB**: uma migration reversa com:
+  ```sql
+  DROP TABLE IF EXISTS public.vehicle_incidents;
+  DROP TABLE IF EXISTS public.vehicle_expenses;
+  DROP TABLE IF EXISTS public.traffic_fines;
+  ALTER TABLE public.maintenance_records
+    DROP COLUMN IF EXISTS maintenance_category,
+    DROP COLUMN IF EXISTS service_provider_rating,
+    DROP COLUMN IF EXISTS warranty_until;
+  ```
+- **Frontend**: remover os 4 arquivos novos (`Sinistros.tsx`, `Despesas.tsx`, `Multas.tsx`, `VehicleHistory.tsx`), o `ModulePlaceholder.tsx`, as 4 rotas em `App.tsx`, os 3 itens no sidebar, o botão "Histórico" no `VehicleDialog`, e os 4 itens novos do array `features` em `Landing.tsx`. Tudo isolado, sem dependências cruzadas.
+
+---
+
+Confirma "OK" para eu rodar a migration (Etapa 1) e na sequência implementar Etapas 2-4 no frontend?
