@@ -985,6 +985,8 @@ export default function InsurancePanel() {
     if (globalSearchMode !== "veiculo") return null;
     const term = normId(globalSearch);
     if (!term || term.length < 3) return null;
+    const termPlate = normPlate(globalSearch);
+    const termRen = normRenavam(globalSearch);
     const today = new Date();
     const isVigente = (p: Policy) =>
       p.status === "ativa" &&
