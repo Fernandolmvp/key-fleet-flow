@@ -65,13 +65,57 @@ function adaptTools(tools?: any[], toolChoice?: any) {
     .map((t) => ({
       name: t.function.name,
       description: t.function.description,
-      parameters: t.function.parameters,
+      parameters: normalizeSchemaForGemini(t.function.parameters),
     }));
   const out: any = { tools: [{ functionDeclarations }] };
   if (toolChoice?.type === "function" && toolChoice.function?.name) {
     out.toolConfig = {
       functionCallingConfig: { mode: "ANY", allowedFunctionNames: [toolChoice.function.name] },
     };
+  }
+  return out;
+}
+
+/**
+ * Converte JSON Schema (estilo OpenAI) -> schema aceito pela API Gemini direta.
+ *  - type: ["X","null"]  -> type: "X", nullable: true
+ *  - enum contendo null  -> remove null e marca nullable
+ *  - remove additionalProperties (não suportado em function declarations)
+ *  - aplica recursivamente em properties / items / anyOf / oneOf / allOf
+ */
+function normalizeSchemaForGemini(schema: any): any {
+  if (schema == null || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(normalizeSchemaForGemini);
+
+  const out: any = { ...schema };
+
+  if (Array.isArray(out.type)) {
+    const types = out.type.filter((t: any) => t !== "null");
+    const hasNull = out.type.includes("null");
+    if (types.length === 1) out.type = types[0];
+    else if (types.length === 0) delete out.type;
+    else out.type = types[0];
+    if (hasNull) out.nullable = true;
+  }
+
+  if (Array.isArray(out.enum)) {
+    const filtered = out.enum.filter((v: any) => v !== null);
+    if (filtered.length !== out.enum.length) out.nullable = true;
+    out.enum = filtered;
+  }
+
+  if ("additionalProperties" in out) delete out.additionalProperties;
+
+  if (out.properties && typeof out.properties === "object") {
+    const np: any = {};
+    for (const k of Object.keys(out.properties)) {
+      np[k] = normalizeSchemaForGemini(out.properties[k]);
+    }
+    out.properties = np;
+  }
+  if (out.items) out.items = normalizeSchemaForGemini(out.items);
+  for (const key of ["anyOf", "oneOf", "allOf"]) {
+    if (Array.isArray(out[key])) out[key] = out[key].map(normalizeSchemaForGemini);
   }
   return out;
 }
