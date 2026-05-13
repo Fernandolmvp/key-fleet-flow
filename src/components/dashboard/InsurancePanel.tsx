@@ -2356,6 +2356,22 @@ export default function InsurancePanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VehicleDialog
+        open={vehicleDialogOpen}
+        onOpenChange={(o: boolean) => {
+          setVehicleDialogOpen(o);
+          if (!o) setVehiclePrefill(null);
+        }}
+        vehicle={null}
+        prefill={vehiclePrefill}
+        onSaved={async () => {
+          setVehicleDialogOpen(false);
+          setVehiclePrefill(null);
+          toast.success("Veículo cadastrado. Vinculando à apólice…");
+          await load();
+        }}
+      />
     </div>
   );
 }
