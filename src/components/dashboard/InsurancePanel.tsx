@@ -958,6 +958,8 @@ export default function InsurancePanel() {
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
     const registeredPlates = new Set(vehicles.map((v) => normPlate(v.plate)).filter(Boolean));
+    const externalKeys = new Set(externalPlates.map((e) => `${e.policy_id}|${e.normalized_plate}`));
+    const manualKeys = new Set(manualMatches.map((m) => `${m.policy_id}|${m.normalized_plate}`));
     const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
     for (const p of policies.filter(isVigente)) {
       const ex: any = p.ai_extracted || {};
@@ -973,12 +975,15 @@ export default function InsurancePanel() {
           (v) => chassisMatch(v.chassis, a.chassis) || renavamEq(v.renavam, (a as any).renavam),
         );
         if (matchedByVin) continue;
+        // exclui placas já marcadas como externas ou já vinculadas manualmente
+        if (externalKeys.has(`${p.id}|${key}`)) continue;
+        if (manualKeys.has(`${p.id}|${key}`)) continue;
         if (!map.has(key)) map.set(key, { plate: (a.plate || key).toUpperCase(), entries: [] });
         map.get(key)!.entries.push({ policy: p, ai: a });
       }
     }
     return Array.from(map.values()).sort((a, b) => a.plate.localeCompare(b.plate));
-  }, [policies, vehicles]);
+  }, [policies, vehicles, externalPlates, manualMatches]);
 
   // === Resultado da busca por placa/chassi cobrindo os 4 cenários ===
   type SearchResult =
