@@ -2894,6 +2894,67 @@ export type Database = {
         }
         Relationships: []
       }
+      policy_external_plates: {
+        Row: {
+          ai_plate: string
+          company_id: string
+          created_at: string
+          id: string
+          marked_at: string
+          marked_by: string | null
+          normalized_plate: string
+          policy_id: string
+          reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_plate: string
+          company_id: string
+          created_at?: string
+          id?: string
+          marked_at?: string
+          marked_by?: string | null
+          normalized_plate: string
+          policy_id: string
+          reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_plate?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          marked_at?: string
+          marked_by?: string | null
+          normalized_plate?: string
+          policy_id?: string
+          reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_external_plates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_external_plates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "policy_external_plates_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -3855,6 +3916,89 @@ export type Database = {
           vehicle_id?: string
         }
         Relationships: []
+      }
+      vehicle_policy_manual_matches: {
+        Row: {
+          ai_plate: string
+          can_be_revoked: boolean
+          company_id: string
+          created_at: string
+          id: string
+          matched_at: string
+          matched_by: string | null
+          normalized_plate: string
+          notes: string | null
+          policy_id: string
+          reason: string
+          revoked_at: string | null
+          revoked_by: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          ai_plate: string
+          can_be_revoked?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          matched_at?: string
+          matched_by?: string | null
+          normalized_plate: string
+          notes?: string | null
+          policy_id: string
+          reason?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          ai_plate?: string
+          can_be_revoked?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          matched_at?: string
+          matched_by?: string | null
+          normalized_plate?: string
+          notes?: string | null
+          policy_id?: string
+          reason?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_policy_manual_matches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_policy_manual_matches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "vehicle_policy_manual_matches_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_policy_manual_matches_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicles: {
         Row: {
