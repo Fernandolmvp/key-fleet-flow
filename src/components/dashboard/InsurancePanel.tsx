@@ -1033,9 +1033,14 @@ export default function InsurancePanel() {
     for (const [key, entries] of policyHits) {
       // se a placa exata já corresponde a um veículo cadastrado, foi tratada acima
       if (matchedPlates.has(key)) continue;
-      const isRegistered = vehicles.some((v) => normId(v.plate) === key);
-      if (isRegistered) continue;
       const ai0 = entries[0].ai;
+      const isRegistered = vehicles.some(
+        (v) =>
+          normPlate(v.plate) === key ||
+          chassisMatch(v.chassis, ai0.chassis) ||
+          renavamEq(v.renavam, (ai0 as any).renavam),
+      );
+      if (isRegistered) continue;
       results.push({ kind: "scenario3", plate: (ai0.plate || key).toUpperCase(), entries });
     }
     if (results.length === 0) results.push({ kind: "scenario4", term: globalSearch });
