@@ -331,42 +331,17 @@ export default function InsurancePanel() {
   // Em seguida, sincroniza os campos de seguro no cadastro do veículo.
   async function autoLinkAiPolicies(pols: Policy[], vehs: Vehicle[], lnks: Link[]) {
     if (!currentCompanyId) return;
-    const today = new Date();
-    const isVigente = (p: Policy) => {
-      if (p.status !== "ativa") return false;
-      if (!p.end_date) return true;
-      return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
-    };
-    const aiActive = pols.filter((p) => isAiPolicy(p) && isVigente(p));
-    if (!aiActive.length) return;
-    const newLinks: { company_id: string; policy_id: string; vehicle_id: string; inclusion_type: "apolice" | "adendo"; removed_at: null }[] = [];
-    const touchedVehicleIds = new Set<string>();
-    for (const pol of aiActive) {
-      const existing = new Set(
-        lnks.filter((l) => l.policy_id === pol.id && !l.removed_at).map((l) => l.vehicle_id)
-      );
-      const ex: any = pol.ai_extracted || {};
-      const aiList: AiVehicle[] = Array.isArray(ex.vehicles) && ex.vehicles.length
-        ? ex.vehicles
-        : (Array.isArray(ex.plates) ? ex.plates.map((p: string) => ({ plate: p } as AiVehicle)) : []);
-      aiList.forEach((a) => {
-        const r = matchAiVehicle(a, vehs);
-        if (r.status === "linked" && r.vehicle && !existing.has(r.vehicle.id)) {
-          newLinks.push({
-            company_id: currentCompanyId!,
-            policy_id: pol.id,
-            vehicle_id: r.vehicle.id,
-            inclusion_type: (a.inclusion_type === "adendo" ? "adendo" : "apolice"),
-            removed_at: null,
-          });
-          touchedVehicleIds.add(r.vehicle.id);
-        }
-      });
+    // Delega para a RPC server-side (Mercosul + chassi + RENAVAM, ignora trigger anti-fraude
+    // pois os matches são contra dados extraídos pela IA — sem fraude possível).
+    const { data, error } = await supabase.rpc("auto_link_ai_policies" as any, {
+      _company_id: currentCompanyId,
+    });
+    if (error) { console.error("auto_link_ai_policies failed", error); return; }
+    const linked = Array.isArray(data) ? (data[0] as any)?.linked_count ?? 0 : (data as any)?.linked_count ?? 0;
+    if (linked > 0) {
+      toast.success(`${linked} veículo(s) vinculado(s) automaticamente às apólices`);
     }
-    if (!newLinks.length) return;
-    const ins = await supabase.from("insurance_policy_vehicles").upsert(newLinks, { onConflict: "policy_id,vehicle_id" });
-    if (ins.error) { console.error(ins.error); return; }
-    await syncVehicleInsuranceFields(currentCompanyId, Array.from(touchedVehicleIds));
+    void vehs; void lnks; void pols;
     // recarrega vínculos atualizados (sem chamar load() para evitar loop)
     const { data: refreshed } = await supabase
       .from("insurance_policy_vehicles").select("*")
