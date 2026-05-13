@@ -834,6 +834,10 @@ export default function InsurancePanel() {
     const coveredVehicleIds = new Set<string>(
       links.filter((l) => activeIds.has(l.policy_id) && !l.removed_at).map((l) => l.vehicle_id)
     );
+    // Inclui também veículos vinculados manualmente em apólices vigentes
+    manualMatches.forEach((m) => {
+      if (activeIds.has(m.policy_id)) coveredVehicleIds.add(m.vehicle_id);
+    });
     const onlyInPolicy = new Set<string>();
     activePolicies.forEach((p) => {
       const ex: any = p.ai_extracted || {};
@@ -864,8 +868,11 @@ export default function InsurancePanel() {
       vigentes,
       vencendo30,
       vencidas,
+      manualCount: manualMatches.filter((m) => activeIds.has(m.policy_id)).length,
+      externalCount: externalPlates.filter((e) => activeIds.has(e.policy_id)).length,
+      autoCount: Math.max(0, coveredVehicleIds.size - manualMatches.filter((m) => activeIds.has(m.policy_id)).length),
     };
-  }, [policies, links, vehicles]);
+  }, [policies, links, vehicles, manualMatches, externalPlates]);
 
   // === Estatísticas por apólice (para os cards) ===
   const policyStats = useMemo(() => {
