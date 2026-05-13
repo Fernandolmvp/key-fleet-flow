@@ -206,7 +206,7 @@ export default function FuelStations() {
             <div className="space-y-2"><Label>Bandeira</Label>
               <Input placeholder="Ex.: Petrobras, Shell, Ipiranga" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
             </div>
-            <div className="space-y-2"><Label>&nbsp;</Label>
+            <div>
               <CepInput
                 value={form.cep || ""}
                 onChange={(v) => setForm({ ...form, cep: v })}
