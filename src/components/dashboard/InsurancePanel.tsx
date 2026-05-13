@@ -1716,11 +1716,11 @@ export default function InsurancePanel() {
                 )}
                 {orphanPlates.length > 0 && (
                   <RouterLink
-                    to="/app/insurance/orphans"
+                    to="/app/insurance/review-matches"
                     className="w-full flex items-center justify-between p-2 rounded border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-colors text-left"
                   >
                     <span className="flex items-center gap-2 text-sky-400">
-                      <Sparkles className="h-4 w-4" /> {orphanPlates.length} placa(s) coberta(s) por apólice mas SEM cadastro
+                      <Sparkles className="h-4 w-4" /> {orphanPlates.length} placa(s) pendente(s) de revisão manual
                     </span>
                     <ExternalLink className="h-3 w-3 text-sky-400" />
                   </RouterLink>
