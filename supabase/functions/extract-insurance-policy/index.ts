@@ -194,12 +194,15 @@ function normalizePlate(plate: unknown): string {
   return String(plate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-function normalizeVehicle(vehicle: ExtractedVehicle, pageOffset = 0): ExtractedVehicle | null {
+function normalizeVehicle(vehicle: ExtractedVehicle, pageOffset = 0, chunkPageCount?: number): ExtractedVehicle | null {
   const plate = normalizePlate(vehicle?.plate);
   if (!plate) return null;
-  const page = typeof vehicle.page_number === "number" && Number.isFinite(vehicle.page_number)
-    ? Math.max(1, Math.trunc(vehicle.page_number) + pageOffset)
+  const rawPage = typeof vehicle.page_number === "number" && Number.isFinite(vehicle.page_number)
+    ? Math.max(1, Math.trunc(vehicle.page_number))
     : null;
+  const page = rawPage == null
+    ? null
+    : (chunkPageCount && rawPage <= chunkPageCount ? rawPage + pageOffset : rawPage);
   return {
     ...vehicle,
     plate,
@@ -478,7 +481,7 @@ Deno.serve(async (req) => {
               ...part,
               plates: (Array.isArray(part.plates) ? part.plates : []).map(normalizePlate).filter(Boolean),
               vehicles: (Array.isArray(part.vehicles) ? part.vehicles : [])
-                .map((vehicle) => normalizeVehicle(vehicle, chunk.startPage - 1))
+                .map((vehicle) => normalizeVehicle(vehicle, chunk.startPage - 1, chunk.endPage - chunk.startPage + 1))
                 .filter(Boolean) as ExtractedVehicle[],
             } satisfies ExtractedPolicy;
           });
