@@ -134,15 +134,20 @@ Deno.serve(async (req) => {
       ],
       tools: [TOOL],
       toolChoice: { type: "function", function: { name: "extract_insurance_policy" } },
-      timeoutMs: isPdf ? 60_000 : undefined,
+      timeoutMs: isPdf ? 120_000 : 45_000,
     });
 
     if (!result.success) {
       const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
+      const errLower = String(result.errorMessage || "").toLowerCase();
+      const isTimeout = errLower.includes("timeout") || errLower.includes("aborted") || status === 504;
+      const isParse = errLower.includes("unexpected end of json") || errLower.includes("network");
       const userMsg =
-        status === 429 ? "Limite de requisições da IA excedido." :
+        status === 429 ? "Limite de requisições da IA excedido. Tente novamente em instantes." :
         status === 402 ? "Créditos de IA esgotados." :
-        "Falha ao processar apólice";
+        isTimeout ? "Apólice muito grande/complexa — a IA não conseguiu processar dentro do tempo limite. Tente novamente, ou envie a apólice em partes (ex.: separe os endossos)." :
+        isParse ? "Falha de comunicação com a IA ao processar a apólice. Tente novamente em instantes." :
+        "Falha ao processar apólice. Tente novamente; se persistir, envie em partes ou outro formato (PDF nativo, não escaneado).";
       console.error("[extract-insurance-policy] ai-failed", { feature: FEATURE, status, provider: result.providerUsed, error: result.errorMessage });
       return new Response(JSON.stringify({ error: userMsg }), {
         status, headers: { ...corsHeaders, "Content-Type": "application/json" },
