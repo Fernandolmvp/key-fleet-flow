@@ -921,11 +921,25 @@ export default function InsurancePanel() {
 
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
-    const ids = links
+    const v = vehicles.find((x) => x.id === vehicleId);
+    const plateN = normId(v?.plate);
+    const chassisN = normId(v?.chassis);
+    const ids = new Set<string>(links
       .filter((l) => l.vehicle_id === vehicleId)
-      .map((l) => l.policy_id);
+      .map((l) => l.policy_id));
+    // também considera apólices que listam a placa/chassi via IA
+    policies.forEach((p) => {
+      const ex: any = p.ai_extracted || {};
+      const plates: string[] = Array.isArray(ex.plates)
+        ? ex.plates
+        : Array.isArray(ex.vehicles) ? ex.vehicles.map((x: any) => x?.plate).filter(Boolean) : [];
+      const chassisList: string[] = Array.isArray(ex.vehicles)
+        ? ex.vehicles.map((x: any) => x?.chassis).filter(Boolean) : [];
+      if (plateN && plates.some((pl) => normId(pl) === plateN)) ids.add(p.id);
+      if (chassisN && chassisList.some((c) => normId(c) === chassisN)) ids.add(p.id);
+    });
     return policies.filter((p) => {
-      if (!ids.includes(p.id)) return false;
+      if (!ids.has(p.id)) return false;
       if (p.status !== "ativa") return false;
       if (!p.end_date) return true;
       return new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString());
