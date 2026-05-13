@@ -73,6 +73,7 @@ const TOOL = {
               insured_amount: { type: ["number", "null"], description: "Importância segurada / valor do casco para este veículo" },
               premium: { type: ["number", "null"], description: "Prêmio individual deste veículo, se discriminado" },
               deductible: { type: ["number", "null"], description: "Franquia específica deste veículo, se diferente da padrão" },
+        renavam: { type: ["string", "null"], description: "RENAVAM do veículo (apenas dígitos), se visível" },
               inclusion_type: { type: ["string", "null"], enum: ["apolice", "adendo", null], description: "'adendo' se foi incluído por endosso após emissão; 'apolice' se está na lista original" },
               endorsement_number: { type: ["string", "null"] },
               coverage_notes: { type: ["string", "null"], description: "Observação curta sobre coberturas/limites específicos deste veículo" },
@@ -403,63 +404,120 @@ Deno.serve(async (req) => {
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
     const isPdf = (mimeType || "").toLowerCase().includes("pdf");
     const sys =
-      "Você é especialista em apólices de seguro de frota brasileiras (Porto, Bradesco, Allianz, Tokio, Sompo, HDI, Mapfre, Liberty, Suhai, etc.). Leia a apólice INTEIRA — TODAS as páginas, incluindo a relação de bens segurados, endossos, adendos e cláusulas. Extraia: número da apólice, seguradora (telefone/email/CNPJ), segurado (nome/CNPJ), vigência (início/fim/emissão), prêmio total, prêmio líquido, IOF, parcelas, franquia padrão, corretor (nome, CNPJ, SUSEP, telefone, email), coberturas principais com limites, e a LISTA COMPLETA E DETALHADA de TODOS os veículos cobertos (placa, marca, modelo, ano, FIPE, chassi, importância segurada, prêmio individual quando discriminado). Inclua veículos adicionados por endosso/adendo marcando inclusion_type='adendo'. Placas SEMPRE em maiúsculas, sem hífen/espaços. Datas em ISO YYYY-MM-DD. NUNCA invente placas — se não tiver certeza, omita.";
+      "Você é especialista em apólices de seguro de frota brasileiras (Porto, Bradesco, Allianz, Tokio, Sompo, HDI, Mapfre, Liberty, Suhai, etc.). Leia a apólice INTEIRA — TODAS as páginas, incluindo a relação de bens segurados, endossos, adendos e cláusulas. Extraia: número da apólice, seguradora (telefone/email/CNPJ), segurado (nome/CNPJ), vigência (início/fim/emissão), prêmio total, prêmio líquido, IOF, parcelas, franquia padrão, corretor (nome, CNPJ, SUSEP, telefone, email), coberturas principais com limites, e a LISTA COMPLETA E DETALHADA de TODOS os veículos cobertos (placa, marca, modelo, ano, FIPE, chassi, RENAVAM, importância segurada, prêmio individual quando discriminado). Inclua veículos adicionados por endosso/adendo marcando inclusion_type='adendo'. Placas SEMPRE em maiúsculas, sem hífen/espaços. Datas em ISO YYYY-MM-DD. NUNCA invente placas — se não tiver certeza, omita.";
 
-    // Para PDFs: usar input_file (Gemini lê o documento inteiro). Para imagens: image_url.
-    const userContent: any[] = [
-      { type: "text", text: "Extraia TODOS os dados visíveis do documento e retorne pela function call. Não resuma a lista de veículos — inclua TODOS." },
-    ];
+    const callSingleExtraction = async () => {
+      const userContent: any[] = [
+        { type: "text", text: "Extraia TODOS os dados visíveis do documento e retorne pela function call. Não resuma a lista de veículos — inclua TODOS." },
+      ];
+      if (isPdf) {
+        userContent.push({ type: "file", file: { filename: "apolice.pdf", file_data: dataUrl } });
+      } else {
+        userContent.push({ type: "image_url", image_url: { url: dataUrl } });
+      }
+
+      return await callAi({
+        ctx,
+        feature: FEATURE,
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: userContent },
+        ],
+        tools: [TOOL],
+        toolChoice: { type: "function", function: { name: "extract_insurance_policy" } },
+        timeoutMs: isPdf ? PDF_CHUNK_TIMEOUT_MS : 45_000,
+      });
+    };
+
+    let parsed: ExtractedPolicy | null = null;
+    let chunkMeta: { totalPages: number; chunks: number } | null = null;
+
     if (isPdf) {
-      userContent.push({
-        type: "file",
-        file: { filename: "apolice.pdf", file_data: dataUrl },
-      });
+      try {
+        const pdfBytes = decodeBase64(fileBase64);
+        const pdfChunks = await splitPdfIntoChunks(pdfBytes);
+        const totalPages = pdfChunks[0]?.totalPages ?? 0;
+        const shouldChunk = pdfChunks.length > 1 && (totalPages > PDF_CHUNK_PAGE_THRESHOLD || pdfBytes.byteLength >= PDF_CHUNK_BYTES_THRESHOLD);
+
+        if (shouldChunk) {
+          chunkMeta = { totalPages, chunks: pdfChunks.length };
+          console.log("[extract-insurance-policy] chunked:start", {
+            feature: FEATURE,
+            requestId: ctx.requestId,
+            totalPages,
+            chunks: pdfChunks.length,
+            approxBytes: pdfBytes.byteLength,
+          });
+
+          const partials = await mapWithConcurrency(pdfChunks, PDF_CHUNK_CONCURRENCY, async (chunk) => {
+            const chunkDataUrl = `data:application/pdf;base64,${encodeBase64(chunk.bytes)}`;
+            const chunkUserContent = [
+              {
+                type: "text",
+                text:
+                  `Estas são apenas as páginas ${chunk.startPage}-${chunk.endPage} de ${chunk.totalPages} da apólice. ` +
+                  "Extraia SOMENTE o que estiver visível neste trecho. Se um campo não aparecer aqui, retorne null. Inclua todas as placas/veículos destas páginas.",
+              },
+              { type: "file", file: { filename: `apolice_parte_${chunk.index + 1}.pdf`, file_data: chunkDataUrl } },
+            ];
+
+            const chunkResult = await callAi({
+              ctx,
+              feature: FEATURE,
+              messages: [
+                { role: "system", content: sys },
+                { role: "user", content: chunkUserContent },
+              ],
+              tools: [CHUNK_TOOL],
+              toolChoice: { type: "function", function: { name: "extract_insurance_policy_chunk" } },
+              timeoutMs: PDF_CHUNK_TIMEOUT_MS,
+            });
+
+            const part = await parseFunctionArguments(chunkResult, "extract_insurance_policy_chunk");
+            return {
+              ...part,
+              plates: (Array.isArray(part.plates) ? part.plates : []).map(normalizePlate).filter(Boolean),
+              vehicles: (Array.isArray(part.vehicles) ? part.vehicles : [])
+                .map((vehicle) => normalizeVehicle(vehicle, chunk.startPage - 1))
+                .filter(Boolean) as ExtractedVehicle[],
+            } satisfies ExtractedPolicy;
+          });
+
+          parsed = mergePolicies(partials);
+        }
+      } catch (chunkError) {
+        console.warn("[extract-insurance-policy] chunked:unavailable", {
+          feature: FEATURE,
+          requestId: ctx.requestId,
+          error: String((chunkError as Error)?.message ?? chunkError),
+        });
+      }
+    }
+
+    if (!parsed) {
+      const result = await callSingleExtraction();
+      if (!result.success) {
+        const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
+        const errLower = String(result.errorMessage || "").toLowerCase();
+        const isTimeout = errLower.includes("timeout") || errLower.includes("aborted") || status === 504;
+        const isParse = errLower.includes("unexpected end of json") || errLower.includes("network");
+        const userMsg =
+          status === 429 ? "Limite de requisições da IA excedido. Tente novamente em instantes." :
+          status === 402 ? "Créditos de IA esgotados." :
+          isTimeout ? "Apólice grande/escaneada demais para leitura em bloco. Agora o sistema já tenta quebrar o PDF automaticamente, mas este arquivo ainda excedeu o limite. Tente reenviar; se persistir, envie em partes (ex.: apólice e endossos separados)." :
+          isParse ? "Falha de comunicação com a IA ao processar a apólice. Tente novamente em instantes." :
+          "Falha ao processar apólice. Tente novamente; se persistir, envie em partes ou outro formato (PDF nativo, não escaneado).";
+        console.error("[extract-insurance-policy] ai-failed", { feature: FEATURE, status, provider: result.providerUsed, error: result.errorMessage });
+        return new Response(JSON.stringify({ error: userMsg }), {
+          status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      parsed = await parseFunctionArguments(result, "extract_insurance_policy");
+      console.log("[extract-insurance-policy] success", { feature: FEATURE, requestId: ctx.requestId, provider: result.providerUsed, model: result.modelUsed, fallback: result.wasFallback, tokensTotal: result.tokensTotal, mode: "single" });
     } else {
-      userContent.push({ type: "image_url", image_url: { url: dataUrl } });
+      console.log("[extract-insurance-policy] success", { feature: FEATURE, requestId: ctx.requestId, mode: "chunked", totalPages: chunkMeta?.totalPages ?? null, chunks: chunkMeta?.chunks ?? null, vehicles: Array.isArray(parsed.vehicles) ? parsed.vehicles.length : 0 });
     }
-
-    const result = await callAi({
-      ctx, feature: FEATURE,
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: userContent },
-      ],
-      tools: [TOOL],
-      toolChoice: { type: "function", function: { name: "extract_insurance_policy" } },
-      timeoutMs: isPdf ? 120_000 : 45_000,
-    });
-
-    if (!result.success) {
-      const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
-      const errLower = String(result.errorMessage || "").toLowerCase();
-      const isTimeout = errLower.includes("timeout") || errLower.includes("aborted") || status === 504;
-      const isParse = errLower.includes("unexpected end of json") || errLower.includes("network");
-      const userMsg =
-        status === 429 ? "Limite de requisições da IA excedido. Tente novamente em instantes." :
-        status === 402 ? "Créditos de IA esgotados." :
-        isTimeout ? "Apólice muito grande/complexa — a IA não conseguiu processar dentro do tempo limite. Tente novamente, ou envie a apólice em partes (ex.: separe os endossos)." :
-        isParse ? "Falha de comunicação com a IA ao processar a apólice. Tente novamente em instantes." :
-        "Falha ao processar apólice. Tente novamente; se persistir, envie em partes ou outro formato (PDF nativo, não escaneado).";
-      console.error("[extract-insurance-policy] ai-failed", { feature: FEATURE, status, provider: result.providerUsed, error: result.errorMessage });
-      return new Response(JSON.stringify({ error: userMsg }), {
-        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const call = result.data?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!call?.function?.arguments) {
-      return new Response(JSON.stringify({ error: "IA não conseguiu extrair dados." }), {
-        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    let parsed: Record<string, unknown> = {};
-    try { parsed = JSON.parse(call.function.arguments); }
-    catch {
-      return new Response(JSON.stringify({ error: "Resposta da IA inválida" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    console.log("[extract-insurance-policy] success", { feature: FEATURE, requestId: ctx.requestId, provider: result.providerUsed, model: result.modelUsed, fallback: result.wasFallback, tokensTotal: result.tokensTotal });
 
     return new Response(JSON.stringify({ data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
