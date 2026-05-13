@@ -951,7 +951,7 @@ export default function InsurancePanel() {
     const isVigente = (p: Policy) =>
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
-    const registered = new Set(vehicles.map((v) => normId(v.plate)));
+    const registeredPlates = new Set(vehicles.map((v) => normPlate(v.plate)).filter(Boolean));
     const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
     for (const p of policies.filter(isVigente)) {
       const ex: any = p.ai_extracted || {};
@@ -959,8 +959,14 @@ export default function InsurancePanel() {
         ? ex.vehicles
         : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
       for (const a of list) {
-        const key = normId(a.plate);
-        if (!key || registered.has(key)) continue;
+        const key = normPlate(a.plate);
+        if (!key) continue;
+        if (registeredPlates.has(key)) continue;
+        // antes de marcar como órfã, tenta cruzar por chassi/renavam
+        const matchedByVin = vehicles.some(
+          (v) => chassisMatch(v.chassis, a.chassis) || renavamEq(v.renavam, (a as any).renavam),
+        );
+        if (matchedByVin) continue;
         if (!map.has(key)) map.set(key, { plate: (a.plate || key).toUpperCase(), entries: [] });
         map.get(key)!.entries.push({ policy: p, ai: a });
       }
