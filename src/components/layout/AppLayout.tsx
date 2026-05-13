@@ -40,7 +40,7 @@ const nav: NavEntry[] = [
       { to: "/app/maintenance", label: "Manutenção", icon: Wrench, module: "maintenance" },
       { to: "/app/sinistros", label: "Sinistros", icon: CarFront, soon: true },
       { to: "/app/despesas", label: "Despesas", icon: Receipt, soon: true },
-      { to: "/app/multas", label: "Multas", icon: AlertTriangle, soon: true },
+      { to: "/app/multas", label: "Multas", icon: AlertTriangle },
       { to: "/app/checklists", label: "Checklists", icon: ClipboardList, module: "checklists" },
       { to: "/app/tires", label: "Pneus", icon: CircleDot, module: "tires" },
       { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents", module: "documents" },
