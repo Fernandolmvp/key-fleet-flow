@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Plus, Search, Sparkles, ShieldCheck } from "lucide-react";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { toast } from "sonner";
+import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
 
 type Policy = {
   id: string;
@@ -20,17 +21,22 @@ type Policy = {
   status: string;
   ai_extracted: any;
 };
-type AiVehicle = { plate: string; brand?: string | null; model?: string | null; year?: string | null; chassis?: string | null };
+type AiVehicle = { plate: string; brand?: string | null; model?: string | null; year?: string | null; chassis?: string | null; renavam?: string | null };
 type OrphanRow = { plate: string; ai: AiVehicle; policy: Policy };
 
 const normId = (s?: string | null) =>
   String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const chassisMatch = (a?: string|null, b?: string|null) => {
+  const x = normChassis(a), y = normChassis(b);
+  return !!x && !!y && (x === y || x.slice(-8) === y.slice(-8));
+};
 
 export default function InsuranceOrphans() {
   const { currentCompanyId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [registeredPlates, setRegisteredPlates] = useState<Set<string>>(new Set());
+  const [vehiclesData, setVehiclesData] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,10 +49,11 @@ export default function InsuranceOrphans() {
     const [p, v] = await Promise.all([
       supabase.from("insurance_policies").select("id,policy_number,insurer_name,start_date,end_date,status,ai_extracted")
         .eq("company_id", currentCompanyId).eq("status", "ativa"),
-      supabase.from("vehicles").select("plate").eq("company_id", currentCompanyId),
+      supabase.from("vehicles").select("plate,chassis,renavam").eq("company_id", currentCompanyId),
     ]);
     setPolicies((p.data as any[]) || []);
-    setRegisteredPlates(new Set(((v.data as any[]) || []).map((r) => normId(r.plate))));
+    setVehiclesData((v.data as any[]) || []);
+    setRegisteredPlates(new Set(((v.data as any[]) || []).map((r) => normalizePlate(r.plate)).filter(Boolean)));
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
@@ -61,13 +68,20 @@ export default function InsuranceOrphans() {
         ? ex.vehicles
         : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
       for (const a of list) {
-        const key = normId(a.plate);
-        if (!key || registeredPlates.has(key)) continue;
+        const key = normalizePlate(a.plate);
+        if (!key) continue;
+        if (registeredPlates.has(key)) continue;
+        // descarta se chassi/renavam já existe em algum veículo cadastrado
+        const matchedByVin = vehiclesData.some(
+          (v) => chassisMatch(v.chassis, a.chassis) ||
+                 (normRenavam(v.renavam) && normRenavam(v.renavam) === normRenavam(a.renavam)),
+        );
+        if (matchedByVin) continue;
         rows.push({ plate: (a.plate || key).toUpperCase(), ai: a, policy: p });
       }
     }
     return rows.sort((x, y) => x.plate.localeCompare(y.plate));
-  }, [policies, registeredPlates]);
+  }, [policies, registeredPlates, vehiclesData]);
 
   const filtered = useMemo(() => {
     const q = normId(search);

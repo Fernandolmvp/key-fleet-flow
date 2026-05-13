@@ -3889,6 +3889,7 @@ export type Database = {
           insurer: string | null
           licensing_year: number | null
           model: string
+          normalized_plate: string | null
           notes: string | null
           owner_doc: string | null
           owner_name: string | null
@@ -3943,6 +3944,7 @@ export type Database = {
           insurer?: string | null
           licensing_year?: number | null
           model: string
+          normalized_plate?: string | null
           notes?: string | null
           owner_doc?: string | null
           owner_name?: string | null
@@ -3997,6 +3999,7 @@ export type Database = {
           insurer?: string | null
           licensing_year?: number | null
           model?: string
+          normalized_plate?: string | null
           notes?: string | null
           owner_doc?: string | null
           owner_name?: string | null
@@ -4285,6 +4288,25 @@ export type Database = {
         }
         Returns: undefined
       }
+      match_policies_for_vehicle: {
+        Args: { _vehicle_id: string }
+        Returns: {
+          match_by: string
+          policy_id: string
+        }[]
+      }
+      match_vehicles_for_ai_plate: {
+        Args: {
+          _chassis?: string
+          _company_id: string
+          _plate: string
+          _renavam?: string
+        }
+        Returns: {
+          match_by: string
+          vehicle_id: string
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -4294,6 +4316,7 @@ export type Database = {
         }
         Returns: number
       }
+      normalize_plate: { Args: { p: string }; Returns: string }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {

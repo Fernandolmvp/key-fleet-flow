@@ -16,9 +16,10 @@ import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
+import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
 
 type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
-type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; vehicle_type: string | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; renavam: string | null; vehicle_type: string | null };
 type AiVehicle = {
   plate: string;
   brand?: string | null;
@@ -26,6 +27,7 @@ type AiVehicle = {
   year?: string | null;
   fipe_code?: string | null;
   chassis?: string | null;
+  renavam?: string | null;
   insured_amount?: number | null;
   premium?: number | null;
   deductible?: number | null;
@@ -75,9 +77,22 @@ const COVERAGE_TYPES: { value: string; label: string }[] = [
 const coverageTypeLabel = (v?: string | null) =>
   COVERAGE_TYPES.find((c) => c.value === v)?.label || null;
 
-/** Normaliza placa/chassi: maiúsculas e somente A-Z/0-9. */
+/** Normaliza string: maiúsculas e somente A-Z/0-9. (uso geral / chassi). */
 function normId(s?: string | null): string {
   return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+/** Normaliza placa para formato Mercosul (cruza placas antigas e novas do mesmo carro). */
+const normPlate = (s?: string | null) => normalizePlate(s);
+/** Igualdade chassi: exato OU últimos 8 dígitos. */
+function chassisMatch(a?: string | null, b?: string | null): boolean {
+  const x = normChassis(a), y = normChassis(b);
+  if (!x || !y) return false;
+  return x === y || x.slice(-8) === y.slice(-8);
+}
+/** Igualdade RENAVAM (somente dígitos). */
+function renavamEq(a?: string | null, b?: string | null): boolean {
+  const x = normRenavam(a), y = normRenavam(b);
+  return !!x && x === y;
 }
 
 /** Detecta se uma apólice veio de importação por IA.
@@ -135,24 +150,17 @@ type MatchResult = {
 
 /** Busca o veículo cadastrado correspondente: 1) por placa, 2) fallback por chassi. Detecta inconsistência. */
 function matchAiVehicle(ai: AiVehicle, vehicles: Vehicle[]): MatchResult {
-  const aiPlate = normId(ai.plate);
-  const aiChassis = normId(ai.chassis);
+  const aiPlateN = normPlate(ai.plate);
 
+  // 1) placa Mercosul-normalizada (cruza placa antiga e nova do MESMO carro)
   let v: Vehicle | undefined;
-  if (aiPlate) v = vehicles.find((x) => normId(x.plate) === aiPlate);
-  if (!v && aiChassis) v = vehicles.find((x) => normId(x.chassis) === aiChassis);
+  if (aiPlateN) v = vehicles.find((x) => normPlate(x.plate) === aiPlateN);
+  // 2) chassi (exato ou últimos 8)
+  if (!v && ai.chassis) v = vehicles.find((x) => chassisMatch(x.chassis, ai.chassis));
+  // 3) RENAVAM exato
+  if (!v && (ai as any).renavam) v = vehicles.find((x) => renavamEq(x.renavam, (ai as any).renavam));
 
   if (!v) return { ai, vehicle: null, status: "not_found" };
-
-  // Inconsistência: ambos os lados têm placa+chassi e algum não confere
-  const dbPlate = normId(v.plate);
-  const dbChassis = normId(v.chassis);
-  if (aiPlate && dbPlate && aiPlate !== dbPlate) {
-    return { ai, vehicle: v, status: "mismatch", reason: `Placa do banco (${v.plate}) ≠ placa da apólice (${ai.plate})` };
-  }
-  if (aiChassis && dbChassis && aiChassis !== dbChassis) {
-    return { ai, vehicle: v, status: "mismatch", reason: `Chassi do banco (${v.chassis}) ≠ chassi da apólice (${ai.chassis})` };
-  }
   return { ai, vehicle: v, status: "linked" };
 }
 
@@ -294,7 +302,7 @@ export default function InsurancePanel() {
     const [p, b, v, l] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
-      supabase.from("vehicles").select("id,plate,brand,model,status,chassis,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,status,chassis,renavam,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
     ]);
     if (p.error) toast.error(p.error.message);
@@ -943,7 +951,7 @@ export default function InsurancePanel() {
     const isVigente = (p: Policy) =>
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
-    const registered = new Set(vehicles.map((v) => normId(v.plate)));
+    const registeredPlates = new Set(vehicles.map((v) => normPlate(v.plate)).filter(Boolean));
     const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
     for (const p of policies.filter(isVigente)) {
       const ex: any = p.ai_extracted || {};
@@ -951,8 +959,14 @@ export default function InsurancePanel() {
         ? ex.vehicles
         : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
       for (const a of list) {
-        const key = normId(a.plate);
-        if (!key || registered.has(key)) continue;
+        const key = normPlate(a.plate);
+        if (!key) continue;
+        if (registeredPlates.has(key)) continue;
+        // antes de marcar como órfã, tenta cruzar por chassi/renavam
+        const matchedByVin = vehicles.some(
+          (v) => chassisMatch(v.chassis, a.chassis) || renavamEq(v.renavam, (a as any).renavam),
+        );
+        if (matchedByVin) continue;
         if (!map.has(key)) map.set(key, { plate: (a.plate || key).toUpperCase(), entries: [] });
         map.get(key)!.entries.push({ policy: p, ai: a });
       }
@@ -971,15 +985,21 @@ export default function InsurancePanel() {
     if (globalSearchMode !== "veiculo") return null;
     const term = normId(globalSearch);
     if (!term || term.length < 3) return null;
+    const termPlate = normPlate(globalSearch);
+    const termRen = normRenavam(globalSearch);
     const today = new Date();
     const isVigente = (p: Policy) =>
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
 
     const matchedVehicles = vehicles.filter(
-      (v) => normId(v.plate).includes(term) || (v.chassis && normId(v.chassis).includes(term))
+      (v) =>
+        normPlate(v.plate).includes(term) ||
+        (termPlate && normPlate(v.plate) === termPlate) ||
+        (v.chassis && normChassis(v.chassis).includes(term)) ||
+        (termRen && renavamEq(v.renavam, termRen)),
     );
-    const matchedPlates = new Set(matchedVehicles.map((v) => normId(v.plate)));
+    const matchedPlates = new Set(matchedVehicles.map((v) => normPlate(v.plate)));
 
     const policyHits = new Map<string, { policy: Policy; ai: AiVehicle }[]>();
     for (const p of policies.filter(isVigente)) {
@@ -988,9 +1008,13 @@ export default function InsurancePanel() {
         ? ex.vehicles
         : (Array.isArray(ex.plates) ? ex.plates.map((pl: string) => ({ plate: pl } as AiVehicle)) : []);
       for (const a of list) {
-        const ap = normId(a.plate);
-        const ac = normId(a.chassis);
-        const hit = (ap && ap.includes(term)) || (ac && ac.includes(term));
+        const ap = normPlate(a.plate);
+        const ac = normChassis(a.chassis);
+        const ar = normRenavam((a as any).renavam);
+        const hit =
+          (ap && (ap.includes(term) || (termPlate && ap === termPlate))) ||
+          (ac && ac.includes(term)) ||
+          (!!termRen && ar === termRen);
         if (!hit) continue;
         const key = ap || ac;
         if (!key) continue;
@@ -1009,9 +1033,14 @@ export default function InsurancePanel() {
     for (const [key, entries] of policyHits) {
       // se a placa exata já corresponde a um veículo cadastrado, foi tratada acima
       if (matchedPlates.has(key)) continue;
-      const isRegistered = vehicles.some((v) => normId(v.plate) === key);
-      if (isRegistered) continue;
       const ai0 = entries[0].ai;
+      const isRegistered = vehicles.some(
+        (v) =>
+          normPlate(v.plate) === key ||
+          chassisMatch(v.chassis, ai0.chassis) ||
+          renavamEq(v.renavam, (ai0 as any).renavam),
+      );
+      if (isRegistered) continue;
       results.push({ kind: "scenario3", plate: (ai0.plate || key).toUpperCase(), entries });
     }
     if (results.length === 0) results.push({ kind: "scenario4", term: globalSearch });
@@ -1022,8 +1051,8 @@ export default function InsurancePanel() {
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
     const v = vehicles.find((x) => x.id === vehicleId);
-    const plateN = normId(v?.plate);
-    const chassisN = normId(v?.chassis);
+    const plateN = normPlate(v?.plate);
+    const renavamN = normRenavam(v?.renavam);
     const ids = new Set<string>(links
       .filter((l) => l.vehicle_id === vehicleId)
       .map((l) => l.policy_id));
@@ -1035,8 +1064,11 @@ export default function InsurancePanel() {
         : Array.isArray(ex.vehicles) ? ex.vehicles.map((x: any) => x?.plate).filter(Boolean) : [];
       const chassisList: string[] = Array.isArray(ex.vehicles)
         ? ex.vehicles.map((x: any) => x?.chassis).filter(Boolean) : [];
-      if (plateN && plates.some((pl) => normId(pl) === plateN)) ids.add(p.id);
-      if (chassisN && chassisList.some((c) => normId(c) === chassisN)) ids.add(p.id);
+      const renavamList: string[] = Array.isArray(ex.vehicles)
+        ? ex.vehicles.map((x: any) => x?.renavam).filter(Boolean) : [];
+      if (plateN && plates.some((pl) => normPlate(pl) === plateN)) ids.add(p.id);
+      if (v?.chassis && chassisList.some((c) => chassisMatch(c, v.chassis))) ids.add(p.id);
+      if (renavamN && renavamList.some((r) => renavamEq(r, renavamN))) ids.add(p.id);
     });
     return policies.filter((p) => {
       if (!ids.has(p.id)) return false;

@@ -1,180 +1,193 @@
 ## Objetivo
 
-Melhorar a busca por placa/chassi na aba "Visão Geral" de `/app/insurance` para cobrir 4 cenários (cadastrado+coberto, cadastrado sem cobertura, **placa em apólice mas não cadastrada**, e nada encontrado), expor "placas órfãs" como KPI/alerta e criar uma tela dedicada para cadastrá-las (em lote ou individual).
+Vincular veículos e apólices considerando que a placa antiga (`AAA-9999`) e a Mercosul (`AAA9A99`) podem representar o **mesmo carro**. O cruzamento passa a usar 3 critérios em paralelo: **placa normalizada**, **chassi** (exato ou últimos 8) e **RENAVAM**.
 
-## Mockups
+Boa notícia: `vehicles` já tem `chassis` e `renavam`. Não precisa adicionar essas colunas.
 
-### Cards do resultado de busca (4 cenários)
+## Migration (nova)
 
-```text
-┌─ CENÁRIO 1 — verde ────────────────────────────────────────┐
-│ ✅ ABC1D23 — Honda Civic 2020                              │
-│    Coberto por: Porto Seguro · Apólice 12345               │
-│    Vigência: 01/01/2026 → 31/12/2026 · Cobertura: Compreensivo│
-│    [Ver detalhes da apólice]                               │
-└────────────────────────────────────────────────────────────┘
+`supabase/migrations/<timestamp>_normalize_plate_matching.sql`
 
-┌─ CENÁRIO 2 — âmbar ────────────────────────────────────────┐
-│ ⚠️ ABC1D23 — Honda Civic 2020                              │
-│    SEM COBERTURA ATIVA                                     │
-│    [Adicionar a uma apólice]   [Importar nova apólice]     │
-└────────────────────────────────────────────────────────────┘
+```sql
+-- 1. Normalizador (SECURITY DEFINER, IMMUTABLE)
+create or replace function public.normalize_plate(p text)
+returns text
+language plpgsql
+immutable
+security definer
+set search_path = public
+as $$
+declare
+  s text;
+  c char;
+  m text;
+begin
+  if p is null then return null; end if;
+  s := upper(regexp_replace(p, '[^A-Za-z0-9]', '', 'g'));
+  if length(s) <> 7 then
+    return s;                       -- devolve o que tiver, sem inventar
+  end if;
+  -- já é Mercosul (5º char é letra)?
+  if substring(s,5,1) ~ '[A-Z]' then
+    return s;
+  end if;
+  -- antiga AAA9999 -> AAA9A99 (5º dígito vira letra: 0->A..9->J)
+  if s ~ '^[A-Z]{3}[0-9]{4}$' then
+    c := substring(s,5,1);
+    m := chr(ascii('A') + (c::int));
+    return substring(s,1,4) || m || substring(s,6,2);
+  end if;
+  return s;
+end
+$$;
 
-┌─ CENÁRIO 3 — azul informativo (NOVO) ──────────────────────┐
-│ 💡 Veículo NÃO cadastrado no sistema                       │
-│    Placa identificada na apólice: ABC1D23                  │
-│    Modelo (apólice): Honda Civic                           │
-│    Apólice: Porto Seguro 12345 · Vigência 01/01–31/12/2026 │
-│    [★ Cadastrar este veículo na frota]   [Ver apólice]     │
-│    (se houver mais de uma apólice cobrindo a placa, lista) │
-└────────────────────────────────────────────────────────────┘
+-- 2. Coluna gerada em vehicles
+alter table public.vehicles
+  add column if not exists normalized_plate text
+  generated always as (public.normalize_plate(plate)) stored;
 
-┌─ CENÁRIO 4 — vermelho ─────────────────────────────────────┐
-│ ❌ Nenhum veículo nem apólice para "XXX"                   │
-│    [Cadastrar veículo novo]   [Importar nova apólice]      │
-└────────────────────────────────────────────────────────────┘
+create index if not exists idx_vehicles_normalized_plate
+  on public.vehicles (company_id, normalized_plate);
+create index if not exists idx_vehicles_renavam
+  on public.vehicles (company_id, renavam);
+
+-- 3. Match: apólices que cobrem um veículo (cruza por placa norm/chassi/renavam
+--    direto no JSONB ai_extracted das apólices ativas + vínculos manuais)
+create or replace function public.match_policies_for_vehicle(_vehicle_id uuid)
+returns table (
+  policy_id uuid,
+  match_by  text         -- 'plate' | 'chassis' | 'renavam' | 'link'
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with v as (
+    select id, company_id, normalized_plate,
+           upper(regexp_replace(coalesce(chassis,''), '[^A-Za-z0-9]', '', 'g')) as chs,
+           regexp_replace(coalesce(renavam,''), '[^0-9]', '', 'g') as rnv
+    from public.vehicles where id = _vehicle_id
+  ),
+  ai as (
+    select p.id as policy_id, av.*
+    from public.insurance_policies p, v,
+         lateral jsonb_array_elements(coalesce(p.ai_extracted->'vehicles','[]'::jsonb)) as a(elem)
+    cross join lateral (select
+      public.normalize_plate(a.elem->>'plate')                                as np,
+      upper(regexp_replace(coalesce(a.elem->>'chassis',''),'[^A-Za-z0-9]','','g')) as ch,
+      regexp_replace(coalesce(a.elem->>'renavam',''),'[^0-9]','','g')          as rn
+    ) av
+    where p.company_id = v.company_id
+      and p.status = 'ativa'
+      and (p.end_date is null or p.end_date >= current_date)
+  )
+  select policy_id, 'plate'   from ai, v where ai.np is not null and ai.np = v.normalized_plate
+  union
+  select policy_id, 'chassis' from ai, v where v.chs <> '' and ai.ch <> ''
+                                            and (ai.ch = v.chs or right(ai.ch,8) = right(v.chs,8))
+  union
+  select policy_id, 'renavam' from ai, v where v.rnv <> '' and ai.rn = v.rnv
+  union
+  select ipv.policy_id, 'link'
+    from public.insurance_policy_vehicles ipv
+    where ipv.vehicle_id = _vehicle_id and ipv.removed_at is null;
+$$;
+
+-- 4. Inverso: dado um veículo "AI" da apólice, achar veículos compatíveis
+create or replace function public.match_vehicles_for_ai_plate(
+  _company_id uuid, _plate text, _chassis text default null, _renavam text default null
+) returns table (vehicle_id uuid, match_by text)
+language sql stable security definer set search_path = public as $$
+  with t as (
+    select public.normalize_plate(_plate) as np,
+           upper(regexp_replace(coalesce(_chassis,''),'[^A-Za-z0-9]','','g')) as ch,
+           regexp_replace(coalesce(_renavam,''),'[^0-9]','','g') as rn
+  )
+  select v.id, 'plate'   from public.vehicles v, t
+    where v.company_id = _company_id and t.np is not null and v.normalized_plate = t.np
+  union
+  select v.id, 'chassis' from public.vehicles v, t
+    where v.company_id = _company_id and t.ch <> ''
+      and upper(regexp_replace(coalesce(v.chassis,''),'[^A-Za-z0-9]','','g'))
+          in (t.ch, right(t.ch,8))
+  union
+  select v.id, 'renavam' from public.vehicles v, t
+    where v.company_id = _company_id and t.rn <> ''
+      and regexp_replace(coalesce(v.renavam,''),'[^0-9]','','g') = t.rn;
+$$;
 ```
 
-### Card "Cobertura da Frota" atualizado
+`ai_extracted` continua imutável (a trigger existente bloqueia mudanças). Só adicionamos coluna gerada e funções de leitura.
 
-```text
-┌─ Cobertura da Frota ───────────────────────────────────────┐
-│  ✅ 47   COM apólice (verde)                               │
-│  ❌ 52   SEM apólice (vermelho)                            │
-│  💡  X   Em apólice mas SEM cadastro  →  [Ver placas órfãs]│
-└────────────────────────────────────────────────────────────┘
+## Como muda o frontend
+
+Tudo passa a usar `normalize_plate` no cliente (helper TS espelhando a função SQL) **e** chamadas opcionais às funções RPC para confirmar match por chassi/renavam.
+
+`src/lib/plate.ts` (novo, 20 linhas)
+```ts
+export function normalizePlate(p?: string|null): string {
+  if (!p) return "";
+  const s = p.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if (s.length !== 7) return s;
+  if (/[A-Z]/.test(s[4])) return s;
+  if (/^[A-Z]{3}[0-9]{4}$/.test(s)) {
+    return s.slice(0,4) + String.fromCharCode(65 + Number(s[4])) + s.slice(5);
+  }
+  return s;
+}
+export const normChassis = (c?: string|null) =>
+  (c||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+export const normRenavam = (r?: string|null) =>
+  (r||"").replace(/[^0-9]/g,"");
 ```
 
-### "Alertas Críticos" — novo item
+Arquivos que substituem `normId(plate)` por `normalizePlate(plate)` e adicionam fallback por chassi/renavam:
+- `src/components/dashboard/InsurancePanel.tsx` — `smartSearchResults`, `useOrphanPlates`, badge "Vinculado por: placa | chassi | renavam".
+- `src/pages/app/insurance/Orphans.tsx` — antes de listar como órfã, descarta placas cujo chassi/renavam bate com algum `vehicles`.
+- `src/components/dashboard/VehicleDialog.tsx` — campo **RENAVAM** (já existe coluna), tooltip "Recomendamos preencher chassi e RENAVAM para vinculação automática mesmo se a placa mudar".
 
-```text
-• X placa(s) coberta(s) por apólice mas SEM cadastro no sistema
-  [Abrir lista]
-```
+Sem mudança em `ai_extracted`, sem alterar `plate` original do usuário.
 
-### Tela `/app/insurance/orphans`
-
-```text
-☐ Placa     Modelo (apólice)   Apólice   Seguradora    Vigência              Ação
-☐ ABC1D23   Honda Civic        12345     Porto Seguro  01/01/26 → 31/12/26   [Cadastrar]
-☐ DEF4G56   Fiat Strada        12345     Porto Seguro  01/01/26 → 31/12/26   [Cadastrar]
-
-[Cadastrar selecionados em lote]
-```
-
-## Detalhes técnicos
-
-### Busca paralela (frontend, sem migration)
-
-Toda a busca acontece no cliente sobre dados que já são carregados em `InsurancePanel.load()` (`policies`, `vehicles`, `links`). Para o Cenário 3, o lookup usa as placas/veículos extraídos pela IA na apólice (`ai_extracted.plates`, `ai_extracted.vehicles`) — fonte de verdade já presente.
-
-Pseudo-código do hook de busca:
+## Query de busca (resumo)
 
 ```ts
-const term = normId(input);                     // upper, sem hífen, A-Z0-9
-const last8 = term.slice(-8);
+const term = normalizePlate(input);     // Mercosul-normalizado
+const last8 = normChassis(input).slice(-8);
 
-// 1. veículos cadastrados
-const vehiclesHit = vehicles.filter(v =>
-  normId(v.plate).includes(term) ||
-  (v.chassis && normId(v.chassis).includes(last8))
+vehicles.filter(v =>
+  v.normalized_plate === term ||
+  (normChassis(v.chassis) && normChassis(v.chassis).includes(last8)) ||
+  (normRenavam(v.renavam) && normRenavam(v.renavam) === normRenavam(input))
 );
-
-// 2. placas presentes em apólices (independe de vehicles)
-const today = new Date().toISOString().slice(0,10);
-const policyHits: { policy: Policy; aiVehicle: AiVehicle }[] = [];
-for (const p of policies) {
-  if (p.status !== "ativa") continue;
-  if (p.end_date && p.end_date < today) continue;
-  const ex = p.ai_extracted || {};
-  const list: AiVehicle[] = ex.vehicles?.length
-     ? ex.vehicles
-     : (ex.plates || []).map((pl: string) => ({ plate: pl }));
-  for (const a of list) {
-    const ap = normId(a.plate);
-    const ac = normId(a.chassis);
-    if (ap.includes(term) || (ac && ac.includes(last8))) {
-      policyHits.push({ policy: p, aiVehicle: a });
-    }
-  }
-}
-
-// 3. correlação → 4 cenários
-//    - vehiclesHit.length>0 && coberto(v.id) → Cenário 1
-//    - vehiclesHit.length>0 && !coberto       → Cenário 2
-//    - !vehiclesHit.length && policyHits      → Cenário 3 (lista todas)
-//    - nada                                   → Cenário 4
 ```
 
-`coberto(v.id)` = existe `link` ativo apontando para uma `policy` `ativa` com `end_date >= hoje`.
+Para apólices, mesmo critério sobre `ai_extracted.vehicles[*]` (placa, chassi, renavam).
 
-Normalização aceita: `ABC-1234`, `ABC1234`, `ABC1D23` (Mercosul), chassi parcial (últimos 8), case insensitive.
+## Casos de teste cobertos
 
-### Cálculo de "placas órfãs" (KPI + alerta + tela)
+| # | Cenário | Esperado |
+|---|---------|----------|
+| 1 | veic `ABC-1234` + apólice `ABC1C34` | match por placa (Mercosul) |
+| 2 | busca `ABC1234`  | acha veículo + apólice |
+| 3 | busca `ABC1C34`  | acha veículo + apólice |
+| 4 | veic só com chassi, apólice mesmo chassi placa diferente | match por chassi |
+| 5 | match por últimos 8 do chassi | ok |
+| 6 | match por RENAVAM | ok |
+| 7 | placa parcial via UI | filtro `includes` no campo `normalized_plate` |
 
-```ts
-const registeredPlates = new Set(vehicles.map(v => normId(v.plate)));
-const orphanMap = new Map<string, OrphanRow>();      // chave = placa normalizada
-for (const p of activeAiPolicies) {
-  for (const a of aiVehiclesOf(p)) {
-    const key = normId(a.plate);
-    if (!key || registeredPlates.has(key)) continue;
-    if (!orphanMap.has(key)) orphanMap.set(key, { plate: a.plate, entries: [] });
-    orphanMap.get(key)!.entries.push({ policy: p, ai: a });
-  }
-}
-```
+## Arquivos alterados
 
-`orphanMap.size` alimenta:
-- terceiro número do card "Cobertura da Frota"
-- novo item de "Alertas Críticos" (se > 0)
-- tela `/app/insurance/orphans`
-
-### Cadastro a partir do Cenário 3 / tela órfãs
-
-Reutiliza `VehicleDialog` com props pré-preenchidas:
-
-```ts
-{
-  plate: ai.plate,
-  brand: ai.brand,
-  model: ai.model,
-  year: ai.year,
-  chassis: ai.chassis,
-}
-```
-
-Após salvar:
-1. Não toca na apólice (regra IA imutável preservada).
-2. Dispara `autoLinkAiPolicies(...)` (já existente em `InsurancePanel`) → cria `insurance_policy_vehicles` com `inclusion_type='apolice'` e roda `sync_vehicle_insurance_fields`.
-3. Toast "Veículo cadastrado e vinculado à apólice X".
-
-Cadastro em lote: itera sobre seleção, chama o mesmo fluxo, e ao final um único `autoLinkAiPolicies`.
-
-### Arquivos afetados
-
+- `supabase/migrations/<ts>_normalize_plate_matching.sql` (novo)
+- `src/lib/plate.ts` (novo)
 - `src/components/dashboard/InsurancePanel.tsx`
-  - Novo componente interno `<SmartSearchResults/>` para os 4 cards.
-  - Novo helper `useOrphanPlates(policies, vehicles)`.
-  - Card "Cobertura da Frota" atualizado com 3ª métrica.
-  - "Alertas Críticos" recebe novo item.
-- `src/pages/app/insurance/Orphans.tsx` *(novo)* — tabela com seleção múltipla, integração com `VehicleDialog`.
-- `src/App.tsx` — nova rota `/app/insurance/orphans` dentro de `RequireActiveSubscription`.
-- `src/components/dashboard/VehicleDialog.tsx` — aceitar prop opcional `prefill?: Partial<Vehicle>` (se ainda não existir).
-- Sem migrations: nenhuma mudança de schema.
+- `src/pages/app/insurance/Orphans.tsx`
+- `src/components/dashboard/VehicleDialog.tsx`
 
-### Regras críticas respeitadas
+## Rollback
 
-1. Sem duplicação: vínculos só via `insurance_policy_vehicles`.
-2. Apólices `ai_extracted` continuam imutáveis (trigger `tg_ip_block_ai_field_changes`).
-3. Nenhum INSERT/UPDATE/DELETE direto em `insurance_policy_vehicles` para apólices IA fora do fluxo `autoLinkAiPolicies` (já valida placa via `tg_ipv_block_ai_changes`).
-4. Veículo cadastrado no Cenário 3 só passa a "Coberto" pela auto-vinculação, sem alterar a apólice.
+- `drop function match_policies_for_vehicle, match_vehicles_for_ai_plate, normalize_plate;`
+- `alter table vehicles drop column normalized_plate;`
+- Reverter os 4 arquivos do frontend.
 
-## Plano de rollback
-
-- Mudanças são só frontend e adição de uma rota. Reverter = remover:
-  - novo componente `<SmartSearchResults/>` e novo bloco do card de cobertura em `InsurancePanel.tsx` (substituir pelo bloco atual);
-  - `src/pages/app/insurance/Orphans.tsx`;
-  - rota `/app/insurance/orphans` em `App.tsx`;
-  - prop `prefill` em `VehicleDialog`.
-- Nenhum dado do banco é tocado por essas mudanças, então rollback é puramente de código (revert do commit).
+Nenhum dado do usuário é tocado; a coluna gerada é derivada de `plate`.
