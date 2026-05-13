@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions, type PermModule } from "@/lib/permissions";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck, CarFront
 } from "lucide-react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,9 @@ const nav: NavEntry[] = [
       { to: "/app/fuel", label: "Abastecimentos", icon: Fuel, module: "fuel" },
       { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals", module: "approvals" },
       { to: "/app/maintenance", label: "Manutenção", icon: Wrench, module: "maintenance" },
+      { to: "/app/sinistros", label: "Sinistros", icon: CarFront, soon: true },
+      { to: "/app/despesas", label: "Despesas", icon: Receipt, soon: true },
+      { to: "/app/multas", label: "Multas", icon: AlertTriangle, soon: true },
       { to: "/app/checklists", label: "Checklists", icon: ClipboardList, module: "checklists" },
       { to: "/app/tires", label: "Pneus", icon: CircleDot, module: "tires" },
       { to: "/app/documents", label: "Documentação", icon: FileText, badgeKey: "documents", module: "documents" },
@@ -46,7 +49,6 @@ const nav: NavEntry[] = [
   },
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
   { to: "/app/configuracoes", label: "Configurações da Empresa", icon: Settings, module: "settings" },
-  { to: "/app/fines", label: "Multas", icon: Receipt, soon: true },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
   { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true, module: "reports" },
 ];
