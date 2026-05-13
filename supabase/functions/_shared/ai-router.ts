@@ -15,6 +15,7 @@ export type CallAiParams = {
   messages: any[];
   tools?: any[];
   toolChoice?: any;
+  timeoutMs?: number;
 };
 
 export type CallAiResult = {
@@ -104,7 +105,7 @@ async function tryProvider(target: Target, params: CallAiParams): Promise<{ resu
   }
 
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ac.abort(), params.timeoutMs ?? TIMEOUT_MS);
   try {
     const result = await fn({
       secret,
