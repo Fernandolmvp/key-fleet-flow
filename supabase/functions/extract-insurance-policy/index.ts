@@ -3,12 +3,19 @@ import {
   jsonResponse,
 } from "../_shared/ai-tokens.ts";
 import { callAi } from "../_shared/ai-router.ts";
+import { PDFDocument } from "npm:pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const PDF_CHUNK_PAGE_COUNT = 4;
+const PDF_CHUNK_PAGE_THRESHOLD = 6;
+const PDF_CHUNK_BYTES_THRESHOLD = 3_000_000;
+const PDF_CHUNK_CONCURRENCY = 3;
+const PDF_CHUNK_TIMEOUT_MS = 55_000;
 
 const TOOL = {
   type: "function",
@@ -81,6 +88,291 @@ const TOOL = {
     },
   },
 };
+
+const CHUNK_TOOL = {
+  type: "function",
+  function: {
+    name: "extract_insurance_policy_chunk",
+    description:
+      "Extrai os dados visíveis de um TRECHO de uma apólice de seguro de frota brasileira. Retorne somente o que aparecer nessas páginas: dados gerais, placas e veículos. Se um campo não aparecer neste trecho, retorne null. NÃO invente placas.",
+    parameters: {
+      type: "object",
+      properties: {
+        policy_number: { type: ["string", "null"] },
+        insurer_name: { type: ["string", "null"] },
+        insurer_phone: { type: ["string", "null"] },
+        insurer_email: { type: ["string", "null"] },
+        insurer_document: { type: ["string", "null"] },
+        start_date: { type: ["string", "null"] },
+        end_date: { type: ["string", "null"] },
+        emission_date: { type: ["string", "null"] },
+        total_value: { type: ["number", "null"] },
+        net_premium: { type: ["number", "null"] },
+        iof: { type: ["number", "null"] },
+        installments_count: { type: ["integer", "null"] },
+        installment_value: { type: ["number", "null"] },
+        deductible: { type: ["number", "null"] },
+        coverage_summary: { type: ["string", "null"] },
+        coverage_type: {
+          type: ["string", "null"],
+          enum: ["compreensivo", "terceiros", "casco_total", "casco_parcial", "frota", "outro", null],
+        },
+        insured_name: { type: ["string", "null"] },
+        insured_document: { type: ["string", "null"] },
+        broker_name: { type: ["string", "null"] },
+        broker_document: { type: ["string", "null"] },
+        broker_susep: { type: ["string", "null"] },
+        broker_phone: { type: ["string", "null"] },
+        broker_email: { type: ["string", "null"] },
+        plates: {
+          type: "array",
+          items: { type: "string" },
+        },
+        vehicles: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              plate: { type: "string" },
+              brand: { type: ["string", "null"] },
+              model: { type: ["string", "null"] },
+              year: { type: ["string", "null"] },
+              fipe_code: { type: ["string", "null"] },
+              chassis: { type: ["string", "null"] },
+              renavam: { type: ["string", "null"] },
+              insured_amount: { type: ["number", "null"] },
+              premium: { type: ["number", "null"] },
+              deductible: { type: ["number", "null"] },
+              inclusion_type: { type: ["string", "null"], enum: ["apolice", "adendo", null] },
+              endorsement_number: { type: ["string", "null"] },
+              coverage_notes: { type: ["string", "null"] },
+              page_number: { type: ["integer", "null"] }
+            },
+            required: ["plate"],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ["plates", "vehicles"],
+      additionalProperties: false,
+    },
+  },
+};
+
+type ExtractedVehicle = {
+  plate: string;
+  brand?: string | null;
+  model?: string | null;
+  year?: string | null;
+  fipe_code?: string | null;
+  chassis?: string | null;
+  renavam?: string | null;
+  insured_amount?: number | null;
+  premium?: number | null;
+  deductible?: number | null;
+  inclusion_type?: "apolice" | "adendo" | null;
+  endorsement_number?: string | null;
+  coverage_notes?: string | null;
+  page_number?: number | null;
+};
+
+type ExtractedPolicy = Record<string, unknown> & {
+  plates?: string[];
+  vehicles?: ExtractedVehicle[];
+};
+
+type PdfChunk = {
+  index: number;
+  startPage: number;
+  endPage: number;
+  totalPages: number;
+  bytes: Uint8Array;
+};
+
+function normalizePlate(plate: unknown): string {
+  return String(plate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function normalizeVehicle(vehicle: ExtractedVehicle, pageOffset = 0): ExtractedVehicle | null {
+  const plate = normalizePlate(vehicle?.plate);
+  if (!plate) return null;
+  const page = typeof vehicle.page_number === "number" && Number.isFinite(vehicle.page_number)
+    ? Math.max(1, Math.trunc(vehicle.page_number) + pageOffset)
+    : null;
+  return {
+    ...vehicle,
+    plate,
+    page_number: page,
+  };
+}
+
+function firstMeaningful<T>(...values: T[]): T | null {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    return value;
+  }
+  return null;
+}
+
+function mergeVehicle(base: ExtractedVehicle, incoming: ExtractedVehicle): ExtractedVehicle {
+  return {
+    plate: base.plate,
+    brand: firstMeaningful(base.brand, incoming.brand),
+    model: firstMeaningful(base.model, incoming.model),
+    year: firstMeaningful(base.year, incoming.year),
+    fipe_code: firstMeaningful(base.fipe_code, incoming.fipe_code),
+    chassis: firstMeaningful(base.chassis, incoming.chassis),
+    renavam: firstMeaningful(base.renavam, incoming.renavam),
+    insured_amount: firstMeaningful(base.insured_amount, incoming.insured_amount),
+    premium: firstMeaningful(base.premium, incoming.premium),
+    deductible: firstMeaningful(base.deductible, incoming.deductible),
+    inclusion_type: firstMeaningful(base.inclusion_type, incoming.inclusion_type),
+    endorsement_number: firstMeaningful(base.endorsement_number, incoming.endorsement_number),
+    coverage_notes: firstMeaningful(base.coverage_notes, incoming.coverage_notes),
+    page_number: firstMeaningful(base.page_number, incoming.page_number),
+  };
+}
+
+function mergePolicies(parts: ExtractedPolicy[]): ExtractedPolicy {
+  const merged: ExtractedPolicy = {};
+  const vehicles = new Map<string, ExtractedVehicle>();
+  const scalarKeys = [
+    "policy_number",
+    "insurer_name",
+    "insurer_phone",
+    "insurer_email",
+    "insurer_document",
+    "start_date",
+    "end_date",
+    "emission_date",
+    "total_value",
+    "net_premium",
+    "iof",
+    "installments_count",
+    "installment_value",
+    "deductible",
+    "coverage_type",
+    "insured_name",
+    "insured_document",
+    "broker_name",
+    "broker_document",
+    "broker_susep",
+    "broker_phone",
+    "broker_email",
+  ] as const;
+
+  for (const key of scalarKeys) {
+    const candidate = parts.map((part) => part[key]).find((value) => firstMeaningful(value) !== null);
+    if (candidate !== undefined) merged[key] = candidate;
+  }
+
+  const summaries = parts
+    .map((part) => String(part.coverage_summary ?? "").trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  merged.coverage_summary = summaries[0] ?? null;
+
+  for (const part of parts) {
+    for (const rawVehicle of Array.isArray(part.vehicles) ? part.vehicles : []) {
+      const normalized = normalizeVehicle(rawVehicle);
+      if (!normalized) continue;
+      const existing = vehicles.get(normalized.plate);
+      vehicles.set(normalized.plate, existing ? mergeVehicle(existing, normalized) : normalized);
+    }
+  }
+
+  const dedupedPlates = new Set<string>();
+  for (const part of parts) {
+    for (const plate of Array.isArray(part.plates) ? part.plates : []) {
+      const normalized = normalizePlate(plate);
+      if (normalized) dedupedPlates.add(normalized);
+    }
+  }
+  for (const plate of vehicles.keys()) dedupedPlates.add(plate);
+
+  merged.vehicles = Array.from(vehicles.values()).sort((a, b) => {
+    const pa = a.page_number ?? Number.MAX_SAFE_INTEGER;
+    const pb = b.page_number ?? Number.MAX_SAFE_INTEGER;
+    return pa - pb || a.plate.localeCompare(b.plate);
+  });
+  merged.plates = Array.from(dedupedPlates.values());
+
+  return merged;
+}
+
+function decodeBase64(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function splitPdfIntoChunks(bytes: Uint8Array): Promise<PdfChunk[]> {
+  const source = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const totalPages = source.getPageCount();
+  const chunks: PdfChunk[] = [];
+
+  for (let start = 0, index = 0; start < totalPages; start += PDF_CHUNK_PAGE_COUNT, index += 1) {
+    const end = Math.min(start + PDF_CHUNK_PAGE_COUNT, totalPages);
+    const chunkDoc = await PDFDocument.create();
+    const copiedPages = await chunkDoc.copyPages(source, Array.from({ length: end - start }, (_, i) => start + i));
+    for (const page of copiedPages) chunkDoc.addPage(page);
+    const chunkBytes = await chunkDoc.save({ useObjectStreams: false });
+    chunks.push({
+      index,
+      startPage: start + 1,
+      endPage: end,
+      totalPages,
+      bytes: chunkBytes,
+    });
+  }
+
+  return chunks;
+}
+
+async function parseFunctionArguments(result: Awaited<ReturnType<typeof callAi>>, functionName: string): Promise<ExtractedPolicy> {
+  if (!result.success) {
+    throw new Error(result.errorMessage || "Falha ao processar apólice");
+  }
+
+  const toolCalls = result.data?.choices?.[0]?.message?.tool_calls ?? [];
+  const call = toolCalls.find((entry: any) => entry?.function?.name === functionName) ?? toolCalls[0];
+  if (!call?.function?.arguments) {
+    throw new Error("IA não conseguiu extrair dados.");
+  }
+
+  try {
+    return JSON.parse(call.function.arguments) as ExtractedPolicy;
+  } catch {
+    throw new Error("Resposta da IA inválida");
+  }
+}
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const current = cursor;
+      cursor += 1;
+      results[current] = await worker(items[current]);
+    }
+  });
+
+  await Promise.all(runners);
+  return results;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
