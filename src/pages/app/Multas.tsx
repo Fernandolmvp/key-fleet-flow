@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, Plus, AlertOctagon, Mail, Gavel, DollarSign, AlertTriangle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -10,6 +11,7 @@ import FineCard from "@/components/fines/FineCard";
 import FinePhotoUploadDialog from "@/components/fines/FinePhotoUploadDialog";
 import FineFormDialog from "@/components/fines/FineFormDialog";
 import FineDetailsDialog from "@/components/fines/FineDetailsDialog";
+import FinesReports from "@/components/fines/FinesReports";
 import {
   FINE_STATUS_LABEL, daysUntil, fmtBRL, type TrafficFine, type FineStatus,
 } from "@/lib/fines";
@@ -91,7 +93,13 @@ export default function Multas() {
         <KpiCard label="Pontos em risco" value={kpis.pontosRisco} icon={AlertTriangle} tone="destructive" hint="Soma de pontos não pagos" />
       </div>
 
-      <div className="surface-card rounded-xl p-3 flex flex-wrap gap-2 items-center">
+      <Tabs defaultValue="lista" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="lista">Lista</TabsTrigger>
+          <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+        </TabsList>
+        <TabsContent value="lista" className="space-y-4">
+          <div className="surface-card rounded-xl p-3 flex flex-wrap gap-2 items-center">
         <Input placeholder="Buscar por placa, AIT, local…" className="max-w-xs" value={search} onChange={e => setSearch(e.target.value)} />
         <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
@@ -122,7 +130,7 @@ export default function Multas() {
             {driverList.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
           </SelectContent>
         </Select>
-      </div>
+          </div>
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Carregando…</div>
@@ -139,6 +147,11 @@ export default function Multas() {
           ))}
         </div>
       )}
+        </TabsContent>
+        <TabsContent value="relatorios">
+          <FinesReports fines={fines} vehicles={vehicles} drivers={drivers} />
+        </TabsContent>
+      </Tabs>
 
       {currentCompanyId && photoOpen && (
         <FinePhotoUploadDialog open={photoOpen} onClose={() => setPhotoOpen(false)} companyId={currentCompanyId} onSaved={() => { setPhotoOpen(false); load(); }} />
