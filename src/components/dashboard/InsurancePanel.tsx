@@ -16,9 +16,10 @@ import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
+import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
 
 type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
-type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; vehicle_type: string | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; renavam: string | null; vehicle_type: string | null };
 type AiVehicle = {
   plate: string;
   brand?: string | null;
@@ -26,6 +27,7 @@ type AiVehicle = {
   year?: string | null;
   fipe_code?: string | null;
   chassis?: string | null;
+  renavam?: string | null;
   insured_amount?: number | null;
   premium?: number | null;
   deductible?: number | null;
@@ -75,9 +77,22 @@ const COVERAGE_TYPES: { value: string; label: string }[] = [
 const coverageTypeLabel = (v?: string | null) =>
   COVERAGE_TYPES.find((c) => c.value === v)?.label || null;
 
-/** Normaliza placa/chassi: maiúsculas e somente A-Z/0-9. */
+/** Normaliza string: maiúsculas e somente A-Z/0-9. (uso geral / chassi). */
 function normId(s?: string | null): string {
   return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+/** Normaliza placa para formato Mercosul (cruza placas antigas e novas do mesmo carro). */
+const normPlate = (s?: string | null) => normalizePlate(s);
+/** Igualdade chassi: exato OU últimos 8 dígitos. */
+function chassisMatch(a?: string | null, b?: string | null): boolean {
+  const x = normChassis(a), y = normChassis(b);
+  if (!x || !y) return false;
+  return x === y || x.slice(-8) === y.slice(-8);
+}
+/** Igualdade RENAVAM (somente dígitos). */
+function renavamEq(a?: string | null, b?: string | null): boolean {
+  const x = normRenavam(a), y = normRenavam(b);
+  return !!x && x === y;
 }
 
 /** Detecta se uma apólice veio de importação por IA.
