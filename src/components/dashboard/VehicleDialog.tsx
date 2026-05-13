@@ -175,7 +175,7 @@ const buildVehicleStateFromHistory = (rows: MovementRow[]) => {
   return { status: "ativo", notes: null, ...clearedState };
 };
 
-export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: any) {
+export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, prefill }: any) {
   const { currentCompanyId, refreshCompanies } = useAuth();
 
   const resolveCompany = async (): Promise<string | null> => {
@@ -211,7 +211,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
 
       if (!open) return;
       if (!vehicle?.id) {
-        setForm(buildFormState());
+        setForm(buildFormState(prefill || undefined));
         return;
       }
 
@@ -234,7 +234,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
 
     hydrateForm();
     return () => { alive = false; };
-  }, [vehicle, open]);
+  }, [vehicle, open, prefill]);
 
   const loadMovements = async () => {
     if (!vehicle?.id) { setMovements([]); return; }
