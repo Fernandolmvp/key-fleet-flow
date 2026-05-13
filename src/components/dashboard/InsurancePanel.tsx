@@ -150,24 +150,17 @@ type MatchResult = {
 
 /** Busca o veículo cadastrado correspondente: 1) por placa, 2) fallback por chassi. Detecta inconsistência. */
 function matchAiVehicle(ai: AiVehicle, vehicles: Vehicle[]): MatchResult {
-  const aiPlate = normId(ai.plate);
-  const aiChassis = normId(ai.chassis);
+  const aiPlateN = normPlate(ai.plate);
 
+  // 1) placa Mercosul-normalizada (cruza placa antiga e nova do MESMO carro)
   let v: Vehicle | undefined;
-  if (aiPlate) v = vehicles.find((x) => normId(x.plate) === aiPlate);
-  if (!v && aiChassis) v = vehicles.find((x) => normId(x.chassis) === aiChassis);
+  if (aiPlateN) v = vehicles.find((x) => normPlate(x.plate) === aiPlateN);
+  // 2) chassi (exato ou últimos 8)
+  if (!v && ai.chassis) v = vehicles.find((x) => chassisMatch(x.chassis, ai.chassis));
+  // 3) RENAVAM exato
+  if (!v && (ai as any).renavam) v = vehicles.find((x) => renavamEq(x.renavam, (ai as any).renavam));
 
   if (!v) return { ai, vehicle: null, status: "not_found" };
-
-  // Inconsistência: ambos os lados têm placa+chassi e algum não confere
-  const dbPlate = normId(v.plate);
-  const dbChassis = normId(v.chassis);
-  if (aiPlate && dbPlate && aiPlate !== dbPlate) {
-    return { ai, vehicle: v, status: "mismatch", reason: `Placa do banco (${v.plate}) ≠ placa da apólice (${ai.plate})` };
-  }
-  if (aiChassis && dbChassis && aiChassis !== dbChassis) {
-    return { ai, vehicle: v, status: "mismatch", reason: `Chassi do banco (${v.chassis}) ≠ chassi da apólice (${ai.chassis})` };
-  }
   return { ai, vehicle: v, status: "linked" };
 }
 
