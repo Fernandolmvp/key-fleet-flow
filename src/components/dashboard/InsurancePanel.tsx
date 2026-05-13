@@ -1652,31 +1652,28 @@ export default function InsurancePanel() {
                         <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
                         <span>{fleetSummary.uncoveredCount} sem cobertura</span>
                       </div>
-                      {orphanPlates.length > 0 && (
-                        <div className="flex items-center gap-2 text-amber-400">
-                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                          <span>{orphanPlates.length} pendente(s) de revisão</span>
-                        </div>
-                      )}
                       {fleetSummary.externalCount > 0 && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <span className="h-2.5 w-2.5 rounded-full bg-muted" />
                           <span>{fleetSummary.externalCount} marcadas como externas</span>
                         </div>
                       )}
-                      {fleetSummary.onlyInPolicyCount > 0 && (
-                        <RouterLink
-                          to="/app/insurance/review-matches"
-                          className="mt-2 flex items-center gap-2 text-xs text-sky-400 hover:underline"
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          {fleetSummary.onlyInPolicyCount} placa(s) em apólice sem cadastro · ver lista
-                        </RouterLink>
-                      )}
                     </div>
                   </div>
                 );
               })()}
+              {orphanPlates.length > 0 && (
+                <RouterLink
+                  to="/app/insurance/review-matches"
+                  className="mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-xs text-amber-400"
+                >
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {orphanPlates.length} placa(s) em apólice aguardando revisão
+                  </span>
+                  <span className="underline">ver lista</span>
+                </RouterLink>
+              )}
             </Card>
 
             <Card className="p-4">
@@ -1713,17 +1710,6 @@ export default function InsurancePanel() {
                     </span>
                     <ExternalLink className="h-3 w-3 text-destructive" />
                   </button>
-                )}
-                {orphanPlates.length > 0 && (
-                  <RouterLink
-                    to="/app/insurance/review-matches"
-                    className="w-full flex items-center justify-between p-2 rounded border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-colors text-left"
-                  >
-                    <span className="flex items-center gap-2 text-sky-400">
-                      <Sparkles className="h-4 w-4" /> {orphanPlates.length} placa(s) pendente(s) de revisão manual
-                    </span>
-                    <ExternalLink className="h-3 w-3 text-sky-400" />
-                  </RouterLink>
                 )}
               </div>
             </Card>
