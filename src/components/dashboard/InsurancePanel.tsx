@@ -993,9 +993,13 @@ export default function InsurancePanel() {
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
 
     const matchedVehicles = vehicles.filter(
-      (v) => normId(v.plate).includes(term) || (v.chassis && normId(v.chassis).includes(term))
+      (v) =>
+        normPlate(v.plate).includes(term) ||
+        (termPlate && normPlate(v.plate) === termPlate) ||
+        (v.chassis && normChassis(v.chassis).includes(term)) ||
+        (termRen && renavamEq(v.renavam, termRen)),
     );
-    const matchedPlates = new Set(matchedVehicles.map((v) => normId(v.plate)));
+    const matchedPlates = new Set(matchedVehicles.map((v) => normPlate(v.plate)));
 
     const policyHits = new Map<string, { policy: Policy; ai: AiVehicle }[]>();
     for (const p of policies.filter(isVigente)) {
