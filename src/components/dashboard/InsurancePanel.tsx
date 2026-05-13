@@ -409,7 +409,9 @@ export default function InsurancePanel() {
     try {
       const buf = await file.arrayBuffer();
       const b64 = arrayBufferToBase64(buf);
+      const requestId = crypto.randomUUID();
       const { data, error } = await supabase.functions.invoke("extract-insurance-policy", {
+        headers: { "x-request-id": requestId },
         body: { fileBase64: b64, mimeType: file.type || "application/pdf" },
       });
       if (error) {
@@ -422,6 +424,10 @@ export default function InsurancePanel() {
             try { const j = JSON.parse(txt); if (j?.error) msg = j.error; } catch { /* keep */ }
           }
         } catch { /* ignore */ }
+        const lower = String(msg).toLowerCase();
+        if (lower.includes("timeout") || lower.includes("limite") || lower.includes("grande/escaneada")) {
+          msg = "A leitura automática levou mais tempo que o normal. O sistema já tenta quebrar PDFs grandes, mas este arquivo ainda excedeu o limite. Tente reenviar; se persistir, envie a apólice e os endossos em PDFs separados.";
+        }
         throw new Error(msg);
       }
       const ex = (data as any)?.data || {};
