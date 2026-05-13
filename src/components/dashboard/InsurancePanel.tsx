@@ -206,6 +206,8 @@ export default function InsurancePanel() {
   const [brokers, setBrokers] = useState<Broker[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [links, setLinks] = useState<Link[]>([]);
+  const [manualMatches, setManualMatches] = useState<Array<{ id: string; vehicle_id: string; policy_id: string; normalized_plate: string }>>([]);
+  const [externalPlates, setExternalPlates] = useState<Array<{ policy_id: string; normalized_plate: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
 
@@ -299,11 +301,13 @@ export default function InsurancePanel() {
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
-    const [p, b, v, l] = await Promise.all([
+    const [p, b, v, l, mm, ep] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
       supabase.from("vehicles").select("id,plate,brand,model,status,chassis,renavam,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
+      supabase.from("vehicle_policy_manual_matches" as any).select("id,vehicle_id,policy_id,normalized_plate").eq("company_id", currentCompanyId).is("revoked_at", null),
+      supabase.from("policy_external_plates" as any).select("policy_id,normalized_plate").eq("company_id", currentCompanyId),
     ]);
     if (p.error) toast.error(p.error.message);
     const policiesData = (p.data as any[]) || [];
@@ -313,6 +317,8 @@ export default function InsurancePanel() {
     setBrokers((b.data as any[]) || []);
     setVehicles(vehiclesData);
     setLinks(linksData);
+    setManualMatches(((mm as any)?.data as any[]) || []);
+    setExternalPlates(((ep as any)?.data as any[]) || []);
     setLoading(false);
     // Auto-vincula novos veículos cadastrados às apólices de IA já importadas
     autoLinkAiPolicies(policiesData, vehiclesData, linksData).catch((e) =>
@@ -828,6 +834,10 @@ export default function InsurancePanel() {
     const coveredVehicleIds = new Set<string>(
       links.filter((l) => activeIds.has(l.policy_id) && !l.removed_at).map((l) => l.vehicle_id)
     );
+    // Inclui também veículos vinculados manualmente em apólices vigentes
+    manualMatches.forEach((m) => {
+      if (activeIds.has(m.policy_id)) coveredVehicleIds.add(m.vehicle_id);
+    });
     const onlyInPolicy = new Set<string>();
     activePolicies.forEach((p) => {
       const ex: any = p.ai_extracted || {};
@@ -858,8 +868,11 @@ export default function InsurancePanel() {
       vigentes,
       vencendo30,
       vencidas,
+      manualCount: manualMatches.filter((m) => activeIds.has(m.policy_id)).length,
+      externalCount: externalPlates.filter((e) => activeIds.has(e.policy_id)).length,
+      autoCount: Math.max(0, coveredVehicleIds.size - manualMatches.filter((m) => activeIds.has(m.policy_id)).length),
     };
-  }, [policies, links, vehicles]);
+  }, [policies, links, vehicles, manualMatches, externalPlates]);
 
   // === Estatísticas por apólice (para os cards) ===
   const policyStats = useMemo(() => {
@@ -952,6 +965,8 @@ export default function InsurancePanel() {
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
     const registeredPlates = new Set(vehicles.map((v) => normPlate(v.plate)).filter(Boolean));
+    const externalKeys = new Set(externalPlates.map((e) => `${e.policy_id}|${e.normalized_plate}`));
+    const manualKeys = new Set(manualMatches.map((m) => `${m.policy_id}|${m.normalized_plate}`));
     const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
     for (const p of policies.filter(isVigente)) {
       const ex: any = p.ai_extracted || {};
@@ -967,12 +982,15 @@ export default function InsurancePanel() {
           (v) => chassisMatch(v.chassis, a.chassis) || renavamEq(v.renavam, (a as any).renavam),
         );
         if (matchedByVin) continue;
+        // exclui placas já marcadas como externas ou já vinculadas manualmente
+        if (externalKeys.has(`${p.id}|${key}`)) continue;
+        if (manualKeys.has(`${p.id}|${key}`)) continue;
         if (!map.has(key)) map.set(key, { plate: (a.plate || key).toUpperCase(), entries: [] });
         map.get(key)!.entries.push({ policy: p, ai: a });
       }
     }
     return Array.from(map.values()).sort((a, b) => a.plate.localeCompare(b.plate));
-  }, [policies, vehicles]);
+  }, [policies, vehicles, externalPlates, manualMatches]);
 
   // === Resultado da busca por placa/chassi cobrindo os 4 cenários ===
   type SearchResult =
@@ -1337,6 +1355,31 @@ export default function InsurancePanel() {
 
         {/* ===================== TAB 0 — VISÃO GERAL ===================== */}
         <TabsContent value="overview" className="space-y-4 mt-0">
+          {orphanPlates.length > 0 && (
+            <RouterLink
+              to="/app/insurance/review-matches"
+              className="flex items-center justify-between gap-3 p-4 rounded-xl border-2 border-amber-500/50 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/20 grid place-items-center text-amber-400 group-hover:scale-110 transition-transform">
+                  <Search className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="font-display font-bold text-amber-400 flex items-center gap-2">
+                    🔍 Revisar Vinculações Pendentes
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/40">
+                      {orphanPlates.length}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Placas em apólice que não foram cruzadas automaticamente — revise manualmente.
+                  </div>
+                </div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-amber-400" />
+            </RouterLink>
+          )}
+
           {/* Consulta de seguro por placa ou chassi */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2">
@@ -1601,13 +1644,29 @@ export default function InsurancePanel() {
                         <span className="h-2.5 w-2.5 rounded-full bg-success" />
                         <span>{fleetSummary.coveredCount} cobertos</span>
                       </div>
+                      <div className="pl-4 text-xs text-muted-foreground space-y-0.5">
+                        <div>↳ {fleetSummary.autoCount} vinculados automaticamente</div>
+                        <div>↳ {fleetSummary.manualCount} vinculados manualmente</div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
                         <span>{fleetSummary.uncoveredCount} sem cobertura</span>
                       </div>
+                      {orphanPlates.length > 0 && (
+                        <div className="flex items-center gap-2 text-amber-400">
+                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                          <span>{orphanPlates.length} pendente(s) de revisão</span>
+                        </div>
+                      )}
+                      {fleetSummary.externalCount > 0 && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <span className="h-2.5 w-2.5 rounded-full bg-muted" />
+                          <span>{fleetSummary.externalCount} marcadas como externas</span>
+                        </div>
+                      )}
                       {fleetSummary.onlyInPolicyCount > 0 && (
                         <RouterLink
-                          to="/app/insurance/orphans"
+                          to="/app/insurance/review-matches"
                           className="mt-2 flex items-center gap-2 text-xs text-sky-400 hover:underline"
                         >
                           <Sparkles className="h-3 w-3" />
@@ -1657,11 +1716,11 @@ export default function InsurancePanel() {
                 )}
                 {orphanPlates.length > 0 && (
                   <RouterLink
-                    to="/app/insurance/orphans"
+                    to="/app/insurance/review-matches"
                     className="w-full flex items-center justify-between p-2 rounded border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-colors text-left"
                   >
                     <span className="flex items-center gap-2 text-sky-400">
-                      <Sparkles className="h-4 w-4" /> {orphanPlates.length} placa(s) coberta(s) por apólice mas SEM cadastro
+                      <Sparkles className="h-4 w-4" /> {orphanPlates.length} placa(s) pendente(s) de revisão manual
                     </span>
                     <ExternalLink className="h-3 w-3 text-sky-400" />
                   </RouterLink>
