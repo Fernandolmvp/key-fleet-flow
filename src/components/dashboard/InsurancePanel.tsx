@@ -1574,9 +1574,13 @@ export default function InsurancePanel() {
                         <span>{fleetSummary.uncoveredCount} sem cobertura</span>
                       </div>
                       {fleetSummary.onlyInPolicyCount > 0 && (
-                        <div className="text-xs text-amber-400 mt-2">
-                          + {fleetSummary.onlyInPolicyCount} placa(s) na apólice sem cadastro na frota
-                        </div>
+                        <RouterLink
+                          to="/app/insurance/orphans"
+                          className="mt-2 flex items-center gap-2 text-xs text-sky-400 hover:underline"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {fleetSummary.onlyInPolicyCount} placa(s) em apólice sem cadastro · ver lista
+                        </RouterLink>
                       )}
                     </div>
                   </div>
