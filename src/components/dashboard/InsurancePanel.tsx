@@ -1380,6 +1380,174 @@ export default function InsurancePanel() {
               );
             })()}
           </Card>
+      {/* BUSCA GLOBAL POR VEÍCULO */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-primary" />
+          <div className="font-display font-bold">Consultar seguro</div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={globalSearchMode} onValueChange={(v) => setGlobalSearchMode(v as any)}>
+            <SelectTrigger className="h-9 w-44 shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="veiculo">Por veículo (placa/chassi)</SelectItem>
+              <SelectItem value="apolice">Por nº da apólice</SelectItem>
+              <SelectItem value="seguradora">Por seguradora</SelectItem>
+              <SelectItem value="corretora">Por corretora</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            className="flex-1 min-w-[220px]"
+            placeholder={
+              globalSearchMode === "veiculo"
+                ? "Digite placa ou chassi (ignora traços, pontos e espaços)..."
+                : globalSearchMode === "apolice"
+                ? "Digite o número da apólice..."
+                : globalSearchMode === "seguradora"
+                ? "Digite o nome da seguradora..."
+                : "Digite o nome do corretor..."
+            }
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+          />
+        </div>
+        {globalSearch && globalSearch.length < 3 && (
+          <div className="text-xs text-muted-foreground">Digite ao menos 3 caracteres.</div>
+        )}
+        {((globalSearchResult && globalSearchResult.length === 0) || (globalPolicyResult && globalPolicyResult.length === 0)) && (
+          <div className="text-xs text-muted-foreground">Nenhum veículo encontrado.</div>
+        )}
+        {globalPolicyResult && globalPolicyResult.map((p) => {
+          const broker = brokers.find((b) => b.id === p.broker_id);
+          const st = policyStatus(p);
+          const policyVehicles = links
+            .filter((l) => l.policy_id === p.id)
+            .map((l) => vehicles.find((v) => v.id === l.vehicle_id))
+            .filter(Boolean) as typeof vehicles;
+          return (
+        </TabsContent>
+
+        {/* ===================== TAB 1 — APÓLICES ===================== */}
+        <TabsContent value="apolices" className="space-y-4 mt-0">
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="font-display font-bold flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Apólices da frota</div>
+            <div className="text-xs text-muted-foreground">Suba o PDF — a IA extrai dados, corretor e placas cobertas. Clique num card para expandir.</div>
+          </div>
+          <Button onClick={openNew}><Plus className="h-4 w-4" /> Nova apólice</Button>
+        </div>
+
+        <div className="relative">
+          <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9 h-9"
+            placeholder="Filtrar por seguradora, nº da apólice ou corretor..."
+            value={policySearch}
+            onChange={(e) => setPolicySearch(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2 max-h-[800px] overflow-y-auto">
+          {loading && <div className="text-sm text-muted-foreground py-4 text-center">Carregando…</div>}
+          {!loading && policies.length === 0 && (
+            <div className="text-sm text-muted-foreground py-8 text-center">Nenhuma apólice cadastrada.</div>
+          )}
+          {policies
+            .filter((p) => {
+              const q = policySearch.trim().toLowerCase();
+              if (!q) return true;
+              const broker = brokers.find((b) => b.id === p.broker_id);
+              return [p.insurer_name, p.policy_number, broker?.name].filter(Boolean).join(" ").toLowerCase().includes(q);
+            })
+            .map((p) => {
+            const st = policyStatus(p);
+            const broker = brokers.find((b) => b.id === p.broker_id);
+            const vCount = links.filter((l) => l.policy_id === p.id).length;
+            const isSel = p.id === selectedPolicyId;
+            return (
+              <div key={p.id} className="space-y-0">
+              <div
+                onClick={() => setSelectedPolicyId(isSel ? null : p.id)}
+                className={`p-3 rounded-lg border cursor-pointer transition-colors ${isSel ? "bg-primary/10 border-primary/40 rounded-b-none" : "border-border hover:bg-muted/30"}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate">{p.insurer_name}</div>
+                    <div className="text-xs text-muted-foreground font-mono">#{p.policy_number}</div>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <Badge variant="outline" className={st.cls}>{st.label}</Badge>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Truck className="h-3 w-3" /> {vCount} veíc.</span>
+                      {broker && <span className="text-xs text-muted-foreground">Corretor: {broker.name}</span>}
+                      {p.insurer_phone && <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{p.insurer_phone}</span>}
+                      {coverageTypeLabel(p.coverage_type) && <span className="text-xs text-muted-foreground">Tipo: {coverageTypeLabel(p.coverage_type)}</span>}
+                    </div>
+                    {p.start_date && p.end_date && (
+                      <div className="text-[11px] text-muted-foreground mt-1">
+                        {format(new Date(p.start_date + "T00:00:00"), "dd/MM/yy")} → {format(new Date(p.end_date + "T00:00:00"), "dd/MM/yy")}
+                      </div>
+                    )}
+                    {(() => {
+                      const s = policyStats[p.id] || { covered: 0, onlyInPolicy: 0 };
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0.5">
+                            {s.covered} cobertos
+                          </Badge>
+                          {s.onlyInPolicy > 0 && (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0.5">
+                              {s.onlyInPolicy} s/ cadastro
+                            </Badge>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-end text-muted-foreground">
+                      {isSel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
+                    {p.file_url && (
+                      <Button asChild variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
+                        <a href={p.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
+                      </Button>
+                    )}
+                    {(() => {
+                      const isAi = isAiPolicy(p);
+                      if (isAi) {
+                        return (
+                          <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px] flex items-center gap-1 px-1.5 py-0.5">
+                            <Lock className="h-2.5 w-2.5" /> IA
+                          </Badge>
+                        );
+                      }
+                      return (
+                        <>
+                          <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 text-[10px] px-1.5 py-0.5">
+                            Manual
+                          </Badge>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); removePolicy(p.id); }}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+              {isSel && (
+                <div className="border border-t-0 border-primary/40 bg-background/40 rounded-b-lg p-3 space-y-3 animate-accordion-down">
+                  {renderPolicyDetails()}
+                </div>
+              )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
         </TabsContent>
 
         {/* ===================== TAB 1 — APÓLICES ===================== */}
