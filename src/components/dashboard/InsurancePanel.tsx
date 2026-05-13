@@ -1380,6 +1380,52 @@ export default function InsurancePanel() {
               );
             })()}
           </Card>
+
+      {/* BUSCA GLOBAL POR VEÍCULO */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-primary" />
+          <div className="font-display font-bold">Consultar seguro</div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={globalSearchMode} onValueChange={(v) => setGlobalSearchMode(v as any)}>
+            <SelectTrigger className="h-9 w-44 shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="veiculo">Por veículo (placa/chassi)</SelectItem>
+              <SelectItem value="apolice">Por nº da apólice</SelectItem>
+              <SelectItem value="seguradora">Por seguradora</SelectItem>
+              <SelectItem value="corretora">Por corretora</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            className="flex-1 min-w-[220px]"
+            placeholder={
+              globalSearchMode === "veiculo"
+                ? "Digite placa ou chassi (ignora traços, pontos e espaços)..."
+                : globalSearchMode === "apolice"
+                ? "Digite o número da apólice..."
+                : globalSearchMode === "seguradora"
+                ? "Digite o nome da seguradora..."
+                : "Digite o nome do corretor..."
+            }
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+          />
+        </div>
+        {globalSearch && globalSearch.length < 3 && (
+          <div className="text-xs text-muted-foreground">Digite ao menos 3 caracteres.</div>
+        )}
+        {((globalSearchResult && globalSearchResult.length === 0) || (globalPolicyResult && globalPolicyResult.length === 0)) && (
+          <div className="text-xs text-muted-foreground">Nenhum veículo encontrado.</div>
+        )}
+        {globalPolicyResult && globalPolicyResult.map((p) => {
+          const broker = brokers.find((b) => b.id === p.broker_id);
+          const st = policyStatus(p);
+          const policyVehicles = links
+            .filter((l) => l.policy_id === p.id)
+            .map((l) => vehicles.find((v) => v.id === l.vehicle_id))
+            .filter(Boolean) as typeof vehicles;
+          return (
         </TabsContent>
 
         {/* ===================== TAB 1 — APÓLICES ===================== */}
