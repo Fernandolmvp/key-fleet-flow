@@ -26,6 +26,10 @@ import Brokers from "./pages/app/Brokers";
 import Checklists from "./pages/app/Checklists";
 import Insurance from "./pages/app/Insurance";
 import Configuracoes from "./pages/app/Configuracoes";
+import Sinistros from "./pages/app/Sinistros";
+import Despesas from "./pages/app/Despesas";
+import Multas from "./pages/app/Multas";
+import VehicleHistory from "./pages/app/VehicleHistory";
 import SuperAdminShell from "./pages/admin/SuperAdminShell";
 import CompaniesPanel from "./pages/admin/CompaniesPanel";
 import ProvidersPage from "./pages/admin/ai/ProvidersPage";
@@ -99,6 +103,10 @@ const App = () => (
               <Route path="brokers" element={<Brokers />} />
               <Route path="assinatura" element={<Subscription />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
+                  <Route path="sinistros" element={<Sinistros />} />
+                  <Route path="despesas" element={<Despesas />} />
+                  <Route path="multas" element={<Multas />} />
+                  <Route path="vehicles/:id/historico" element={<VehicleHistory />} />
                 </Route>
               </Route>
             </Route>

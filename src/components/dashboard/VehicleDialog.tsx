@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle, BarChart3 } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 
 const STATUSES = [
@@ -892,6 +893,13 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved }: 
         </Tabs>
 
         <DialogFooter>
+          {isEdit && vehicle?.id && (
+            <Button asChild variant="outline" className="mr-auto gap-2">
+              <Link to={`/app/vehicles/${vehicle.id}/historico`} onClick={() => onOpenChange(false)}>
+                <BarChart3 className="h-4 w-4" /> Ver Histórico Completo
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={save} disabled={busy} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}

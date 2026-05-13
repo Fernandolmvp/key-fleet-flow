@@ -2515,18 +2515,21 @@ export type Database = {
           km_override_by: string | null
           km_override_reason: string | null
           labor_value: number
+          maintenance_category: string | null
           next_service_at: string | null
           next_service_km: number | null
           notes: string | null
           parts: Json
           parts_value: number
           service_at: string
+          service_provider_rating: number | null
           state: string | null
           status: Database["public"]["Enums"]["maintenance_status"]
           total_value: number
           type: Database["public"]["Enums"]["maintenance_type"]
           updated_at: string
           vehicle_id: string
+          warranty_until: string | null
           workshop_cnpj: string | null
           workshop_name: string | null
         }
@@ -2546,18 +2549,21 @@ export type Database = {
           km_override_by?: string | null
           km_override_reason?: string | null
           labor_value?: number
+          maintenance_category?: string | null
           next_service_at?: string | null
           next_service_km?: number | null
           notes?: string | null
           parts?: Json
           parts_value?: number
           service_at?: string
+          service_provider_rating?: number | null
           state?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"]
           total_value?: number
           type: Database["public"]["Enums"]["maintenance_type"]
           updated_at?: string
           vehicle_id: string
+          warranty_until?: string | null
           workshop_cnpj?: string | null
           workshop_name?: string | null
         }
@@ -2577,18 +2583,21 @@ export type Database = {
           km_override_by?: string | null
           km_override_reason?: string | null
           labor_value?: number
+          maintenance_category?: string | null
           next_service_at?: string | null
           next_service_km?: number | null
           notes?: string | null
           parts?: Json
           parts_value?: number
           service_at?: string
+          service_provider_rating?: number | null
           state?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"]
           total_value?: number
           type?: Database["public"]["Enums"]["maintenance_type"]
           updated_at?: string
           vehicle_id?: string
+          warranty_until?: string | null
           workshop_cnpj?: string | null
           workshop_name?: string | null
         }
@@ -3400,6 +3409,66 @@ export type Database = {
           },
         ]
       }
+      traffic_fines: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_id: string | null
+          due_date: string | null
+          fine_date: string
+          fine_type: string
+          id: string
+          license_points: number
+          notification_number: string | null
+          paid_at: string | null
+          photo_url: string | null
+          status: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          amount?: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          due_date?: string | null
+          fine_date?: string
+          fine_type: string
+          id?: string
+          license_points?: number
+          notification_number?: string | null
+          paid_at?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          due_date?: string | null
+          fine_date?: string
+          fine_type?: string
+          id?: string
+          license_points?: number
+          notification_number?: string | null
+          paid_at?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           company_id: string
@@ -3504,6 +3573,114 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicle_expenses: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          expense_category: string
+          expense_date: string
+          id: string
+          paid: boolean
+          receipt_url: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          amount?: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          expense_category: string
+          expense_date?: string
+          id?: string
+          paid?: boolean
+          receipt_url?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          expense_category?: string
+          expense_date?: string
+          id?: string
+          paid?: boolean
+          receipt_url?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_incidents: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_id: string | null
+          id: string
+          incident_date: string
+          incident_type: string
+          insurance_claimed: boolean
+          km_at_incident: number | null
+          location: string | null
+          photos_urls: string[] | null
+          police_report_number: string | null
+          repair_cost: number | null
+          status: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          incident_date?: string
+          incident_type: string
+          insurance_claimed?: boolean
+          km_at_incident?: number | null
+          location?: string | null
+          photos_urls?: string[] | null
+          police_report_number?: string | null
+          repair_cost?: number | null
+          status?: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          insurance_claimed?: boolean
+          km_at_incident?: number | null
+          location?: string | null
+          photos_urls?: string[] | null
+          police_report_number?: string | null
+          repair_cost?: number | null
+          status?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: []
       }
       vehicle_movements: {
         Row: {

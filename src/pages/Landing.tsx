@@ -14,6 +14,10 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
+  AlertOctagon,
+  Receipt,
+  AlertTriangle,
+  History,
 } from "lucide-react";
 
 const features = [
@@ -23,6 +27,10 @@ const features = [
   { icon: ClipboardCheck, title: "Checklists Digitais", desc: "Templates customizáveis, evidências por foto e bloqueio operacional." },
   { icon: ShieldCheck, title: "Seguros & Sinistros", desc: "Apólices, corretores e extração automática por IA." },
   { icon: BarChart3, title: "BI Executivo", desc: "Custo/km, KPIs em tempo real e exportação para a diretoria." },
+  { icon: AlertOctagon, title: "Gestão de Sinistros", desc: "Registro de ocorrências, fotos, BO e custo de reparo por veículo.", soon: true },
+  { icon: Receipt, title: "Despesas Operacionais", desc: "IPVA, licenciamento, lavagem, pedágio e estacionamento centralizados.", soon: true },
+  { icon: AlertTriangle, title: "Controle de Multas", desc: "Multas, pontos na CNH, recursos e ranking de motoristas.", soon: true },
+  { icon: History, title: "Histórico Completo do Veículo", desc: "Linha do tempo 360°: manutenções, combustível, sinistros e indicadores.", soon: true },
 ];
 
 const metrics = [
@@ -164,7 +172,12 @@ export default function Landing() {
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f) => (
-            <div key={f.title} className="surface-card rounded-xl p-6 hover:border-primary/40 transition-colors">
+            <div key={f.title} className="surface-card rounded-xl p-6 hover:border-primary/40 transition-colors relative">
+              {f.soon && (
+                <span className="absolute top-3 right-3 text-[10px] uppercase font-mono tracking-wider text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-full">
+                  Em breve
+                </span>
+              )}
               <div className="h-11 w-11 rounded-lg bg-primary/15 grid place-items-center text-primary mb-4">
                 <f.icon className="h-5 w-5" />
               </div>
