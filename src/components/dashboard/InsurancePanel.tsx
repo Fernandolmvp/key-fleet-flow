@@ -1644,13 +1644,29 @@ export default function InsurancePanel() {
                         <span className="h-2.5 w-2.5 rounded-full bg-success" />
                         <span>{fleetSummary.coveredCount} cobertos</span>
                       </div>
+                      <div className="pl-4 text-xs text-muted-foreground space-y-0.5">
+                        <div>↳ {fleetSummary.autoCount} vinculados automaticamente</div>
+                        <div>↳ {fleetSummary.manualCount} vinculados manualmente</div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
                         <span>{fleetSummary.uncoveredCount} sem cobertura</span>
                       </div>
+                      {orphanPlates.length > 0 && (
+                        <div className="flex items-center gap-2 text-amber-400">
+                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                          <span>{orphanPlates.length} pendente(s) de revisão</span>
+                        </div>
+                      )}
+                      {fleetSummary.externalCount > 0 && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <span className="h-2.5 w-2.5 rounded-full bg-muted" />
+                          <span>{fleetSummary.externalCount} marcadas como externas</span>
+                        </div>
+                      )}
                       {fleetSummary.onlyInPolicyCount > 0 && (
                         <RouterLink
-                          to="/app/insurance/orphans"
+                          to="/app/insurance/review-matches"
                           className="mt-2 flex items-center gap-2 text-xs text-sky-400 hover:underline"
                         >
                           <Sparkles className="h-3 w-3" />
