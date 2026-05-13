@@ -1,180 +1,132 @@
-## Objetivo
-Criar base (tabelas + UI placeholder) para Sinistros, Despesas, Multas e Histórico de Vida. Tudo aditivo, zero breaking change.
+## Módulo Completo de Multas — Plano de Implementação
 
----
+Vou implementar o sistema completo de gestão de multas em 10 etapas sequenciais conforme especificado, em uma única execução.
 
-## ETAPA 1 — Migration SQL (uma migration única, tudo `CREATE`/`ADD COLUMN`)
+### ETAPA 1 — Migration `traffic_fines` (recriar tabela)
 
-```sql
--- A) vehicle_incidents
-CREATE TABLE public.vehicle_incidents (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL,
-  vehicle_id uuid NOT NULL,
-  driver_id uuid,
-  incident_date timestamptz NOT NULL DEFAULT now(),
-  incident_type text NOT NULL,         -- colisao|raspao|perda_total|furto|vandalismo|outro
-  description text,
-  km_at_incident integer,
-  location text,
-  repair_cost numeric,
-  insurance_claimed boolean NOT NULL DEFAULT false,
-  police_report_number text,
-  photos_urls text[] DEFAULT '{}',
-  status text NOT NULL DEFAULT 'aberto', -- aberto|em_reparo|resolvido|perda_total
-  created_by uuid,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.vehicle_incidents ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "members view incidents" ON public.vehicle_incidents
-  FOR SELECT USING (is_company_member(auth.uid(), company_id));
-CREATE POLICY "managers write incidents" ON public.vehicle_incidents
-  FOR ALL USING (can_manage_fleet(auth.uid(), company_id))
-  WITH CHECK (can_manage_fleet(auth.uid(), company_id));
-CREATE TRIGGER trg_vehicle_incidents_updated
-  BEFORE UPDATE ON public.vehicle_incidents
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+A tabela atual `traffic_fines` é mínima (do placeholder). Como ainda não tem dados em produção, vou:
+- `DROP TABLE IF EXISTS public.traffic_fines CASCADE`
+- Criar novamente com TODOS os campos do escopo (record_type, status expandido, dados infração, notificação, indicação, recurso, pagamento, anexos, IA, audit)
+- RLS: `is_company_member` SELECT, `can_manage_fleet` ALL
+- Trigger `update_updated_at_column`
+- Trigger de audit log para todas mudanças
+- Índices em (company_id, vehicle_id), (status), (driver_id)
 
--- B) vehicle_expenses
-CREATE TABLE public.vehicle_expenses (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL,
-  vehicle_id uuid NOT NULL,
-  expense_date date NOT NULL DEFAULT CURRENT_DATE,
-  expense_category text NOT NULL,       -- ipva|licenciamento|lavagem|pedagio|estacionamento|adesivacao|multa_paga|outro
-  amount numeric NOT NULL DEFAULT 0,
-  description text,
-  receipt_url text,
-  paid boolean NOT NULL DEFAULT true,
-  due_date date,
-  created_by uuid,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.vehicle_expenses ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "members view expenses" ON public.vehicle_expenses
-  FOR SELECT USING (is_company_member(auth.uid(), company_id));
-CREATE POLICY "managers write expenses" ON public.vehicle_expenses
-  FOR ALL USING (can_manage_fleet(auth.uid(), company_id))
-  WITH CHECK (can_manage_fleet(auth.uid(), company_id));
-CREATE TRIGGER trg_vehicle_expenses_updated
-  BEFORE UPDATE ON public.vehicle_expenses
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+### ETAPA 2 — Edge Function `extract-traffic-fine`
 
--- C) traffic_fines
-CREATE TABLE public.traffic_fines (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL,
-  vehicle_id uuid NOT NULL,
-  driver_id uuid,
-  fine_date date NOT NULL DEFAULT CURRENT_DATE,
-  fine_type text NOT NULL,              -- velocidade|estacionamento|sem_cinto|celular|alcool|outro
-  amount numeric NOT NULL DEFAULT 0,
-  license_points integer NOT NULL DEFAULT 0,
-  description text,
-  status text NOT NULL DEFAULT 'pendente', -- pendente|paga|em_recurso|arquivada
-  notification_number text,
-  due_date date,
-  paid_at date,
-  photo_url text,
-  created_by uuid,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.traffic_fines ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "members view fines" ON public.traffic_fines
-  FOR SELECT USING (is_company_member(auth.uid(), company_id));
-CREATE POLICY "managers write fines" ON public.traffic_fines
-  FOR ALL USING (can_manage_fleet(auth.uid(), company_id))
-  WITH CHECK (can_manage_fleet(auth.uid(), company_id));
-CREATE TRIGGER trg_traffic_fines_updated
-  BEFORE UPDATE ON public.traffic_fines
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+- Nova função em `supabase/functions/extract-traffic-fine/index.ts`
+- Recebe `{ fileBase64, mimeType }`
+- Chama Lovable AI (`google/gemini-2.5-flash` via gateway)
+- Tool calling para JSON estruturado: tipo (aviso/notificacao), placa, datas, local, infração, AIT, valor, pontos, prazos, confiança
+- Trata 429/402
+- `verify_jwt = false` em config.toml (segue padrão das outras extract-*)
 
--- D) maintenance_records — apenas ADD COLUMN (todas nullable)
-ALTER TABLE public.maintenance_records
-  ADD COLUMN IF NOT EXISTS maintenance_category text,
-  ADD COLUMN IF NOT EXISTS service_provider_rating integer
-    CHECK (service_provider_rating IS NULL OR (service_provider_rating BETWEEN 1 AND 5)),
-  ADD COLUMN IF NOT EXISTS warranty_until date;
+### ETAPA 3 — UI principal `/app/multas`
 
--- Índices úteis
-CREATE INDEX idx_incidents_company_vehicle ON public.vehicle_incidents(company_id, vehicle_id);
-CREATE INDEX idx_expenses_company_vehicle  ON public.vehicle_expenses(company_id, vehicle_id);
-CREATE INDEX idx_fines_company_vehicle     ON public.traffic_fines(company_id, vehicle_id);
-```
+Substitui placeholder por:
+- **Header KPIs (5 cards)**: Avisos aguardando notif (azul), Multas a vencer 7d (vermelho), Em recurso (laranja), Total pendente R$, Pontos em risco
+- **Filtros**: tipo registro, status, motorista, veículo, período (Select + DatePicker)
+- **Botões**: 🤖 "Cadastrar via Foto" (primary), ✏️ "Cadastrar Manualmente"
+- **Lista de cards**: visual diferenciado AVISO (azul claro) vs MULTA (cor por status), ações contextuais
 
-**Sem FK explícita** para `companies/vehicles/drivers` — segue padrão do schema atual (que usa RLS via `is_company_member` em vez de FKs declaradas).
+Arquivo principal: `src/pages/app/Multas.tsx` (rewrite completo).
 
----
+Componentes:
+- `src/components/fines/FinesKpis.tsx`
+- `src/components/fines/FineCard.tsx`
+- `src/components/fines/FineFiltersBar.tsx`
+- `src/components/fines/FinePhotoUploadDialog.tsx` (etapa principal IA)
+- `src/components/fines/FineFormDialog.tsx` (manual + edição, abas Aviso/Notificação)
+- `src/components/fines/FineDetailsDialog.tsx` (timeline + ações)
+- `src/components/fines/ConvertAvisoDialog.tsx` (etapa 4)
+- `src/components/fines/IndicateDriverDialog.tsx` (etapa 5)
+- `src/components/fines/RecourseDialog.tsx` (etapa 6 — abrir + atualizar resultado)
+- `src/components/fines/PaymentDialog.tsx` (etapa 7)
 
-## ETAPA 2 — UI Placeholder (3 abas novas)
+Helper: `src/lib/fines.ts` — tipos, status labels/cores, severity labels, fluxo de transição.
 
-**Componente compartilhado:** `src/components/placeholder/ModulePlaceholder.tsx`
-- Props: `icon`, `title`, `subtitle`, `features: string[]`
-- Layout: card centralizado, ícone grande em `bg-primary/10`, badge "Disponível em breve", botão ghost "Receber notificação quando lançar" (sem handler).
+### ETAPA 4 — Conversão AVISO → MULTA
 
-**Páginas novas:**
-- `src/pages/app/Sinistros.tsx` (ícone `CarFront` ou `AlertOctagon`)
-- `src/pages/app/Despesas.tsx` (ícone `Receipt`)
-- `src/pages/app/Multas.tsx` (ícone `AlertTriangle`)
+Botão "Converter em Multa" no card de aviso → abre `ConvertAvisoDialog`:
+1. Mantém dados da infração já preenchidos
+2. Solicita upload da notificação oficial (chama `extract-traffic-fine`)
+3. Preenche campos da notificação
+4. Update: `record_type='multa'`, `status='multa_autuada'`, dados de notificação
+5. Audit log automático via trigger
 
-**Rotas em `App.tsx`** (dentro de `/app` protegido):
-```
-<Route path="sinistros" element={<Sinistros />} />
-<Route path="despesas" element={<Despesas />} />
-<Route path="multas" element={<Multas />} />
-```
+### ETAPA 5 — Indicação de Motorista
 
-**Sidebar (`AppLayout.tsx`):** inserir 3 itens logo após "Manutenção" com mesmo padrão visual dos demais. Cada item leva à respectiva rota.
+`IndicateDriverDialog`:
+- Select de motorista (lista de `drivers` da empresa)
+- Mostra dados (CNH, validade)
+- Radio: "Indicação manual" vs "Solicitar confirmação no app" (placeholder)
+- Update: `driver_id`, `driver_indicated_at`, `driver_indication_method`, `status='motorista_indicado'`
 
-Funcionalidades planejadas (bullets) por módulo:
-- **Sinistros**: registro de ocorrência, fotos, custo de reparo, vínculo com apólice, status do reparo, relatório consolidado.
-- **Despesas**: IPVA/licenciamento com vencimentos, pedágio/lavagem/estacionamento, comprovantes, custo total por veículo, alertas de vencimento.
-- **Multas**: cadastro com pontos na CNH, vínculo com motorista, status (pendente/paga/recurso), upload da notificação, alerta de vencimento.
+### ETAPA 6 — Recurso
 
----
+`RecourseDialog` (modo "abrir"):
+- Tipo defesa (defesa_previa/jari/cetran) → salvo em `recourse_notes`
+- Argumentos (textarea)
+- Upload documento (storage `fines-attachments`)
+- Data protocolo
+- Update: `recourse_filed_at`, `recourse_document_url`, `status='em_recurso'`
 
-## ETAPA 3 — Histórico de Vida (placeholder)
+`RecourseDialog` (modo "resultado"):
+- Radio deferido/indeferido
+- Data resultado
+- Notas
+- Update: `recourse_result`, `recourse_result_date`, status condicional
 
-- **Botão em `VehicleDialog.tsx`**: aparece só em modo edição (veículo já existente). Texto: "📊 Ver Histórico Completo". Navega para `/app/veiculos/:id/historico`.
-- **Página nova**: `src/pages/app/VehicleHistory.tsx` em rota `vehicles/:id/historico`.
-  - Cabeçalho com placa do veículo (busca rápida por id).
-  - Grid de cards-mockup das abas planejadas (Identificação, Timeline, Manutenções, Combustível, Pneus, Documentos, Sinistros, Checklists, Indicadores Financeiros, Motoristas, Exportar) — apenas título + ícone, todos `disabled` visualmente.
-  - Badge "Em desenvolvimento — disponível em breve".
+### ETAPA 7 — Pagamento
 
----
+`PaymentDialog`:
+- Data, valor, método, upload comprovante
+- Detecção automática: `paid_amount === discount_amount` → `paga_com_desconto`, senão `paga_integral`
+- Update: `paid_at`, `paid_amount`, `payment_method`, `payment_receipt_url`, `status`
 
-## ETAPA 4 — Landing Page
+### ETAPA 8 — Alertas Automáticos
 
-Em `src/pages/Landing.tsx`, no array `features`, adicionar 4 itens novos com flag `comingSoon: true`. Render: badge "Em breve" no canto do card.
-- 🚨 Gestão de Sinistros
-- 💰 Despesas Operacionais
-- 🚓 Controle de Multas
-- 📊 Histórico Completo do Veículo
+Função SQL `update_fines_auto_status()`:
+- Avisos com >60 dias sem `notification_received_date` → `arquivada` + nota
+- Multas com `due_date < CURRENT_DATE` e não pagas → `vencida`
 
----
+Cron schedule diário via `pg_cron` + edge function `fines-daily-check` (ou só SQL function se for tudo no banco). Vou usar SQL function + pg_cron direto.
 
-## Garantia de não-quebra
-- Migrations: 100% aditivas (`CREATE TABLE`, `ADD COLUMN ... nullable`). Nenhum `DROP`/`ALTER COLUMN`/`RENAME`. RLS habilitada já no `CREATE`.
-- `maintenance_records`: novas colunas todas nullable → INSERTs/SELECTs existentes seguem funcionando.
-- Frontend: só adiciona arquivos e 3 rotas + 3 itens de sidebar + 1 botão no `VehicleDialog`. Nenhuma página/rota existente alterada.
-- Tipos do Supabase regeneram automaticamente após migration; código existente não referencia as novas colunas.
+Alertas visuais (vencimento 7d, prazo recurso, pontos CNH) calculados no frontend em tempo real (já refletidos nos KPIs + badges nos cards).
 
-## Plano de Rollback
-- **DB**: uma migration reversa com:
-  ```sql
-  DROP TABLE IF EXISTS public.vehicle_incidents;
-  DROP TABLE IF EXISTS public.vehicle_expenses;
-  DROP TABLE IF EXISTS public.traffic_fines;
-  ALTER TABLE public.maintenance_records
-    DROP COLUMN IF EXISTS maintenance_category,
-    DROP COLUMN IF EXISTS service_provider_rating,
-    DROP COLUMN IF EXISTS warranty_until;
-  ```
-- **Frontend**: remover os 4 arquivos novos (`Sinistros.tsx`, `Despesas.tsx`, `Multas.tsx`, `VehicleHistory.tsx`), o `ModulePlaceholder.tsx`, as 4 rotas em `App.tsx`, os 3 itens no sidebar, o botão "Histórico" no `VehicleDialog`, e os 4 itens novos do array `features` em `Landing.tsx`. Tudo isolado, sem dependências cruzadas.
+### ETAPA 9 — Relatórios
 
----
+Aba "Relatórios" dentro de `/app/multas` (Tabs no topo: Lista | Relatórios):
+- **Por motorista**: tabela com qtd, pontos, valor total, ranking, badge "próximo de 20 pontos"
+- **Por veículo**: tabela com histórico, custo total, locais mais comuns
+- **Por período**: gráfico mensal (recharts), top infrações, top locais
 
-Confirma "OK" para eu rodar a migration (Etapa 1) e na sequência implementar Etapas 2-4 no frontend?
+Componente: `src/components/fines/FinesReports.tsx`.
+
+### ETAPA 10 — Landing Page
+
+`src/pages/Landing.tsx`: localizar feature card "Controle de Multas" e atualizar descrição com bullets do escopo. Remover badge "Em breve" deste item.
+
+### Storage
+
+Bucket `fines-attachments` (privado, scoped por company_id). Migration cria bucket + policies.
+
+### Sidebar
+
+`AppLayout.tsx`: remover badge "Soon" do item "Multas".
+
+### Garantias
+- Migration aditiva (DROP só da tabela placeholder vazia + recriação)
+- Outras tabelas/fluxos intocados
+- IA opcional (botão manual sempre disponível)
+- PT-BR em toda UI
+- Audit log via trigger genérico
+
+### Plano de Rollback
+- DROP TABLE traffic_fines + recriar versão simples do placeholder
+- Restaurar `Multas.tsx` para `ModulePlaceholder`
+- Remover componentes em `src/components/fines/`
+- Remover edge function `extract-traffic-fine`
+- Remover bucket `fines-attachments`
+
+Confirma para eu executar tudo de uma vez?
