@@ -1531,6 +1531,24 @@ export type Database = {
         }
         Relationships: []
       }
+      fipe_cache: {
+        Row: {
+          cache_key: string
+          fetched_at: string
+          payload: Json
+        }
+        Insert: {
+          cache_key: string
+          fetched_at?: string
+          payload: Json
+        }
+        Update: {
+          cache_key?: string
+          fetched_at?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       fuel_authorization_items: {
         Row: {
           authorization_id: string
@@ -3818,6 +3836,70 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_fipe_history: {
+        Row: {
+          company_id: string
+          created_at: string
+          depreciation_pct: number | null
+          fipe_code: string | null
+          fipe_value: number
+          id: string
+          queried_at: string
+          queried_by: string | null
+          reference_month: string | null
+          source: string
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          depreciation_pct?: number | null
+          fipe_code?: string | null
+          fipe_value: number
+          id?: string
+          queried_at?: string
+          queried_by?: string | null
+          reference_month?: string | null
+          source?: string
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          depreciation_pct?: number | null
+          fipe_code?: string | null
+          fipe_value?: number
+          id?: string
+          queried_at?: string
+          queried_by?: string | null
+          reference_month?: string | null
+          source?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_fipe_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_fipe_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "vehicle_fipe_history_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_incidents: {
         Row: {
           company_id: string
@@ -4020,7 +4102,13 @@ export type Database = {
           current_km: number
           documents: string[]
           expected_consumption_kml: number | null
+          fipe_brand_code: string | null
+          fipe_code: string | null
+          fipe_model_code: string | null
+          fipe_reference_month: string | null
           fipe_value: number | null
+          fipe_value_updated_at: string | null
+          fipe_year_code: string | null
           fuel_type: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker: boolean
           id: string
@@ -4075,7 +4163,13 @@ export type Database = {
           current_km?: number
           documents?: string[]
           expected_consumption_kml?: number | null
+          fipe_brand_code?: string | null
+          fipe_code?: string | null
+          fipe_model_code?: string | null
+          fipe_reference_month?: string | null
           fipe_value?: number | null
+          fipe_value_updated_at?: string | null
+          fipe_year_code?: string | null
           fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker?: boolean
           id?: string
@@ -4130,7 +4224,13 @@ export type Database = {
           current_km?: number
           documents?: string[]
           expected_consumption_kml?: number | null
+          fipe_brand_code?: string | null
+          fipe_code?: string | null
+          fipe_model_code?: string | null
+          fipe_reference_month?: string | null
           fipe_value?: number | null
+          fipe_value_updated_at?: string | null
+          fipe_year_code?: string | null
           fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
           has_tracker?: boolean
           id?: string
