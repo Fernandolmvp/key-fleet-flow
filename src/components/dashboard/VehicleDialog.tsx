@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle, BarChart3 } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
+import VehicleFipePanel from "./VehicleFipePanel";
 
 const STATUSES = [
   { value: "ativo", label: "Ativo" },
@@ -710,6 +711,13 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
             <p className="text-[11px] text-muted-foreground">Se igual ao ano atual, o veículo é considerado licenciado.</p>
           </div>
         </div>
+
+        <VehicleFipePanel
+          vehicleId={vehicle?.id}
+          brand={form.brand}
+          model={form.model}
+          year={form.year_model || form.year_manufacture}
+        />
 
         <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
           <div className="flex items-center gap-2">
