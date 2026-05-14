@@ -17,6 +17,8 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.fipe-lookup]
     verify_jwt = false
+  [functions.cnpj-lookup]
+    verify_jwt = false
   [functions.partner-accept-invite]
     verify_jwt = false
   [functions.partner-invite]

@@ -17,7 +17,7 @@ import KmOverrideField from "@/components/dashboard/KmOverrideField";
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
 const blank = () => ({
-  vehicle_id: "", driver_id: "",
+  vehicle_id: "", driver_id: "", workshop_id: "",
   type: "preventiva", status: "concluida", category: "",
   service_at: new Date().toISOString().slice(0, 16),
   km_at_service: "",
@@ -35,6 +35,7 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
   const [aiBusy, setAiBusy] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [workshops, setWorkshops] = useState<any[]>([]);
   const [form, setForm] = useState<any>(blank());
   const [maxKm, setMaxKm] = useState<number>(0);
   const [kmOverrideReason, setKmOverrideReason] = useState<string>("");
@@ -42,11 +43,12 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
   useEffect(() => {
     if (!open || !currentCompanyId) return;
     (async () => {
-      const [{ data: v }, { data: d }] = await Promise.all([
+      const [{ data: v }, { data: d }, { data: w }] = await Promise.all([
         supabase.from("vehicles").select("id,plate,brand,model,current_km").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
         supabase.from("drivers").select("id,full_name").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
+        supabase.from("workshops" as any).select("id,name,phone,city,state").eq("company_id", currentCompanyId).eq("status", "active").order("name"),
       ]);
-      setVehicles(v ?? []); setDrivers(d ?? []);
+      setVehicles(v ?? []); setDrivers(d ?? []); setWorkshops((w as any[]) ?? []);
     })();
     if (record) {
       setForm({
@@ -54,6 +56,7 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
         service_at: record.service_at ? new Date(record.service_at).toISOString().slice(0, 16) : "",
         next_service_at: record.next_service_at ?? "",
         driver_id: record.driver_id ?? "",
+        workshop_id: record.workshop_id ?? "",
         parts: record.parts ?? [],
         labor_value: String(record.labor_value ?? "0"),
         parts_value: String(record.parts_value ?? "0"),
@@ -175,6 +178,7 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
       company_id: currentCompanyId,
       vehicle_id: form.vehicle_id,
       driver_id: form.driver_id || null,
+      workshop_id: form.workshop_id || null,
       type: form.type,
       status: form.status,
       category: form.category || null,
@@ -342,7 +346,39 @@ export default function MaintenanceDialog({ open, onOpenChange, record, onSaved 
 
           <div>
             <Label>Oficina</Label>
-            <Input value={form.workshop_name} onChange={(e) => setForm((f: any) => ({ ...f, workshop_name: e.target.value }))} />
+            {workshops.length > 0 ? (
+              <Select
+                value={form.workshop_id || "__free__"}
+                onValueChange={(v) => {
+                  if (v === "__free__") {
+                    setForm((f: any) => ({ ...f, workshop_id: "" }));
+                  } else {
+                    const w = workshops.find((x) => x.id === v);
+                    setForm((f: any) => ({
+                      ...f,
+                      workshop_id: v,
+                      workshop_name: w?.name ?? f.workshop_name,
+                      city: w?.city ?? f.city,
+                      state: w?.state ?? f.state,
+                    }));
+                  }
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecionar oficina cadastrada..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__free__">— Digitar manualmente —</SelectItem>
+                  {workshops.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>{w.name}{w.city ? ` · ${w.city}/${w.state ?? ""}` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Input
+              className={workshops.length > 0 ? "mt-2" : ""}
+              placeholder={workshops.length > 0 ? "Ou digite o nome livre" : "Nome da oficina"}
+              value={form.workshop_name}
+              onChange={(e) => setForm((f: any) => ({ ...f, workshop_name: e.target.value, workshop_id: "" }))}
+            />
           </div>
           <div>
             <Label>CNPJ oficina</Label>
