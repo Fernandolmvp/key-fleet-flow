@@ -20,6 +20,48 @@ function norm(s: string) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
+function tokenize(s: string): string[] {
+  return norm(s)
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length >= 2);
+}
+
+// Aliases comuns de modelos truncados/codificados em cadastros (RENAVAM/Detran)
+const MODEL_ALIASES: Record<string, string> = {
+  kgoo: "kangoo",
+  enduran: "endurance",
+  endur: "endurance",
+  freed: "freedom",
+  advent: "adventure",
+  attract: "attractive",
+  highl: "highline",
+  comfortl: "comfortline",
+  trendl: "trendline",
+};
+
+function expandAliases(tokens: string[]): string[] {
+  return tokens.map((t) => MODEL_ALIASES[t] ?? t);
+}
+
+function scoreModel(queryTokens: string[], candidate: string): number {
+  const ct = tokenize(candidate);
+  if (ct.length === 0) return 0;
+  let score = 0;
+  // bônus forte se a primeira palavra (família) bate
+  const q0 = queryTokens[0];
+  const c0 = ct[0];
+  if (q0 && c0) {
+    if (q0 === c0) score += 10;
+    else if (c0.startsWith(q0) || q0.startsWith(c0)) score += 6;
+  }
+  for (const t of queryTokens) {
+    if (ct.includes(t)) score += 3;
+    else if (ct.some((c) => c.startsWith(t) || t.startsWith(c))) score += 1;
+  }
+  return score;
+}
+
 async function fetchJson(url: string) {
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) throw new Error(`FIPE ${r.status} em ${url}`);
@@ -37,23 +79,47 @@ async function cachedFetch(supa: any, key: string, fn: () => Promise<any>) {
 async function lookup(supa: any, kind: string, brand: string, model: string, year: number | null) {
   const brands: any[] = await cachedFetch(supa, `brands:${kind}`, () => fetchJson(`${FIPE_BASE}/${kind}/marcas`));
   const nb = norm(brand);
-  const brandMatch = brands.find((b: any) => norm(b.nome) === nb) || brands.find((b: any) => norm(b.nome).includes(nb) || nb.includes(norm(b.nome)));
+  const brandMatch =
+    brands.find((b: any) => norm(b.nome) === nb) ||
+    brands.find((b: any) => {
+      const n = norm(b.nome);
+      return n === nb || n.split(/[\s\-]+/).includes(nb) || nb.split(/[\s\-]+/).includes(n);
+    }) ||
+    brands.find((b: any) => norm(b.nome).includes(nb) || nb.includes(norm(b.nome)));
   if (!brandMatch) throw new Error(`Marca "${brand}" não localizada na FIPE`);
   const models: any = await cachedFetch(supa, `models:${kind}:${brandMatch.codigo}`, () => fetchJson(`${FIPE_BASE}/${kind}/marcas/${brandMatch.codigo}/modelos`));
   const modelList: any[] = models.modelos ?? models;
-  const nm = norm(model);
-  const modelMatch =
-    modelList.find((m: any) => norm(m.nome) === nm) ||
-    modelList.find((m: any) => norm(m.nome).startsWith(nm)) ||
-    modelList.find((m: any) => norm(m.nome).includes(nm));
-  if (!modelMatch) throw new Error(`Modelo "${model}" não localizado para ${brandMatch.nome}`);
+  const queryTokens = expandAliases(tokenize(model));
+  if (queryTokens.length === 0) throw new Error(`Modelo "${model}" inválido`);
+  // Score todos os candidatos
+  const scored = modelList
+    .map((m: any) => ({ m, s: scoreModel(queryTokens, m.nome) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s);
+  if (scored.length === 0 || scored[0].s < 6) {
+    throw new Error(`Modelo "${model}" não localizado para ${brandMatch.nome}`);
+  }
+  const modelMatch = scored[0].m;
   const years: any[] = await cachedFetch(supa, `years:${kind}:${brandMatch.codigo}:${modelMatch.codigo}`, () =>
     fetchJson(`${FIPE_BASE}/${kind}/marcas/${brandMatch.codigo}/modelos/${modelMatch.codigo}/anos`),
   );
   let yearMatch = years[0];
   if (year) {
-    const yc = years.find((y: any) => String(y.codigo).startsWith(String(year))) || years.find((y: any) => String(y.nome).startsWith(String(year)));
-    if (yc) yearMatch = yc;
+    const exact =
+      years.find((y: any) => String(y.codigo).startsWith(String(year))) ||
+      years.find((y: any) => String(y.nome).startsWith(String(year)));
+    if (exact) {
+      yearMatch = exact;
+    } else {
+      // fallback: ano mais próximo
+      const withDist = years
+        .map((y: any) => {
+          const yr = parseInt(String(y.codigo).split("-")[0], 10);
+          return { y, d: isNaN(yr) ? 9999 : Math.abs(yr - year) };
+        })
+        .sort((a, b) => a.d - b.d);
+      if (withDist[0]) yearMatch = withDist[0].y;
+    }
   }
   const detail: any = await cachedFetch(supa, `value:${kind}:${brandMatch.codigo}:${modelMatch.codigo}:${yearMatch.codigo}`, () =>
     fetchJson(`${FIPE_BASE}/${kind}/marcas/${brandMatch.codigo}/modelos/${modelMatch.codigo}/anos/${yearMatch.codigo}`),
