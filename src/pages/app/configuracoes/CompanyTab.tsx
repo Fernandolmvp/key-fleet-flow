@@ -138,7 +138,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         <CepInput
           value={cep}
           onChange={setCep}
-          nextFieldRef={addressRef}
+          nextFieldRef={numberRef}
           onAddressFound={(a) => {
             setAddress(a.street);
             setNeighborhood(a.neighborhood);
