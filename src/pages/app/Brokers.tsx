@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Pencil, Trash2, Phone, Mail, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import CepInput from "@/components/forms/CepInput";
+import AddressNumberFields from "@/components/forms/AddressNumberFields";
+import { isAddressMissingNumber } from "@/lib/address";
 
 type Broker = {
   id: string;
@@ -26,6 +28,8 @@ type Broker = {
   neighborhood: string | null;
   city: string | null;
   state: string | null;
+  address_number: string | null;
+  address_complement: string | null;
   notes: string | null;
   active: boolean;
 };
@@ -40,6 +44,7 @@ export default function Brokers() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Broker>>(empty);
   const brokerAddressRef = useRef<HTMLInputElement>(null);
+  const brokerNumberRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     if (!currentCompanyId) return;
@@ -76,6 +81,8 @@ export default function Brokers() {
       neighborhood: form.neighborhood || null,
       city: form.city || null,
       state: form.state ? form.state.toUpperCase() : null,
+      address_number: form.address_number || null,
+      address_complement: form.address_complement || null,
       notes: form.notes || null,
       active: form.active ?? true,
     };
@@ -201,13 +208,13 @@ export default function Brokers() {
               <CepInput
                 value={form.cep || ""}
                 onChange={(v) => setForm({ ...form, cep: v })}
-                nextFieldRef={brokerAddressRef}
+                nextFieldRef={brokerNumberRef}
                 onAddressFound={(a) => setForm((p) => ({ ...p, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf }))}
               />
             </div>
             <div>
               <Label>Endereço</Label>
-              <Input ref={brokerAddressRef} value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" />
+              <Input ref={brokerAddressRef} value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua / Logradouro" />
             </div>
             <div>
               <Label>Bairro</Label>
@@ -223,6 +230,14 @@ export default function Brokers() {
                 <Input maxLength={2} value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} />
               </div>
             </div>
+            <AddressNumberFields
+              ref={brokerNumberRef}
+              number={form.address_number || ""}
+              complement={form.address_complement || ""}
+              onNumberChange={(v) => setForm({ ...form, address_number: v })}
+              onComplementChange={(v) => setForm({ ...form, address_complement: v })}
+              warnLegacy={!!form.id && isAddressMissingNumber(form as any)}
+            />
             <div className="col-span-2">
               <Label>Observações</Label>
               <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
