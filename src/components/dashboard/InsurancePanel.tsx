@@ -840,15 +840,28 @@ export default function InsurancePanel() {
       else if (d <= 30) { vencendo30++; vigentes++; }
       else vigentes++;
     });
+    // Veículos contados como "manuais": vínculos diretos com inclusion_type='manual'
+    // (insurance_policy_vehicles) + matches manuais (vehicle_policy_manual_matches).
+    const manualVehicleIds = new Set<string>();
+    links.forEach((l) => {
+      if (l.inclusion_type === "manual" && activeIds.has(l.policy_id) && !l.removed_at) {
+        manualVehicleIds.add(l.vehicle_id);
+      }
+    });
+    manualMatches.forEach((m) => {
+      if (activeIds.has(m.policy_id)) manualVehicleIds.add(m.vehicle_id);
+    });
+    // Só conta como manual se realmente está coberto (não duplica com auto)
+    const manualCovered = Array.from(manualVehicleIds).filter((id) => coveredVehicleIds.has(id)).length;
     return {
       coveredCount: coveredVehicleIds.size,
       uncoveredCount: vehicles.filter((v) => !coveredVehicleIds.has(v.id)).length,
       vigentes,
       vencendo30,
       vencidas,
-      manualCount: manualMatches.filter((m) => activeIds.has(m.policy_id)).length,
+      manualCount: manualCovered,
       externalCount: externalPlates.filter((e) => activeIds.has(e.policy_id)).length,
-      autoCount: Math.max(0, coveredVehicleIds.size - manualMatches.filter((m) => activeIds.has(m.policy_id)).length),
+      autoCount: Math.max(0, coveredVehicleIds.size - manualCovered),
     };
   }, [policies, links, vehicles, manualMatches, externalPlates]);
 
