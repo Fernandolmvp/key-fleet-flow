@@ -846,6 +846,24 @@ export type Database = {
           },
         ]
       }
+      cnpj_cache: {
+        Row: {
+          cnpj: string
+          fetched_at: string
+          payload: Json
+        }
+        Insert: {
+          cnpj: string
+          fetched_at?: string
+          payload: Json
+        }
+        Update: {
+          cnpj?: string
+          fetched_at?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           address: string | null
@@ -2161,75 +2179,216 @@ export type Database = {
       }
       fuel_stations: {
         Row: {
+          accepted_payment_methods: string[] | null
           active: boolean
           address: string | null
           address_complement: string | null
           address_number: string | null
+          anp_register_number: string | null
+          average_fuel_price_diesel: number | null
+          average_fuel_price_etanol: number | null
+          average_fuel_price_gasolina: number | null
+          bank_account: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_name: string | null
           brand: string | null
           cep: string | null
           city: string | null
+          cnae_code: string | null
           cnpj: string | null
+          cnpj_verified: boolean | null
           company_id: string
           contact_name: string | null
+          contract_end: string | null
+          contract_start: string | null
           created_at: string
           created_by: string | null
+          credit_limit: number | null
+          discount_pct_diesel: number | null
+          discount_pct_etanol: number | null
+          discount_pct_gasolina: number | null
+          document_type: string | null
+          documents_urls: Json | null
+          fleet_card_providers: string[] | null
           fuel_types: string[]
+          has_24h_operation: boolean | null
+          has_automatic_reading: boolean | null
+          has_car_wash: boolean | null
+          has_convenience_store: boolean | null
+          has_lubrification: boolean | null
+          has_restaurant: boolean | null
+          has_truck_lane: boolean | null
           id: string
           inactivated_at: string | null
           inactive_reason: string | null
+          internal_notes: string | null
+          invoice_type: string | null
+          issues_invoice: boolean | null
+          latitude: number | null
+          longitude: number | null
+          min_purchase_amount: number | null
+          municipal_registration: string | null
           name: string
           neighborhood: string | null
           notes: string | null
+          operating_hours: Json | null
+          payment_terms: string | null
           phone: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          preferred: boolean | null
+          rating: number | null
+          simples_nacional: boolean | null
           state: string | null
+          state_registration: string | null
+          supports_fleet_card: boolean | null
+          tags: string[] | null
+          total_amount: number | null
+          total_fuelings: number | null
+          trade_name: string | null
           updated_at: string
         }
         Insert: {
+          accepted_payment_methods?: string[] | null
           active?: boolean
           address?: string | null
           address_complement?: string | null
           address_number?: string | null
+          anp_register_number?: string | null
+          average_fuel_price_diesel?: number | null
+          average_fuel_price_etanol?: number | null
+          average_fuel_price_gasolina?: number | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
           brand?: string | null
           cep?: string | null
           city?: string | null
+          cnae_code?: string | null
           cnpj?: string | null
+          cnpj_verified?: boolean | null
           company_id: string
           contact_name?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
           created_at?: string
           created_by?: string | null
+          credit_limit?: number | null
+          discount_pct_diesel?: number | null
+          discount_pct_etanol?: number | null
+          discount_pct_gasolina?: number | null
+          document_type?: string | null
+          documents_urls?: Json | null
+          fleet_card_providers?: string[] | null
           fuel_types?: string[]
+          has_24h_operation?: boolean | null
+          has_automatic_reading?: boolean | null
+          has_car_wash?: boolean | null
+          has_convenience_store?: boolean | null
+          has_lubrification?: boolean | null
+          has_restaurant?: boolean | null
+          has_truck_lane?: boolean | null
           id?: string
           inactivated_at?: string | null
           inactive_reason?: string | null
+          internal_notes?: string | null
+          invoice_type?: string | null
+          issues_invoice?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          min_purchase_amount?: number | null
+          municipal_registration?: string | null
           name: string
           neighborhood?: string | null
           notes?: string | null
+          operating_hours?: Json | null
+          payment_terms?: string | null
           phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          preferred?: boolean | null
+          rating?: number | null
+          simples_nacional?: boolean | null
           state?: string | null
+          state_registration?: string | null
+          supports_fleet_card?: boolean | null
+          tags?: string[] | null
+          total_amount?: number | null
+          total_fuelings?: number | null
+          trade_name?: string | null
           updated_at?: string
         }
         Update: {
+          accepted_payment_methods?: string[] | null
           active?: boolean
           address?: string | null
           address_complement?: string | null
           address_number?: string | null
+          anp_register_number?: string | null
+          average_fuel_price_diesel?: number | null
+          average_fuel_price_etanol?: number | null
+          average_fuel_price_gasolina?: number | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
           brand?: string | null
           cep?: string | null
           city?: string | null
+          cnae_code?: string | null
           cnpj?: string | null
+          cnpj_verified?: boolean | null
           company_id?: string
           contact_name?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
           created_at?: string
           created_by?: string | null
+          credit_limit?: number | null
+          discount_pct_diesel?: number | null
+          discount_pct_etanol?: number | null
+          discount_pct_gasolina?: number | null
+          document_type?: string | null
+          documents_urls?: Json | null
+          fleet_card_providers?: string[] | null
           fuel_types?: string[]
+          has_24h_operation?: boolean | null
+          has_automatic_reading?: boolean | null
+          has_car_wash?: boolean | null
+          has_convenience_store?: boolean | null
+          has_lubrification?: boolean | null
+          has_restaurant?: boolean | null
+          has_truck_lane?: boolean | null
           id?: string
           inactivated_at?: string | null
           inactive_reason?: string | null
+          internal_notes?: string | null
+          invoice_type?: string | null
+          issues_invoice?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          min_purchase_amount?: number | null
+          municipal_registration?: string | null
           name?: string
           neighborhood?: string | null
           notes?: string | null
+          operating_hours?: Json | null
+          payment_terms?: string | null
           phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          preferred?: boolean | null
+          rating?: number | null
+          simples_nacional?: boolean | null
           state?: string | null
+          state_registration?: string | null
+          supports_fleet_card?: boolean | null
+          tags?: string[] | null
+          total_amount?: number | null
+          total_fuelings?: number | null
+          trade_name?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2609,6 +2768,7 @@ export type Database = {
           vehicle_id: string
           warranty_until: string | null
           workshop_cnpj: string | null
+          workshop_id: string | null
           workshop_name: string | null
         }
         Insert: {
@@ -2643,6 +2803,7 @@ export type Database = {
           vehicle_id: string
           warranty_until?: string | null
           workshop_cnpj?: string | null
+          workshop_id?: string | null
           workshop_name?: string | null
         }
         Update: {
@@ -2677,6 +2838,7 @@ export type Database = {
           vehicle_id?: string
           warranty_until?: string | null
           workshop_cnpj?: string | null
+          workshop_id?: string | null
           workshop_name?: string | null
         }
         Relationships: [
@@ -3320,6 +3482,192 @@ export type Database = {
           created_at?: string
           notes?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          address_complement: string | null
+          address_number: string | null
+          bank_account: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_name: string | null
+          blocked_reason: string | null
+          city: string | null
+          cnae_code: string | null
+          cnpj_verified: boolean
+          cofins: string | null
+          company_id: string
+          contact_name: string | null
+          contact_role: string | null
+          contract_end: string | null
+          contract_start: string | null
+          created_at: string
+          created_by: string | null
+          credit_limit: number | null
+          delivery_days_avg: number | null
+          discount_pct: number
+          document_number: string | null
+          document_type: string | null
+          documents_urls: Json
+          email: string | null
+          icms_rate: number | null
+          id: string
+          invoice_type: string | null
+          iss_rate: number | null
+          issues_invoice: boolean
+          latitude: number | null
+          longitude: number | null
+          minimum_order: number | null
+          municipal_registration: string | null
+          name: string
+          neighborhood: string | null
+          notes: string | null
+          payment_terms: string | null
+          phone: string | null
+          pis: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          preferred: boolean
+          rating: number | null
+          simples_nacional: boolean | null
+          state: string | null
+          state_registration: string | null
+          status: string
+          street: string | null
+          supplier_category: string[]
+          tags: string[]
+          total_amount: number
+          total_orders: number
+          trade_name: string | null
+          updated_at: string
+          updated_by: string | null
+          website: string | null
+          whatsapp: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address_complement?: string | null
+          address_number?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          blocked_reason?: string | null
+          city?: string | null
+          cnae_code?: string | null
+          cnpj_verified?: boolean
+          cofins?: string | null
+          company_id: string
+          contact_name?: string | null
+          contact_role?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          delivery_days_avg?: number | null
+          discount_pct?: number
+          document_number?: string | null
+          document_type?: string | null
+          documents_urls?: Json
+          email?: string | null
+          icms_rate?: number | null
+          id?: string
+          invoice_type?: string | null
+          iss_rate?: number | null
+          issues_invoice?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          minimum_order?: number | null
+          municipal_registration?: string | null
+          name: string
+          neighborhood?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          pis?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          preferred?: boolean
+          rating?: number | null
+          simples_nacional?: boolean | null
+          state?: string | null
+          state_registration?: string | null
+          status?: string
+          street?: string | null
+          supplier_category?: string[]
+          tags?: string[]
+          total_amount?: number
+          total_orders?: number
+          trade_name?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+          whatsapp?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address_complement?: string | null
+          address_number?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          blocked_reason?: string | null
+          city?: string | null
+          cnae_code?: string | null
+          cnpj_verified?: boolean
+          cofins?: string | null
+          company_id?: string
+          contact_name?: string | null
+          contact_role?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          delivery_days_avg?: number | null
+          discount_pct?: number
+          document_number?: string | null
+          document_type?: string | null
+          documents_urls?: Json
+          email?: string | null
+          icms_rate?: number | null
+          id?: string
+          invoice_type?: string | null
+          iss_rate?: number | null
+          issues_invoice?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          minimum_order?: number | null
+          municipal_registration?: string | null
+          name?: string
+          neighborhood?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          pis?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          preferred?: boolean
+          rating?: number | null
+          simples_nacional?: boolean | null
+          state?: string | null
+          state_registration?: string | null
+          status?: string
+          street?: string | null
+          supplier_category?: string[]
+          tags?: string[]
+          total_amount?: number
+          total_orders?: number
+          trade_name?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+          whatsapp?: string | null
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -4321,6 +4669,192 @@ export type Database = {
           },
         ]
       }
+      workshops: {
+        Row: {
+          address_complement: string | null
+          address_number: string | null
+          bank_account: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_name: string | null
+          blocked_reason: string | null
+          city: string | null
+          cnae_code: string | null
+          cnpj_verified: boolean
+          cofins: string | null
+          company_id: string
+          contact_name: string | null
+          contact_role: string | null
+          contract_end: string | null
+          contract_start: string | null
+          created_at: string
+          created_by: string | null
+          credit_limit: number | null
+          discount_pct: number
+          document_number: string | null
+          document_type: string | null
+          documents_urls: Json
+          email: string | null
+          icms_rate: number | null
+          id: string
+          invoice_type: string | null
+          iss_rate: number | null
+          issues_invoice: boolean
+          latitude: number | null
+          longitude: number | null
+          municipal_registration: string | null
+          name: string
+          neighborhood: string | null
+          notes: string | null
+          payment_terms: string | null
+          phone: string | null
+          pis: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          preferred: boolean
+          rating: number | null
+          simples_nacional: boolean | null
+          specialties: string[]
+          state: string | null
+          state_registration: string | null
+          status: string
+          street: string | null
+          tags: string[]
+          total_amount: number
+          total_orders: number
+          trade_name: string | null
+          updated_at: string
+          updated_by: string | null
+          warranty_days: number
+          website: string | null
+          whatsapp: string | null
+          workshop_type: string[]
+          zip_code: string | null
+        }
+        Insert: {
+          address_complement?: string | null
+          address_number?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          blocked_reason?: string | null
+          city?: string | null
+          cnae_code?: string | null
+          cnpj_verified?: boolean
+          cofins?: string | null
+          company_id: string
+          contact_name?: string | null
+          contact_role?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          discount_pct?: number
+          document_number?: string | null
+          document_type?: string | null
+          documents_urls?: Json
+          email?: string | null
+          icms_rate?: number | null
+          id?: string
+          invoice_type?: string | null
+          iss_rate?: number | null
+          issues_invoice?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          municipal_registration?: string | null
+          name: string
+          neighborhood?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          pis?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          preferred?: boolean
+          rating?: number | null
+          simples_nacional?: boolean | null
+          specialties?: string[]
+          state?: string | null
+          state_registration?: string | null
+          status?: string
+          street?: string | null
+          tags?: string[]
+          total_amount?: number
+          total_orders?: number
+          trade_name?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          warranty_days?: number
+          website?: string | null
+          whatsapp?: string | null
+          workshop_type?: string[]
+          zip_code?: string | null
+        }
+        Update: {
+          address_complement?: string | null
+          address_number?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          blocked_reason?: string | null
+          city?: string | null
+          cnae_code?: string | null
+          cnpj_verified?: boolean
+          cofins?: string | null
+          company_id?: string
+          contact_name?: string | null
+          contact_role?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          discount_pct?: number
+          document_number?: string | null
+          document_type?: string | null
+          documents_urls?: Json
+          email?: string | null
+          icms_rate?: number | null
+          id?: string
+          invoice_type?: string | null
+          iss_rate?: number | null
+          issues_invoice?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          municipal_registration?: string | null
+          name?: string
+          neighborhood?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          pis?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          preferred?: boolean
+          rating?: number | null
+          simples_nacional?: boolean | null
+          specialties?: string[]
+          state?: string | null
+          state_registration?: string | null
+          status?: string
+          street?: string | null
+          tags?: string[]
+          total_amount?: number
+          total_orders?: number
+          trade_name?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          warranty_days?: number
+          website?: string | null
+          whatsapp?: string | null
+          workshop_type?: string[]
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       company_usage: {
@@ -4622,6 +5156,8 @@ export type Database = {
         Args: { _company_id: string }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       sync_vehicle_insurance_fields: {
         Args: { _vehicle_ids: string[] }
         Returns: undefined
