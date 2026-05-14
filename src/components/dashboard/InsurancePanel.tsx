@@ -1598,8 +1598,8 @@ export default function InsurancePanel() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Sem cobertura</p>
-                  <p className="font-display text-4xl font-bold mt-2 text-destructive">{companyUncovered.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">veículos ativos da frota</p>
+                  <p className="font-display text-4xl font-bold mt-2 text-destructive">{fleetSummary.uncoveredCount}</p>
+                  <p className="text-xs text-muted-foreground mt-1">de {vehicles.length} veículos ativos</p>
                 </div>
                 <div className="h-10 w-10 rounded-lg grid place-items-center bg-destructive/15 text-destructive">
                   <ShieldAlert className="h-5 w-5" />
