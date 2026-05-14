@@ -1635,7 +1635,7 @@ export default function InsurancePanel() {
                 <div className="font-display font-bold">Cobertura da frota</div>
               </div>
               {(() => {
-                const total = fleetSummary.coveredCount + fleetSummary.uncoveredCount;
+                const total = vehicles.length;
                 const pctCov = total > 0 ? Math.round((fleetSummary.coveredCount / total) * 100) : 0;
                 const data = [
                   { name: "Cobertos", value: fleetSummary.coveredCount },
