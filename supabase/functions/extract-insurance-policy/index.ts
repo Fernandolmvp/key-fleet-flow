@@ -40,7 +40,7 @@ const TOOL = {
         installments_count: { type: ["integer", "null"], description: "Número de parcelas" },
         installment_value: { type: ["number", "null"], description: "Valor de cada parcela" },
         deductible: { type: ["number", "null"], description: "Franquia padrão" },
-        coverage_summary: { type: ["string", "null"], description: "Resumo das coberturas principais (Casco, RCF-V, APP, assistência etc.) com limites quando possível" },
+        coverage_summary: { type: ["string", "null"], description: "Resumo CURTO e OBJETIVO da cobertura (máx. 3 linhas / ~280 caracteres). Comece SEMPRE com o tipo de seguro EXATAMENTE como está classificado na apólice (ex.: 'Compreensivo', 'Casco + RCF-V', 'Apenas Terceiros / RCF-V', 'Frota Compreensiva', etc.). Em seguida liste apenas as coberturas principais separadas por vírgula (ex.: Casco, RCF-V Danos Materiais, RCF-V Danos Corporais, APP, Assistência 24h). NÃO inclua valores, limites, franquias, condições, exclusões, observações ou textos de marketing — apenas o tipo + nomes das coberturas." },
         coverage_type: {
           type: ["string", "null"],
           enum: ["compreensivo", "terceiros", "casco_total", "casco_parcial", "frota", "outro", null],
