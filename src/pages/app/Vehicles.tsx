@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List, Upload } from "lucide-react";
+import { Plus, Search, Truck, Pencil, Trash2, FileText, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, LayoutGrid, List, Upload, RefreshCw, Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
@@ -59,6 +59,7 @@ export default function Vehicles() {
   const { currentCompanyId } = useAuth();
   const [items, setItems] = useState<Vehicle[]>([]);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [fipeBulkBusy, setFipeBulkBusy] = useState(false);
   const [docsByVehicle, setDocsByVehicle] = useState<Record<string, DocRow[]>>({});
   const [policiesByVehicle, setPoliciesByVehicle] = useState<Record<string, PolicyLink[]>>({});
   const [driverByVehicle, setDriverByVehicle] = useState<Record<string, string>>({});
@@ -207,6 +208,27 @@ export default function Vehicles() {
         </Button>
         <Button variant="outline" onClick={() => setBulkOpen(true)}>
           <Upload className="h-4 w-4 mr-2" /> Importar em lote
+        </Button>
+        <Button variant="outline" disabled={fipeBulkBusy} onClick={async () => {
+          if (!confirm(`Atualizar valor FIPE de ${items.length} veículo(s)? Pode levar alguns minutos.`)) return;
+          setFipeBulkBusy(true);
+          let ok = 0, notFound = 0, err = 0;
+          const notFoundPlates: string[] = [];
+          for (const v of items as any[]) {
+            try {
+              const { data } = await supabase.functions.invoke("fipe-lookup", { body: { vehicle_id: v.id } });
+              if (data?.error) { notFound++; notFoundPlates.push(v.plate); }
+              else if (data?.ok) { ok++; }
+              else { err++; }
+            } catch { err++; }
+          }
+          setFipeBulkBusy(false);
+          toast.success(`FIPE atualizado: ✅ ${ok} · ⚠️ ${notFound} não encontrados · ❌ ${err} erros`);
+          if (notFoundPlates.length) console.warn("FIPE não encontrado:", notFoundPlates);
+          load();
+        }}>
+          {fipeBulkBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Atualizar FIPE da frota
         </Button>
       </div>
 
