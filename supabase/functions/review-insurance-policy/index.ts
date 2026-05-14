@@ -164,6 +164,7 @@ Deno.serve(async (req) => {
       ],
       tools: [TOOL],
       toolChoice: { type: "function", function: { name: "review_insurance_vs_fleet" } },
+      timeoutMs: 120_000,
     });
 
     if (!result.success) {
