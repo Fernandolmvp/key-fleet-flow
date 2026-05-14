@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import DriverHistoryTab from "@/components/dashboard/DriverHistoryTab";
 import { useTabPermissions } from "@/lib/permissions";
 import CepInput from "@/components/forms/CepInput";
+import AddressNumberFields from "@/components/forms/AddressNumberFields";
+import { isAddressMissingNumber } from "@/lib/address";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -72,11 +74,12 @@ export default function Drivers() {
   const [form, setForm] = useState<any>(blank());
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("drivers:view") as "grid" | "list") || "grid");
   const driverAddressRef = useRef<HTMLInputElement>(null);
+  const driverNumberRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { localStorage.setItem("drivers:view", view); }, [view]);
 
   function blank() {
-    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", cep: "", address: "", neighborhood: "", city: "", state: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "", has_assigned_vehicle: false, assigned_vehicle_id: "" };
+    return { full_name: "", cpf: "", birth_date: "", phone: "", email: "", cnh_number: "", cnh_category: "", cnh_expires_at: "", medical_exam_expires_at: "", cep: "", address: "", address_number: "", address_complement: "", neighborhood: "", city: "", state: "", status: "ativo", photo_url: "", user_id: "", auto_fuel_authorized: false, manager_user_id: "", inactivated_at: "", inactive_reason: "", termination_date: "", has_assigned_vehicle: false, assigned_vehicle_id: "" };
   }
 
   const load = async () => {
@@ -569,13 +572,21 @@ export default function Drivers() {
                 <div className="space-y-2"><CepInput
                   value={form.cep || ""}
                   onChange={(v) => setForm({ ...form, cep: v })}
-                  nextFieldRef={driverAddressRef}
+                  nextFieldRef={driverNumberRef}
                   onAddressFound={(a) => setForm({ ...form, cep: a.cep, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf })}
                 /></div>
-                <div className="space-y-2"><Label>Endereço</Label><Input ref={driverAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" /></div>
+                <div className="space-y-2"><Label>Endereço</Label><Input ref={driverAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua / Logradouro" /></div>
                 <div className="space-y-2"><Label>Bairro</Label><Input value={form.neighborhood || ""} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Cidade</Label><Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
                 <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} /></div>
+                <AddressNumberFields
+                  ref={driverNumberRef}
+                  number={form.address_number || ""}
+                  complement={form.address_complement || ""}
+                  onNumberChange={(v) => setForm({ ...form, address_number: v })}
+                  onComplementChange={(v) => setForm({ ...form, address_complement: v })}
+                  warnLegacy={!!editing && isAddressMissingNumber(form)}
+                />
               </div>
             </TabsContent>
 

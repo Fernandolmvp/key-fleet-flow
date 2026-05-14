@@ -849,6 +849,8 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           cep: string | null
           city: string | null
           cnpj: string | null
@@ -868,6 +870,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           cep?: string | null
           city?: string | null
           cnpj?: string | null
@@ -887,6 +891,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           cep?: string | null
           city?: string | null
           cnpj?: string | null
@@ -1289,6 +1295,8 @@ export type Database = {
       drivers: {
         Row: {
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           assigned_vehicle_id: string | null
           auto_fuel_authorized: boolean
           birth_date: string | null
@@ -1324,6 +1332,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           assigned_vehicle_id?: string | null
           auto_fuel_authorized?: boolean
           birth_date?: string | null
@@ -1359,6 +1369,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           assigned_vehicle_id?: string | null
           auto_fuel_authorized?: boolean
           birth_date?: string | null
@@ -2151,6 +2163,8 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           brand: string | null
           cep: string | null
           city: string | null
@@ -2173,6 +2187,8 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           brand?: string | null
           cep?: string | null
           city?: string | null
@@ -2195,6 +2211,8 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           brand?: string | null
           cep?: string | null
           city?: string | null
@@ -2235,6 +2253,8 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           cep: string | null
           city: string | null
           company_id: string
@@ -2256,6 +2276,8 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           cep?: string | null
           city?: string | null
           company_id: string
@@ -2277,6 +2299,8 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           cep?: string | null
           city?: string | null
           company_id?: string

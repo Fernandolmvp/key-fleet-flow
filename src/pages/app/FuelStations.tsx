@@ -13,6 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTabPermissions } from "@/lib/permissions";
 import PartnerAccessDialog from "@/components/dashboard/PartnerAccessDialog";
 import CepInput from "@/components/forms/CepInput";
+import AddressNumberFields from "@/components/forms/AddressNumberFields";
+import { isAddressMissingNumber } from "@/lib/address";
 
 interface Station {
   id: string; name: string; cnpj: string | null; brand: string | null;
@@ -21,6 +23,8 @@ interface Station {
   phone: string | null; contact_name: string | null; fuel_types: string[];
   notes: string | null; active: boolean;
   inactivated_at: string | null; inactive_reason: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
 }
 
 const FUEL_TYPES = ["gasolina", "etanol", "diesel_s10", "diesel_s500", "gnv", "flex"];
@@ -29,6 +33,7 @@ const blank = () => ({
   name: "", cnpj: "", brand: "", cep: "", address: "", neighborhood: "", city: "", state: "",
   phone: "", contact_name: "", fuel_types: [] as string[], notes: "", active: true,
   inactivated_at: "", inactive_reason: "",
+  address_number: "", address_complement: "",
 });
 
 export default function FuelStations() {
@@ -43,6 +48,7 @@ export default function FuelStations() {
   useEffect(() => { localStorage.setItem("stations:tab", tab); }, [tab]);
   const [accessFor, setAccessFor] = useState<Station | null>(null);
   const stationAddressRef = useRef<HTMLInputElement>(null);
+  const stationNumberRef = useRef<HTMLInputElement>(null);
 
   const { canViewTab, isVisible, fallback } = useTabPermissions(
     "fuel_stations", ["ativos", "inativos", "todos"], tab,
@@ -210,13 +216,13 @@ export default function FuelStations() {
               <CepInput
                 value={form.cep || ""}
                 onChange={(v) => setForm({ ...form, cep: v })}
-                nextFieldRef={stationAddressRef}
+                nextFieldRef={stationNumberRef}
                 onAddressFound={(a) => setForm((p: any) => ({ ...p, address: a.street, neighborhood: a.neighborhood, city: a.city, state: a.uf }))}
                 label="CEP"
               />
             </div>
             <div className="space-y-2"><Label>Endereço</Label>
-              <Input ref={stationAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número" />
+              <Input ref={stationAddressRef} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua / Logradouro" />
             </div>
             <div className="space-y-2"><Label>Bairro</Label>
               <Input value={form.neighborhood || ""} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} />
@@ -227,6 +233,14 @@ export default function FuelStations() {
             <div className="space-y-2"><Label>UF</Label>
               <Input maxLength={2} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} />
             </div>
+            <AddressNumberFields
+              ref={stationNumberRef}
+              number={form.address_number || ""}
+              complement={form.address_complement || ""}
+              onNumberChange={(v) => setForm({ ...form, address_number: v })}
+              onComplementChange={(v) => setForm({ ...form, address_complement: v })}
+              warnLegacy={!!editing && isAddressMissingNumber(form)}
+            />
             <div className="space-y-2"><Label>Telefone</Label>
               <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>

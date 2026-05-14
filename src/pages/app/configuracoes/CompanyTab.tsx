@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import CepInput from "@/components/forms/CepInput";
+import AddressNumberFields from "@/components/forms/AddressNumberFields";
+import { isAddressMissingNumber } from "@/lib/address";
 
 export default function CompanyTab({ companyId }: { companyId: string }) {
   const { refreshCompanies } = useAuth();
@@ -24,15 +26,18 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [addressComplement, setAddressComplement] = useState("");
   const [status, setStatus] = useState<"ativa" | "suspensa" | "cancelada">("ativa");
   const [fuelAuthTtl, setFuelAuthTtl] = useState<number>(30);
   const addressRef = useRef<HTMLInputElement>(null);
+  const numberRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase.from("companies")
-        .select("name, cnpj, logo_url, email, phone, contact_name, address, cep, neighborhood, city, state, status, fuel_auth_code_ttl_minutes")
+        .select("name, cnpj, logo_url, email, phone, contact_name, address, cep, neighborhood, city, state, address_number, address_complement, status, fuel_auth_code_ttl_minutes")
         .eq("id", companyId).maybeSingle();
       setName(data?.name ?? "");
       setCnpj(data?.cnpj ?? "");
@@ -45,6 +50,8 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
       setNeighborhood((data as any)?.neighborhood ?? "");
       setCity((data as any)?.city ?? "");
       setState((data as any)?.state ?? "");
+      setAddressNumber((data as any)?.address_number ?? "");
+      setAddressComplement((data as any)?.address_complement ?? "");
       setStatus(((data as any)?.status as any) ?? "ativa");
       setFuelAuthTtl(Number((data as any)?.fuel_auth_code_ttl_minutes ?? 30));
       setLoading(false);
@@ -66,6 +73,8 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         neighborhood: neighborhood.trim() || null,
         city: city.trim() || null,
         state: state.trim() || null,
+        address_number: addressNumber.trim() || null,
+        address_complement: addressComplement.trim() || null,
         status,
         fuel_auth_code_ttl_minutes: Math.max(5, Math.min(1440, Number(fuelAuthTtl) || 30)),
       }).eq("id", companyId);
@@ -129,7 +138,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         <CepInput
           value={cep}
           onChange={setCep}
-          nextFieldRef={addressRef}
+          nextFieldRef={numberRef}
           onAddressFound={(a) => {
             setAddress(a.street);
             setNeighborhood(a.neighborhood);
@@ -139,7 +148,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
         />
         <div className="space-y-2 md:col-span-2">
           <Label>Endereço</Label>
-          <Input ref={addressRef} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número" />
+          <Input ref={addressRef} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua / Logradouro" />
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -155,6 +164,16 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
           <Label>Estado (UF)</Label>
           <Input value={state} onChange={(e) => setState(e.target.value.toUpperCase())} maxLength={2} placeholder="SP" />
         </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <AddressNumberFields
+          ref={numberRef}
+          number={addressNumber}
+          complement={addressComplement}
+          onNumberChange={setAddressNumber}
+          onComplementChange={setAddressComplement}
+          warnLegacy={isAddressMissingNumber({ address, address_number: addressNumber })}
+        />
       </div>
       <div className="border-t border-border pt-4 space-y-2">
         <h4 className="font-display font-semibold text-sm">Autorização de abastecimento</h4>
