@@ -735,6 +735,10 @@ export default function InsurancePanel() {
     const coveredIds = new Set<string>(
       links.filter((l) => activePolicyIds.has(l.policy_id) && !l.removed_at).map((l) => l.vehicle_id)
     );
+    // inclui matches manuais de placas (vehicle_policy_manual_matches)
+    manualMatches.forEach((m) => {
+      if (activePolicyIds.has(m.policy_id)) coveredIds.add(m.vehicle_id);
+    });
     // também considera coberto qualquer veículo cujas placas/chassis aparecem na extração IA
     activePolicies.forEach((p) => {
       const ex: any = p.ai_extracted || {};
@@ -747,7 +751,7 @@ export default function InsurancePanel() {
       });
     });
     return vehicles.filter((v) => !coveredIds.has(v.id));
-  }, [vehicles, links, policies]);
+  }, [vehicles, links, policies, manualMatches]);
 
   // Apólices manuais (para anexar veículo via tab "Sem cobertura")
   const manualPolicies = useMemo(() => policies.filter((p) => !isAiPolicy(p)), [policies]);
