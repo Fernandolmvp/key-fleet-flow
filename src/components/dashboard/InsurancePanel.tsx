@@ -1419,19 +1419,47 @@ export default function InsurancePanel() {
                                       <ShieldCheck className="h-4 w-4 text-primary" /> {p.insurer_name}
                                     </div>
                                     <div className="text-[11px] text-muted-foreground font-mono">Apólice #{p.policy_number}</div>
+                                    {p.insurer_phone && (
+                                      <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                        <Phone className="h-3 w-3" /> Seguradora: {p.insurer_phone}
+                                      </div>
+                                    )}
                                   </div>
                                   <Badge variant="outline" className={st.cls + " whitespace-nowrap"}>{st.label}</Badge>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                                   <div><div className="text-[10px] uppercase text-muted-foreground">Vigência</div>
                                     <div className="font-medium">{p.start_date || "—"} → {p.end_date || "—"}</div></div>
-                                  <div><div className="text-[10px] uppercase text-muted-foreground">Tipo</div>
+                                  <div><div className="text-[10px] uppercase text-muted-foreground">Tipo de cobertura</div>
                                     <div className="font-medium">{coverageTypeLabel(p.coverage_type) || "—"}</div></div>
                                   <div><div className="text-[10px] uppercase text-muted-foreground">Franquia</div>
                                     <div className="font-medium">{fmtBRL(p.deductible)}</div></div>
-                                  <div><div className="text-[10px] uppercase text-muted-foreground">Corretor</div>
-                                    <div className="font-medium truncate">{broker?.name || "—"}</div></div>
+                                  <div>
+                                    <div className="text-[10px] uppercase text-muted-foreground">Corretora</div>
+                                    <div className="font-medium truncate">{broker?.name || "—"}</div>
+                                    {broker?.phone && (
+                                      <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                        <Phone className="h-2.5 w-2.5" /> {broker.phone}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
+                                {(p.coverage_summary || p.notes) && (
+                                  <div className="rounded-md border border-border/60 bg-muted/20 p-2 text-xs space-y-1">
+                                    {p.coverage_summary && (
+                                      <div>
+                                        <div className="text-[10px] uppercase text-muted-foreground">O que é coberto</div>
+                                        <div className="font-medium whitespace-pre-wrap">{p.coverage_summary}</div>
+                                      </div>
+                                    )}
+                                    {p.notes && (
+                                      <div>
+                                        <div className="text-[10px] uppercase text-muted-foreground">Observações</div>
+                                        <div className="font-medium whitespace-pre-wrap">{p.notes}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </button>
                             );
                           })}
