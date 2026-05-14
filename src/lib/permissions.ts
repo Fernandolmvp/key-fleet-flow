@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export type PermModule =
   | "vehicles" | "drivers" | "fuel" | "approvals" | "maintenance"
   | "tires" | "checklists" | "documents" | "insurance" | "brokers"
-  | "fuel_stations" | "reports" | "settings";
+  | "fuel_stations" | "workshops" | "suppliers" | "reports" | "settings";
 
 export type PermAction = "view" | "create" | "edit" | "delete" | "approve" | "export";
 
@@ -35,6 +35,8 @@ export const ALL_MODULES: { value: PermModule; label: string }[] = [
   { value: "insurance", label: "Seguros" },
   { value: "brokers", label: "Corretores" },
   { value: "fuel_stations", label: "Postos" },
+  { value: "workshops", label: "Oficinas" },
+  { value: "suppliers", label: "Fornecedores" },
   { value: "reports", label: "Relatórios" },
   { value: "settings", label: "Configurações" },
 ];

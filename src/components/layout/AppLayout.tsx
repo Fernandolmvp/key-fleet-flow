@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions, type PermModule } from "@/lib/permissions";
 import {
   LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck, CarFront
+  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck, CarFront, Package
 } from "lucide-react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { NewCompanyDialog } from "@/components/NewCompanyDialog";
 
-type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean; module?: PermModule };
+type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean; module?: PermModule; isNew?: boolean };
 type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
 type NavEntry = NavItem | NavGroup;
 
@@ -29,6 +29,8 @@ const nav: NavEntry[] = [
       { to: "/app/vehicles", label: "Veículos", icon: Truck, module: "vehicles" },
       { to: "/app/drivers", label: "Motoristas", icon: Users, module: "drivers" },
       { to: "/app/fuel-stations", label: "Postos", icon: Store, module: "fuel_stations" },
+      { to: "/app/workshops", label: "Oficinas", icon: Wrench, module: "workshops", isNew: true },
+      { to: "/app/suppliers", label: "Fornecedores", icon: Package, module: "suppliers", isNew: true },
       { to: "/app/brokers", label: "Corretores", icon: Briefcase, module: "brokers" },
     ],
   },
@@ -206,6 +208,7 @@ export default function AppLayout() {
           </span>
         )}
         {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
+        {it.isNew && <span className="text-[9px] uppercase font-mono text-primary bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded">novo</span>}
       </NavLink>
     );
   };

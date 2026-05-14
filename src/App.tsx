@@ -23,6 +23,8 @@ import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
 import ResetPassword from "./pages/auth/ResetPassword";
 import Subscription from "./pages/app/Subscription";
 import Brokers from "./pages/app/Brokers";
+import Workshops from "./pages/app/Workshops";
+import Suppliers from "./pages/app/Suppliers";
 import Checklists from "./pages/app/Checklists";
 import Insurance from "./pages/app/Insurance";
 import InsuranceOrphans from "./pages/app/insurance/Orphans";
@@ -105,6 +107,8 @@ const App = () => (
               <Route path="insurance/orphans" element={<InsuranceOrphans />} />
               <Route path="insurance/review-matches" element={<ReviewMatches />} />
               <Route path="brokers" element={<Brokers />} />
+              <Route path="workshops" element={<Workshops />} />
+              <Route path="suppliers" element={<Suppliers />} />
               <Route path="assinatura" element={<Subscription />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
                   <Route path="sinistros" element={<Sinistros />} />
