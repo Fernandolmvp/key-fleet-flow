@@ -875,6 +875,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           email: string | null
+          expense_auto_approval_limits: Json
           fuel_auth_code_ttl_minutes: number
           group_id: string | null
           id: string
@@ -882,6 +883,7 @@ export type Database = {
           name: string
           neighborhood: string | null
           phone: string | null
+          require_invoice_for_categories: string[]
           state: string | null
           status: string
           updated_at: string
@@ -896,6 +898,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          expense_auto_approval_limits?: Json
           fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
@@ -903,6 +906,7 @@ export type Database = {
           name: string
           neighborhood?: string | null
           phone?: string | null
+          require_invoice_for_categories?: string[]
           state?: string | null
           status?: string
           updated_at?: string
@@ -917,6 +921,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          expense_auto_approval_limits?: Json
           fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
@@ -924,6 +929,7 @@ export type Database = {
           name?: string
           neighborhood?: string | null
           phone?: string | null
+          require_invoice_for_categories?: string[]
           state?: string | null
           status?: string
           updated_at?: string
@@ -4302,6 +4308,168 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "company_usage"
             referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      trip_expenses: {
+        Row: {
+          additional_photos_urls: string[]
+          amount: number
+          approved_by: string | null
+          auto_approved: boolean
+          city: string | null
+          company_card_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_id: string
+          expense_category: string
+          expense_date: string
+          expense_time: string | null
+          has_invoice: boolean
+          id: string
+          invoice_issued_at: string | null
+          invoice_number: string | null
+          invoice_type: string | null
+          invoice_url: string | null
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          payment_method: string
+          receipt_url: string
+          reimbursement_adjusted_amount: number | null
+          reimbursement_approved_at: string | null
+          reimbursement_approved_by: string | null
+          reimbursement_paid_at: string | null
+          reimbursement_paid_method: string | null
+          reimbursement_rejection_reason: string | null
+          reimbursement_status: string
+          requires_reimbursement: boolean
+          state: string | null
+          supplier_document: string | null
+          supplier_name: string | null
+          trip_id: string
+          updated_at: string
+          within_budget_limit: boolean | null
+        }
+        Insert: {
+          additional_photos_urls?: string[]
+          amount: number
+          approved_by?: string | null
+          auto_approved?: boolean
+          city?: string | null
+          company_card_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id: string
+          expense_category: string
+          expense_date: string
+          expense_time?: string | null
+          has_invoice?: boolean
+          id?: string
+          invoice_issued_at?: string | null
+          invoice_number?: string | null
+          invoice_type?: string | null
+          invoice_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          payment_method: string
+          receipt_url: string
+          reimbursement_adjusted_amount?: number | null
+          reimbursement_approved_at?: string | null
+          reimbursement_approved_by?: string | null
+          reimbursement_paid_at?: string | null
+          reimbursement_paid_method?: string | null
+          reimbursement_rejection_reason?: string | null
+          reimbursement_status?: string
+          requires_reimbursement?: boolean
+          state?: string | null
+          supplier_document?: string | null
+          supplier_name?: string | null
+          trip_id: string
+          updated_at?: string
+          within_budget_limit?: boolean | null
+        }
+        Update: {
+          additional_photos_urls?: string[]
+          amount?: number
+          approved_by?: string | null
+          auto_approved?: boolean
+          city?: string | null
+          company_card_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string
+          expense_category?: string
+          expense_date?: string
+          expense_time?: string | null
+          has_invoice?: boolean
+          id?: string
+          invoice_issued_at?: string | null
+          invoice_number?: string | null
+          invoice_type?: string | null
+          invoice_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          payment_method?: string
+          receipt_url?: string
+          reimbursement_adjusted_amount?: number | null
+          reimbursement_approved_at?: string | null
+          reimbursement_approved_by?: string | null
+          reimbursement_paid_at?: string | null
+          reimbursement_paid_method?: string | null
+          reimbursement_rejection_reason?: string | null
+          reimbursement_status?: string
+          requires_reimbursement?: boolean
+          state?: string | null
+          supplier_document?: string | null
+          supplier_name?: string | null
+          trip_id?: string
+          updated_at?: string
+          within_budget_limit?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_expenses_company_card_id_fkey"
+            columns: ["company_card_id"]
+            isOneToOne: false
+            referencedRelation: "company_payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
           },
         ]
       }
