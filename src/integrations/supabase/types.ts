@@ -4473,6 +4473,92 @@ export type Database = {
           },
         ]
       }
+      trip_reimbursements: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          expense_ids: string[]
+          id: string
+          notes: string | null
+          paid_at: string | null
+          paid_method: string | null
+          payment_proof_url: string | null
+          status: string
+          total_amount: number
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          expense_ids?: string[]
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_method?: string | null
+          payment_proof_url?: string | null
+          status?: string
+          total_amount: number
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          expense_ids?: string[]
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_method?: string | null
+          payment_proof_url?: string | null
+          status?: string
+          total_amount?: number
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_reimbursements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_reimbursements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trip_reimbursements_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_reimbursements_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
           actual_end_at: string | null
