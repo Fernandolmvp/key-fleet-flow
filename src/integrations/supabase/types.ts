@@ -4177,6 +4177,191 @@ export type Database = {
         }
         Relationships: []
       }
+      trip_code_seq: {
+        Row: {
+          company_id: string
+          last_number: number
+          year: number
+        }
+        Insert: {
+          company_id: string
+          last_number?: number
+          year: number
+        }
+        Update: {
+          company_id?: string
+          last_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_code_seq_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_code_seq_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      trips: {
+        Row: {
+          actual_end_at: string | null
+          actual_km: number | null
+          actual_start_at: string | null
+          allowed_payment_method_ids: string[]
+          balance_to_return: number
+          budget_by_category: Json
+          budget_total: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          destination_city: string | null
+          destination_state: string | null
+          driver_id: string | null
+          estimated_km: number | null
+          id: string
+          km_at_end: number | null
+          km_at_start: number | null
+          notes: string | null
+          origin_city: string | null
+          origin_state: string | null
+          scheduled_end_date: string | null
+          scheduled_start_date: string
+          settlement_date: string | null
+          settlement_notes: string | null
+          status: string
+          title: string
+          total_advance_cash: number
+          total_reimbursable: number
+          total_spent_card: number
+          total_spent_cash: number
+          total_spent_other: number
+          trip_code: string | null
+          trip_type: string
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string | null
+          waypoints: Json
+        }
+        Insert: {
+          actual_end_at?: string | null
+          actual_km?: number | null
+          actual_start_at?: string | null
+          allowed_payment_method_ids?: string[]
+          balance_to_return?: number
+          budget_by_category?: Json
+          budget_total?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          destination_city?: string | null
+          destination_state?: string | null
+          driver_id?: string | null
+          estimated_km?: number | null
+          id?: string
+          km_at_end?: number | null
+          km_at_start?: number | null
+          notes?: string | null
+          origin_city?: string | null
+          origin_state?: string | null
+          scheduled_end_date?: string | null
+          scheduled_start_date: string
+          settlement_date?: string | null
+          settlement_notes?: string | null
+          status?: string
+          title: string
+          total_advance_cash?: number
+          total_reimbursable?: number
+          total_spent_card?: number
+          total_spent_cash?: number
+          total_spent_other?: number
+          trip_code?: string | null
+          trip_type?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+          waypoints?: Json
+        }
+        Update: {
+          actual_end_at?: string | null
+          actual_km?: number | null
+          actual_start_at?: string | null
+          allowed_payment_method_ids?: string[]
+          balance_to_return?: number
+          budget_by_category?: Json
+          budget_total?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          destination_city?: string | null
+          destination_state?: string | null
+          driver_id?: string | null
+          estimated_km?: number | null
+          id?: string
+          km_at_end?: number | null
+          km_at_start?: number | null
+          notes?: string | null
+          origin_city?: string | null
+          origin_state?: string | null
+          scheduled_end_date?: string | null
+          scheduled_start_date?: string
+          settlement_date?: string | null
+          settlement_notes?: string | null
+          status?: string
+          title?: string
+          total_advance_cash?: number
+          total_reimbursable?: number
+          total_spent_card?: number
+          total_spent_cash?: number
+          total_spent_other?: number
+          trip_code?: string | null
+          trip_type?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+          waypoints?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trips_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trips_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           company_id: string
@@ -5207,6 +5392,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_trip_driver: {
+        Args: { _driver_id: string; _user_id: string }
+        Returns: boolean
+      }
       log_km_override: {
         Args: {
           _company_id: string
