@@ -19,6 +19,8 @@ import Colaborador from "./pages/app/Colaborador";
 import MotoristaShell from "./pages/motorista/MotoristaShell";
 import MotoristaViagens from "./pages/motorista/MotoristaViagens";
 import MotoristaViagemDetalhe from "./pages/motorista/MotoristaViagemDetalhe";
+import MotoristaManutencao from "./pages/motorista/MotoristaManutencao";
+import MotoristaCalendario from "./pages/motorista/MotoristaCalendario";
 import Documents from "./pages/app/Documents";
 import Approvals from "./pages/app/Approvals";
 import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
@@ -36,6 +38,7 @@ import Sinistros from "./pages/app/Sinistros";
 import Despesas from "./pages/app/Despesas";
 import Multas from "./pages/app/Multas";
 import Viagens from "./pages/app/Viagens";
+import ManutencaoSolicitacoes from "./pages/app/ManutencaoSolicitacoes";
 import VehicleHistory from "./pages/app/VehicleHistory";
 import SuperAdminShell from "./pages/admin/SuperAdminShell";
 import CompaniesPanel from "./pages/admin/CompaniesPanel";
@@ -78,6 +81,8 @@ const App = () => (
             <Route element={<RequireAuth />}>
               <Route path="/motorista/viagens" element={<MotoristaViagens />} />
               <Route path="/motorista/viagens/:id" element={<MotoristaViagemDetalhe />} />
+              <Route path="/motorista/manutencao" element={<MotoristaManutencao />} />
+              <Route path="/motorista/calendario" element={<MotoristaCalendario />} />
             </Route>
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdminShell />}>
@@ -122,6 +127,7 @@ const App = () => (
                   <Route path="despesas" element={<Despesas />} />
                   <Route path="multas" element={<Multas />} />
                   <Route path="viagens" element={<Viagens />} />
+                  <Route path="manutencao/solicitacoes" element={<ManutencaoSolicitacoes />} />
                   <Route path="vehicles/:id/historico" element={<VehicleHistory />} />
                 </Route>
               </Route>

@@ -1,8 +1,9 @@
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import Colaborador from "@/pages/app/Colaborador";
-import { Route as RouteIcon } from "lucide-react";
+import MotoristaBottomNav from "@/components/motorista/MotoristaBottomNav";
+import NotificationBell from "@/components/motorista/NotificationBell";
 
 export default function MotoristaShell() {
   const { user, loading, roles } = useAuth();
@@ -25,19 +26,15 @@ export default function MotoristaShell() {
   if (!allowed) return <Navigate to="/app" replace />;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
+        <h1 className="font-semibold flex-1">Portal do motorista</h1>
+        <NotificationBell />
+      </header>
       <main className="px-4 py-4">
-        <Link to="/motorista/viagens" className="surface-card rounded-xl p-3 mb-4 flex items-center gap-3 hover:border-primary/50 transition-all">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary grid place-items-center">
-            <RouteIcon className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="font-semibold">Minhas viagens</div>
-            <div className="text-xs text-muted-foreground">Adiantamentos, despesas e acerto</div>
-          </div>
-        </Link>
         <Colaborador />
       </main>
+      <MotoristaBottomNav />
     </div>
   );
 }
