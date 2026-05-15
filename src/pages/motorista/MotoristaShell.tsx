@@ -1,7 +1,8 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import Colaborador from "@/pages/app/Colaborador";
+import { Route as RouteIcon } from "lucide-react";
 
 export default function MotoristaShell() {
   const { user, loading, roles } = useAuth();
@@ -26,6 +27,15 @@ export default function MotoristaShell() {
   return (
     <div className="min-h-screen bg-background">
       <main className="px-4 py-4">
+        <Link to="/motorista/viagens" className="surface-card rounded-xl p-3 mb-4 flex items-center gap-3 hover:border-primary/50 transition-all">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary grid place-items-center">
+            <RouteIcon className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <div className="font-semibold">Minhas viagens</div>
+            <div className="text-xs text-muted-foreground">Adiantamentos, despesas e acerto</div>
+          </div>
+        </Link>
         <Colaborador />
       </main>
     </div>
