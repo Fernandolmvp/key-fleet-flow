@@ -875,6 +875,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           email: string | null
+          expense_auto_approval_limits: Json
           fuel_auth_code_ttl_minutes: number
           group_id: string | null
           id: string
@@ -882,6 +883,7 @@ export type Database = {
           name: string
           neighborhood: string | null
           phone: string | null
+          require_invoice_for_categories: string[]
           state: string | null
           status: string
           updated_at: string
@@ -896,6 +898,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          expense_auto_approval_limits?: Json
           fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
@@ -903,6 +906,7 @@ export type Database = {
           name: string
           neighborhood?: string | null
           phone?: string | null
+          require_invoice_for_categories?: string[]
           state?: string | null
           status?: string
           updated_at?: string
@@ -917,6 +921,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          expense_auto_approval_limits?: Json
           fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
@@ -924,6 +929,7 @@ export type Database = {
           name?: string
           neighborhood?: string | null
           phone?: string | null
+          require_invoice_for_categories?: string[]
           state?: string | null
           status?: string
           updated_at?: string
@@ -1008,6 +1014,128 @@ export type Database = {
           },
           {
             foreignKeyName: "company_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      company_payment_methods: {
+        Row: {
+          assigned_to_driver_id: string | null
+          assigned_to_vehicle_id: string | null
+          bank_account: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_name: string | null
+          card_brand: string | null
+          card_expiry_month: number | null
+          card_expiry_year: number | null
+          card_holder_name: string | null
+          card_last_four_digits: string | null
+          card_limit: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          method_type: string
+          name: string
+          notes: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          updated_at: string
+          updated_by: string | null
+          voucher_card_number: string | null
+          voucher_monthly_credit: number | null
+          voucher_provider: string | null
+        }
+        Insert: {
+          assigned_to_driver_id?: string | null
+          assigned_to_vehicle_id?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          card_brand?: string | null
+          card_expiry_month?: number | null
+          card_expiry_year?: number | null
+          card_holder_name?: string | null
+          card_last_four_digits?: string | null
+          card_limit?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          method_type: string
+          name: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          voucher_card_number?: string | null
+          voucher_monthly_credit?: number | null
+          voucher_provider?: string | null
+        }
+        Update: {
+          assigned_to_driver_id?: string | null
+          assigned_to_vehicle_id?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          card_brand?: string | null
+          card_expiry_month?: number | null
+          card_expiry_year?: number | null
+          card_holder_name?: string | null
+          card_last_four_digits?: string | null
+          card_limit?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          method_type?: string
+          name?: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          voucher_card_number?: string | null
+          voucher_monthly_credit?: number | null
+          voucher_provider?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_payment_methods_assigned_to_driver_id_fkey"
+            columns: ["assigned_to_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_payment_methods_assigned_to_vehicle_id_fkey"
+            columns: ["assigned_to_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_payment_methods_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_usage"
@@ -4055,6 +4183,534 @@ export type Database = {
         }
         Relationships: []
       }
+      trip_advances: {
+        Row: {
+          advance_date: string
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          driver_confirmation_method: string | null
+          driver_confirmation_notes: string | null
+          driver_confirmed_at: string | null
+          driver_id: string
+          driver_signature_url: string | null
+          gestor_signature_url: string | null
+          id: string
+          notes: string | null
+          payment_method_used: string
+          receipt_number: string | null
+          receipt_url: string | null
+          status: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          advance_date?: string
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          driver_confirmation_method?: string | null
+          driver_confirmation_notes?: string | null
+          driver_confirmed_at?: string | null
+          driver_id: string
+          driver_signature_url?: string | null
+          gestor_signature_url?: string | null
+          id?: string
+          notes?: string | null
+          payment_method_used?: string
+          receipt_number?: string | null
+          receipt_url?: string | null
+          status?: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          advance_date?: string
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          driver_confirmation_method?: string | null
+          driver_confirmation_notes?: string | null
+          driver_confirmed_at?: string | null
+          driver_id?: string
+          driver_signature_url?: string | null
+          gestor_signature_url?: string | null
+          id?: string
+          notes?: string | null
+          payment_method_used?: string
+          receipt_number?: string | null
+          receipt_url?: string | null
+          status?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trip_advances_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_advances_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_code_seq: {
+        Row: {
+          company_id: string
+          last_number: number
+          year: number
+        }
+        Insert: {
+          company_id: string
+          last_number?: number
+          year: number
+        }
+        Update: {
+          company_id?: string
+          last_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_code_seq_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_code_seq_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      trip_expenses: {
+        Row: {
+          additional_photos_urls: string[]
+          amount: number
+          approved_by: string | null
+          auto_approved: boolean
+          city: string | null
+          company_card_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_id: string
+          expense_category: string
+          expense_date: string
+          expense_time: string | null
+          has_invoice: boolean
+          id: string
+          invoice_issued_at: string | null
+          invoice_number: string | null
+          invoice_type: string | null
+          invoice_url: string | null
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          payment_method: string
+          receipt_url: string
+          reimbursement_adjusted_amount: number | null
+          reimbursement_approved_at: string | null
+          reimbursement_approved_by: string | null
+          reimbursement_paid_at: string | null
+          reimbursement_paid_method: string | null
+          reimbursement_rejection_reason: string | null
+          reimbursement_status: string
+          requires_reimbursement: boolean
+          state: string | null
+          supplier_document: string | null
+          supplier_name: string | null
+          trip_id: string
+          updated_at: string
+          within_budget_limit: boolean | null
+        }
+        Insert: {
+          additional_photos_urls?: string[]
+          amount: number
+          approved_by?: string | null
+          auto_approved?: boolean
+          city?: string | null
+          company_card_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id: string
+          expense_category: string
+          expense_date: string
+          expense_time?: string | null
+          has_invoice?: boolean
+          id?: string
+          invoice_issued_at?: string | null
+          invoice_number?: string | null
+          invoice_type?: string | null
+          invoice_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          payment_method: string
+          receipt_url: string
+          reimbursement_adjusted_amount?: number | null
+          reimbursement_approved_at?: string | null
+          reimbursement_approved_by?: string | null
+          reimbursement_paid_at?: string | null
+          reimbursement_paid_method?: string | null
+          reimbursement_rejection_reason?: string | null
+          reimbursement_status?: string
+          requires_reimbursement?: boolean
+          state?: string | null
+          supplier_document?: string | null
+          supplier_name?: string | null
+          trip_id: string
+          updated_at?: string
+          within_budget_limit?: boolean | null
+        }
+        Update: {
+          additional_photos_urls?: string[]
+          amount?: number
+          approved_by?: string | null
+          auto_approved?: boolean
+          city?: string | null
+          company_card_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string
+          expense_category?: string
+          expense_date?: string
+          expense_time?: string | null
+          has_invoice?: boolean
+          id?: string
+          invoice_issued_at?: string | null
+          invoice_number?: string | null
+          invoice_type?: string | null
+          invoice_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          payment_method?: string
+          receipt_url?: string
+          reimbursement_adjusted_amount?: number | null
+          reimbursement_approved_at?: string | null
+          reimbursement_approved_by?: string | null
+          reimbursement_paid_at?: string | null
+          reimbursement_paid_method?: string | null
+          reimbursement_rejection_reason?: string | null
+          reimbursement_status?: string
+          requires_reimbursement?: boolean
+          state?: string | null
+          supplier_document?: string | null
+          supplier_name?: string | null
+          trip_id?: string
+          updated_at?: string
+          within_budget_limit?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_expenses_company_card_id_fkey"
+            columns: ["company_card_id"]
+            isOneToOne: false
+            referencedRelation: "company_payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expenses_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_reimbursements: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          expense_ids: string[]
+          id: string
+          notes: string | null
+          paid_at: string | null
+          paid_method: string | null
+          payment_proof_url: string | null
+          status: string
+          total_amount: number
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          expense_ids?: string[]
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_method?: string | null
+          payment_proof_url?: string | null
+          status?: string
+          total_amount: number
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          expense_ids?: string[]
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_method?: string | null
+          payment_proof_url?: string | null
+          status?: string
+          total_amount?: number
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_reimbursements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_reimbursements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trip_reimbursements_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_reimbursements_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trips: {
+        Row: {
+          actual_end_at: string | null
+          actual_km: number | null
+          actual_start_at: string | null
+          allowed_payment_method_ids: string[]
+          balance_to_return: number
+          budget_by_category: Json
+          budget_total: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          destination_city: string | null
+          destination_state: string | null
+          driver_id: string | null
+          estimated_km: number | null
+          id: string
+          km_at_end: number | null
+          km_at_start: number | null
+          notes: string | null
+          origin_city: string | null
+          origin_state: string | null
+          scheduled_end_date: string | null
+          scheduled_start_date: string
+          settlement_date: string | null
+          settlement_notes: string | null
+          status: string
+          title: string
+          total_advance_cash: number
+          total_reimbursable: number
+          total_spent_card: number
+          total_spent_cash: number
+          total_spent_other: number
+          trip_code: string | null
+          trip_type: string
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string | null
+          waypoints: Json
+        }
+        Insert: {
+          actual_end_at?: string | null
+          actual_km?: number | null
+          actual_start_at?: string | null
+          allowed_payment_method_ids?: string[]
+          balance_to_return?: number
+          budget_by_category?: Json
+          budget_total?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          destination_city?: string | null
+          destination_state?: string | null
+          driver_id?: string | null
+          estimated_km?: number | null
+          id?: string
+          km_at_end?: number | null
+          km_at_start?: number | null
+          notes?: string | null
+          origin_city?: string | null
+          origin_state?: string | null
+          scheduled_end_date?: string | null
+          scheduled_start_date: string
+          settlement_date?: string | null
+          settlement_notes?: string | null
+          status?: string
+          title: string
+          total_advance_cash?: number
+          total_reimbursable?: number
+          total_spent_card?: number
+          total_spent_cash?: number
+          total_spent_other?: number
+          trip_code?: string | null
+          trip_type?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+          waypoints?: Json
+        }
+        Update: {
+          actual_end_at?: string | null
+          actual_km?: number | null
+          actual_start_at?: string | null
+          allowed_payment_method_ids?: string[]
+          balance_to_return?: number
+          budget_by_category?: Json
+          budget_total?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          destination_city?: string | null
+          destination_state?: string | null
+          driver_id?: string | null
+          estimated_km?: number | null
+          id?: string
+          km_at_end?: number | null
+          km_at_start?: number | null
+          notes?: string | null
+          origin_city?: string | null
+          origin_state?: string | null
+          scheduled_end_date?: string | null
+          scheduled_start_date?: string
+          settlement_date?: string | null
+          settlement_notes?: string | null
+          status?: string
+          title?: string
+          total_advance_cash?: number
+          total_reimbursable?: number
+          total_spent_card?: number
+          total_spent_cash?: number
+          total_spent_other?: number
+          trip_code?: string | null
+          trip_type?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+          waypoints?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trips_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trips_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           company_id: string
@@ -5085,6 +5741,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_trip_driver: {
+        Args: { _driver_id: string; _user_id: string }
+        Returns: boolean
+      }
       log_km_override: {
         Args: {
           _company_id: string

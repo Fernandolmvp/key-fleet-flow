@@ -31,6 +31,7 @@ import {
   UserCheck,
   CarFront,
   Package,
+  Route as RouteIcon,
 } from "lucide-react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,7 @@ const nav: NavEntry[] = [
     icon: Activity,
     items: [
       { to: "/app/fuel", label: "Abastecimentos", icon: Fuel, module: "fuel" },
+      { to: "/app/viagens", label: "Viagens", icon: RouteIcon, isNew: true },
       { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals", module: "approvals" },
       { to: "/app/maintenance", label: "Manutenção", icon: Wrench, module: "maintenance" },
       { to: "/app/sinistros", label: "Sinistros", icon: CarFront, soon: true },

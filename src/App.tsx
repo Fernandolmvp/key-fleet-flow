@@ -33,6 +33,7 @@ import Configuracoes from "./pages/app/Configuracoes";
 import Sinistros from "./pages/app/Sinistros";
 import Despesas from "./pages/app/Despesas";
 import Multas from "./pages/app/Multas";
+import Viagens from "./pages/app/Viagens";
 import VehicleHistory from "./pages/app/VehicleHistory";
 import SuperAdminShell from "./pages/admin/SuperAdminShell";
 import CompaniesPanel from "./pages/admin/CompaniesPanel";
@@ -114,6 +115,7 @@ const App = () => (
                   <Route path="sinistros" element={<Sinistros />} />
                   <Route path="despesas" element={<Despesas />} />
                   <Route path="multas" element={<Multas />} />
+                  <Route path="viagens" element={<Viagens />} />
                   <Route path="vehicles/:id/historico" element={<VehicleHistory />} />
                 </Route>
               </Route>
