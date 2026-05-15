@@ -4,38 +4,83 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions, type PermModule } from "@/lib/permissions";
 import {
-  LayoutDashboard, Truck, Users, Wrench, Fuel, FileText, AlertTriangle,
-  CircleDot, Receipt, BarChart3, Settings, LogOut, ChevronDown, ChevronRight, Building2, Loader2, ShieldCheck, Store, ClipboardCheck, CreditCard, Briefcase, ClipboardList, Database, Activity, UserCheck, CarFront, Package
+  LayoutDashboard,
+  Truck,
+  Users,
+  Wrench,
+  Fuel,
+  FileText,
+  AlertTriangle,
+  CircleDot,
+  Receipt,
+  BarChart3,
+  Settings,
+  LogOut,
+  ChevronDown,
+  ChevronRight,
+  Building2,
+  Loader2,
+  ShieldCheck,
+  Store,
+  ClipboardCheck,
+  CreditCard,
+  Briefcase,
+  ClipboardList,
+  Database,
+  Activity,
+  UserCheck,
+  CarFront,
+  Package,
 } from "lucide-react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { NewCompanyDialog } from "@/components/NewCompanyDialog";
 
-type NavItem = { to: string; label: string; icon: any; end?: boolean; badgeKey?: string; soon?: boolean; module?: PermModule; isNew?: boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: any;
+  end?: boolean;
+  badgeKey?: string;
+  soon?: boolean;
+  module?: PermModule;
+  isNew?: boolean;
+};
 type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
 type NavEntry = NavItem | NavGroup;
 
 const nav: NavEntry[] = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   {
-    type: "group", key: "cadastros", label: "Cadastros", icon: Database,
+    type: "group",
+    key: "cadastros",
+    label: "Cadastros",
+    icon: Database,
     items: [
       { to: "/app/vehicles", label: "Veículos", icon: Truck, module: "vehicles" },
       { to: "/app/drivers", label: "Motoristas", icon: Users, module: "drivers" },
       { to: "/app/fuel-stations", label: "Postos", icon: Store, module: "fuel_stations" },
       { to: "/app/workshops", label: "Oficinas", icon: Wrench, module: "workshops", isNew: true },
       { to: "/app/suppliers", label: "Fornecedores", icon: Package, module: "suppliers", isNew: true },
-      { to: "/app/brokers", label: "Corretores", icon: Briefcase, module: "brokers" },
+      { to: "/app/brokers", label: "Corretores de Seguros", icon: Briefcase, module: "brokers" },
     ],
   },
   {
-    type: "group", key: "movimentacao", label: "Movimentação", icon: Activity,
+    type: "group",
+    key: "movimentacao",
+    label: "Movimentação",
+    icon: Activity,
     items: [
       { to: "/app/fuel", label: "Abastecimentos", icon: Fuel, module: "fuel" },
       { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals", module: "approvals" },
@@ -60,7 +105,8 @@ function isGroup(e: NavEntry): e is NavGroup {
 }
 
 export default function AppLayout() {
-  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin, roles } = useAuth();
+  const { user, loading, companies, currentCompanyId, setCurrentCompany, signOut, isDriverOnly, isSuperAdmin, roles } =
+    useAuth();
   const { can, isAdmin, loading: permsLoading } = usePermissions();
   const loc = useLocation();
   const [docPending, setDocPending] = useState(0);
@@ -91,19 +137,30 @@ export default function AppLayout() {
       const today = new Date().toISOString().slice(0, 10);
       const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
       const [expiring, expired, vehiclesRes, linksRes, policiesRes] = await Promise.all([
-        supabase.from("insurance_policies").select("id", { count: "exact", head: true })
-          .eq("company_id", currentCompanyId).eq("status", "ativa")
-          .gte("end_date", today).lte("end_date", in30),
-        supabase.from("insurance_policies").select("id", { count: "exact", head: true })
-          .eq("company_id", currentCompanyId).eq("status", "ativa").lt("end_date", today),
+        supabase
+          .from("insurance_policies")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", currentCompanyId)
+          .eq("status", "ativa")
+          .gte("end_date", today)
+          .lte("end_date", in30),
+        supabase
+          .from("insurance_policies")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", currentCompanyId)
+          .eq("status", "ativa")
+          .lt("end_date", today),
         supabase.from("vehicles").select("id").eq("company_id", currentCompanyId).eq("status", "ativo"),
-        supabase.from("insurance_policy_vehicles").select("vehicle_id,policy_id")
-          .eq("company_id", currentCompanyId).is("removed_at", null),
+        supabase
+          .from("insurance_policy_vehicles")
+          .select("vehicle_id,policy_id")
+          .eq("company_id", currentCompanyId)
+          .is("removed_at", null),
         supabase.from("insurance_policies").select("id").eq("company_id", currentCompanyId).eq("status", "ativa"),
       ]);
       const activePolicyIds = new Set(((policiesRes.data as any[]) || []).map((p) => p.id));
       const coveredIds = new Set(
-        ((linksRes.data as any[]) || []).filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id)
+        ((linksRes.data as any[]) || []).filter((l) => activePolicyIds.has(l.policy_id)).map((l) => l.vehicle_id),
       );
       const uncovered = ((vehiclesRes.data as any[]) || []).filter((v) => !coveredIds.has(v.id)).length;
       setInsurancePending((expiring.count || 0) + (expired.count || 0) + uncovered);
@@ -122,9 +179,12 @@ export default function AppLayout() {
     });
   }, [loc.pathname]);
 
-  if (loading) return (
-    <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-  );
+  if (loading)
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
   if (!user) return <Navigate to="/login" replace state={{ from: loc }} />;
 
   // Motorista (sem cargo de gestão) usa interface dedicada mobile, fora do AppLayout
@@ -135,11 +195,7 @@ export default function AppLayout() {
   const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
   const headerCompanyLabel =
     currentCompany?.name ??
-    (companies.length === 0
-      ? "Nenhuma empresa"
-      : currentCompanyId
-        ? "Carregando empresa…"
-        : "Selecionar empresa");
+    (companies.length === 0 ? "Nenhuma empresa" : currentCompanyId ? "Carregando empresa…" : "Selecionar empresa");
   const hasDriverRole = roles.includes("motorista");
 
   // Filtra a sidebar por permissão de visualizar do módulo. Itens sem `module`
@@ -170,25 +226,27 @@ export default function AppLayout() {
         key={it.to}
         to={it.to}
         end={it.end}
-        className={({ isActive }) => cn(
-          "group flex items-center gap-3 rounded-lg transition-all",
-          primary
-            ? "px-2.5 py-2.5 text-[13px] font-semibold tracking-wide uppercase"
-            : "px-3 py-2 text-sm",
-          indent && "ml-4 pl-3 border-l border-sidebar-border/60",
-          isActive
-            ? primary
-              ? "bg-gradient-to-r from-primary/15 to-transparent text-sidebar-accent-foreground border border-primary/40 shadow-glow"
-              : "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
-            : primary
-              ? "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent"
-              : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-        )}
+        className={({ isActive }) =>
+          cn(
+            "group flex items-center gap-3 rounded-lg transition-all",
+            primary ? "px-2.5 py-2.5 text-[13px] font-semibold tracking-wide uppercase" : "px-3 py-2 text-sm",
+            indent && "ml-4 pl-3 border-l border-sidebar-border/60",
+            isActive
+              ? primary
+                ? "bg-gradient-to-r from-primary/15 to-transparent text-sidebar-accent-foreground border border-primary/40 shadow-glow"
+                : "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
+              : primary
+                ? "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent"
+                : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+          )
+        }
       >
-        <span className={cn(
-          "grid place-items-center rounded-md transition-colors shrink-0",
-          primary ? "h-7 w-7 bg-primary/10 text-primary group-hover:bg-primary/20" : ""
-        )}>
+        <span
+          className={cn(
+            "grid place-items-center rounded-md transition-colors shrink-0",
+            primary ? "h-7 w-7 bg-primary/10 text-primary group-hover:bg-primary/20" : "",
+          )}
+        >
           <it.icon className={cn(primary ? "h-4 w-4" : "h-4 w-4")} />
         </span>
         <span className="flex-1">{it.label}</span>
@@ -207,8 +265,16 @@ export default function AppLayout() {
             {approvalPending}
           </span>
         )}
-        {it.soon && <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">soon</span>}
-        {it.isNew && <span className="text-[9px] uppercase font-mono text-primary bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded">novo</span>}
+        {it.soon && (
+          <span className="text-[9px] uppercase font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+            soon
+          </span>
+        )}
+        {it.isNew && (
+          <span className="text-[9px] uppercase font-mono text-primary bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded">
+            novo
+          </span>
+        )}
       </NavLink>
     );
   };
@@ -245,26 +311,28 @@ export default function AppLayout() {
                     "w-full flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-all",
                     groupActive
                       ? "bg-gradient-to-r from-primary/15 to-transparent text-sidebar-accent-foreground border border-primary/40 shadow-glow"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent",
                   )}
                 >
                   <span className="grid place-items-center rounded-md h-7 w-7 bg-primary/10 text-primary shrink-0">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <span className="flex-1 text-left font-semibold tracking-wide uppercase text-[13px]">{entry.label}</span>
+                  <span className="flex-1 text-left font-semibold tracking-wide uppercase text-[13px]">
+                    {entry.label}
+                  </span>
                   {!open && pendingCount > 0 && (
                     <span className="text-[10px] font-mono bg-warning/20 text-warning border border-warning/40 px-1.5 py-0.5 rounded">
                       {pendingCount}
                     </span>
                   )}
-                  {open
-                    ? <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                    : <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
+                  {open ? (
+                    <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5 opacity-60" />
+                  )}
                 </button>
                 {open && (
-                  <div className="space-y-0.5 pt-0.5">
-                    {entry.items.map((it) => renderItem(it, { indent: true }))}
-                  </div>
+                  <div className="space-y-0.5 pt-0.5">{entry.items.map((it) => renderItem(it, { indent: true }))}</div>
                 )}
               </div>
             );
@@ -290,9 +358,7 @@ export default function AppLayout() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
-              <DropdownMenuLabel>
-                Empresas {companies.length > 0 && `(${companies.length})`}
-              </DropdownMenuLabel>
+              <DropdownMenuLabel>Empresas {companies.length > 0 && `(${companies.length})`}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {companies.map((c) => (
                 <DropdownMenuItem
@@ -307,9 +373,7 @@ export default function AppLayout() {
                   )}
                 </DropdownMenuItem>
               ))}
-              {!companies.length && (
-                <DropdownMenuItem disabled>Nenhuma empresa cadastrada</DropdownMenuItem>
-              )}
+              {!companies.length && <DropdownMenuItem disabled>Nenhuma empresa cadastrada</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowNewCompany(true)} className="text-primary">
                 <Plus className="h-4 w-4 mr-2" /> Nova empresa
@@ -331,12 +395,12 @@ export default function AppLayout() {
               <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {isSuperAdmin && (
-                <DropdownMenuItem onClick={() => window.location.href = "/super-admin"}>
+                <DropdownMenuItem onClick={() => (window.location.href = "/super-admin")}>
                   <ShieldCheck className="h-4 w-4 mr-2" /> Painel Super Admin
                 </DropdownMenuItem>
               )}
               {hasDriverRole && (
-                <DropdownMenuItem onClick={() => window.location.href = "/motorista"}>
+                <DropdownMenuItem onClick={() => (window.location.href = "/motorista")}>
                   <UserCheck className="h-4 w-4 mr-2" /> Modo Motorista
                 </DropdownMenuItem>
               )}
