@@ -22,7 +22,7 @@ const TYPE_META: Record<string, { color: string; icon: any; label: string }> = {
 };
 
 export default function MotoristaCalendario() {
-  const { user } = useAuth();
+  const { user, currentCompanyId } = useAuth();
   const [view, setView] = useState<"mes" | "lista">("mes");
   const [cursor, setCursor] = useState(new Date());
   const [vehicleFilter, setVehicleFilter] = useState<"current" | "all" | string>("current");
@@ -36,13 +36,14 @@ export default function MotoristaCalendario() {
     (async () => {
       if (!user) return;
       const { data: drv } = await supabase.from("drivers").select("assigned_vehicle_id, company_id").eq("user_id", user.id).maybeSingle();
-      if (drv?.company_id) {
-        const { data: vs } = await supabase.from("vehicles").select("id, plate, brand, model").eq("company_id", drv.company_id);
+      const companyId = drv?.company_id ?? currentCompanyId;
+      if (companyId) {
+        const { data: vs } = await supabase.from("vehicles").select("id, plate, brand, model").eq("company_id", companyId).order("plate");
         setVehicles(vs ?? []);
       }
       setCurrentVehicleId(drv?.assigned_vehicle_id ?? null);
     })();
-  }, [user]);
+  }, [user, currentCompanyId]);
 
   useEffect(() => {
     (async () => {
@@ -83,7 +84,7 @@ export default function MotoristaCalendario() {
   const dayEvents = (d: Date) => eventsByDay.get(format(d, "yyyy-MM-dd")) ?? [];
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
         <Link to="/motorista" className="p-1.5 -ml-1.5 rounded hover:bg-muted"><ArrowLeft className="h-5 w-5" /></Link>
         <h1 className="font-semibold flex-1">Calendário</h1>

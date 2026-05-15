@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Wrench, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Wrench, AlertCircle, Loader2, Truck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import MaintenanceRequestWizard from "@/components/motorista/MaintenanceRequestWizard";
 import MotoristaBottomNav from "@/components/motorista/MotoristaBottomNav";
 import NotificationBell from "@/components/motorista/NotificationBell";
 import { PROBLEM_CATEGORIES, SEVERITY_LEVELS, MR_STATUS } from "@/lib/maintenance-requests";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function MotoristaManutencao() {
   const { user, currentCompanyId } = useAuth();
   const [vehicle, setVehicle] = useState<any | null>(null);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [pickedVehicleId, setPickedVehicleId] = useState<string>("");
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
@@ -24,6 +27,13 @@ export default function MotoristaManutencao() {
       const { data: v } = await supabase.from("vehicles").select("*").eq("id", drv.assigned_vehicle_id).maybeSingle();
       setVehicle(v);
     }
+    const { data: vs } = await supabase
+      .from("vehicles")
+      .select("id, plate, brand, model")
+      .eq("company_id", currentCompanyId)
+      .in("status", ["ativo", "manutencao"])
+      .order("plate");
+    setVehicles(vs ?? []);
     const { data } = await supabase
       .from("maintenance_requests")
       .select("*, vehicles(plate, brand, model)")
@@ -35,8 +45,11 @@ export default function MotoristaManutencao() {
   };
   useEffect(() => { load(); }, [user, currentCompanyId]);
 
+  const activeVehicle =
+    vehicle ?? vehicles.find((v) => v.id === pickedVehicleId) ?? null;
+
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 max-w-md mx-auto">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
         <Link to="/motorista" className="p-1.5 -ml-1.5 rounded hover:bg-muted"><ArrowLeft className="h-5 w-5" /></Link>
         <h1 className="font-semibold flex-1">Manutenção</h1>
@@ -44,9 +57,25 @@ export default function MotoristaManutencao() {
       </header>
 
       <div className="p-4 space-y-4">
+        {!vehicle && vehicles.length > 0 && (
+          <div className="surface-card rounded-xl p-3 space-y-2">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Truck className="h-3.5 w-3.5" /> Selecione o veículo
+            </div>
+            <Select value={pickedVehicleId} onValueChange={setPickedVehicleId}>
+              <SelectTrigger className="h-11"><SelectValue placeholder="Escolher veículo..." /></SelectTrigger>
+              <SelectContent>
+                {vehicles.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>{v.plate} — {v.brand} {v.model}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <button
           onClick={() => setShowWizard(true)}
-          disabled={!vehicle}
+          disabled={!activeVehicle}
           className="w-full bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-2xl p-5 flex items-center gap-4 shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
           <div className="h-14 w-14 rounded-xl bg-white/20 grid place-items-center">
@@ -54,7 +83,7 @@ export default function MotoristaManutencao() {
           </div>
           <div className="text-left flex-1">
             <div className="text-lg font-bold">Reportar problema</div>
-            <div className="text-sm text-white/80">{vehicle ? `${vehicle.plate} — ${vehicle.brand} ${vehicle.model}` : "Sem veículo atribuído"}</div>
+            <div className="text-sm text-white/80">{activeVehicle ? `${activeVehicle.plate} — ${activeVehicle.brand} ${activeVehicle.model}` : "Selecione um veículo acima"}</div>
           </div>
         </button>
 
@@ -102,10 +131,10 @@ export default function MotoristaManutencao() {
         </div>
       </div>
 
-      {showWizard && vehicle && (
+      {showWizard && activeVehicle && (
         <MaintenanceRequestWizard
-          vehicleId={vehicle.id}
-          vehicleLabel={`${vehicle.plate} — ${vehicle.brand} ${vehicle.model}`}
+          vehicleId={activeVehicle.id}
+          vehicleLabel={`${activeVehicle.plate} — ${activeVehicle.brand} ${activeVehicle.model}`}
           onClose={() => setShowWizard(false)}
           onCreated={load}
         />
