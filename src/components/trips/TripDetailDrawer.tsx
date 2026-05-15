@@ -4,6 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { TRIP_STATUS, EXPENSE_CATEGORIES, PAYMENT_METHODS, formatBRL, labelOf, paymentGroup, categoryIcon } from "@/lib/trips";
+import AdvanceDialog from "./AdvanceDialog";
+import { Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TripDetailDrawer({
@@ -11,6 +13,7 @@ export default function TripDetailDrawer({
 }: { trip: any; drivers: any[]; vehicles: any[]; onClose: () => void; onChanged: () => void }) {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [advances, setAdvances] = useState<any[]>([]);
+  const [advOpen, setAdvOpen] = useState(false);
 
   const load = async () => {
     const [exp, adv] = await Promise.all([
@@ -76,6 +79,11 @@ export default function TripDetailDrawer({
         </div>
 
         <div className="flex gap-2 mt-4">
+          {trip.status !== "finalizada" && trip.status !== "cancelada" && (
+            <Button size="sm" variant="outline" onClick={() => setAdvOpen(true)}>
+              <Wallet className="h-4 w-4 mr-1.5" /> Liberar adiantamento
+            </Button>
+          )}
           {trip.status !== "finalizada" && trip.status !== "cancelada" && (
             <Button onClick={advance} size="sm">
               {trip.status === "programada" ? "Iniciar viagem" :
@@ -145,6 +153,7 @@ export default function TripDetailDrawer({
             ))}
           </div>
         )}
+        <AdvanceDialog open={advOpen} onOpenChange={setAdvOpen} trip={trip} onSaved={() => { load(); onChanged(); }} />
       </SheetContent>
     </Sheet>
   );
