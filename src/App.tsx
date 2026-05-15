@@ -17,6 +17,8 @@ import Maintenance from "./pages/app/Maintenance";
 import Tires from "./pages/app/Tires";
 import Colaborador from "./pages/app/Colaborador";
 import MotoristaShell from "./pages/motorista/MotoristaShell";
+import MotoristaViagens from "./pages/motorista/MotoristaViagens";
+import MotoristaViagemDetalhe from "./pages/motorista/MotoristaViagemDetalhe";
 import Documents from "./pages/app/Documents";
 import Approvals from "./pages/app/Approvals";
 import DriverFirstAccess from "./pages/auth/DriverFirstAccess";
@@ -73,6 +75,10 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
             <Route path="/motorista" element={<MotoristaShell />} />
+            <Route element={<RequireAuth />}>
+              <Route path="/motorista/viagens" element={<MotoristaViagens />} />
+              <Route path="/motorista/viagens/:id" element={<MotoristaViagemDetalhe />} />
+            </Route>
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdminShell />}>
               <Route index element={<CompaniesPanel />} />
