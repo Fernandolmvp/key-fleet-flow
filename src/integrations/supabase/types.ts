@@ -3294,6 +3294,248 @@ export type Database = {
           },
         ]
       }
+      maintenance_work_orders: {
+        Row: {
+          actual_amount_difference: number | null
+          actual_amount_total: number | null
+          after_photos_urls: string[]
+          before_photos_urls: string[]
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_id: string | null
+          estimated_duration_hours: number | null
+          execution_completed_at: string | null
+          execution_started_at: string | null
+          execution_status: string
+          final_notes: string | null
+          id: string
+          invoice_number: string | null
+          invoice_url: string | null
+          km_at_completion: number | null
+          km_at_scheduling: number | null
+          km_at_start: number | null
+          maintenance_record_id: string | null
+          maintenance_request_id: string | null
+          maintenance_schedule_id: string | null
+          origin_type: string
+          os_number: string | null
+          parts_used: Json
+          payment_due_date: string | null
+          payment_method: string | null
+          payment_paid_at: string | null
+          payment_receipt_url: string | null
+          payment_status: string
+          priority: string
+          problem_category: string[]
+          quote_amount_labor: number | null
+          quote_amount_other: number | null
+          quote_amount_parts: number | null
+          quote_amount_total: number | null
+          quote_approval_notes: string | null
+          quote_approved_at: string | null
+          quote_approved_by: string | null
+          quote_attachment_url: string | null
+          quote_details: Json
+          quote_notes: string | null
+          quote_rejected_reason: string | null
+          quote_sent_at: string | null
+          quote_status: string
+          quote_validity_days: number | null
+          quote_warranty_days: number | null
+          rated_at: string | null
+          rated_by: string | null
+          rating: number | null
+          rating_comment: string | null
+          scheduled_date: string
+          scheduled_time: string | null
+          services_performed: Json
+          title: string
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string
+          warranty_until: string | null
+          workshop_id: string
+        }
+        Insert: {
+          actual_amount_difference?: number | null
+          actual_amount_total?: number | null
+          after_photos_urls?: string[]
+          before_photos_urls?: string[]
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          estimated_duration_hours?: number | null
+          execution_completed_at?: string | null
+          execution_started_at?: string | null
+          execution_status?: string
+          final_notes?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
+          km_at_completion?: number | null
+          km_at_scheduling?: number | null
+          km_at_start?: number | null
+          maintenance_record_id?: string | null
+          maintenance_request_id?: string | null
+          maintenance_schedule_id?: string | null
+          origin_type: string
+          os_number?: string | null
+          parts_used?: Json
+          payment_due_date?: string | null
+          payment_method?: string | null
+          payment_paid_at?: string | null
+          payment_receipt_url?: string | null
+          payment_status?: string
+          priority?: string
+          problem_category?: string[]
+          quote_amount_labor?: number | null
+          quote_amount_other?: number | null
+          quote_amount_parts?: number | null
+          quote_amount_total?: number | null
+          quote_approval_notes?: string | null
+          quote_approved_at?: string | null
+          quote_approved_by?: string | null
+          quote_attachment_url?: string | null
+          quote_details?: Json
+          quote_notes?: string | null
+          quote_rejected_reason?: string | null
+          quote_sent_at?: string | null
+          quote_status?: string
+          quote_validity_days?: number | null
+          quote_warranty_days?: number | null
+          rated_at?: string | null
+          rated_by?: string | null
+          rating?: number | null
+          rating_comment?: string | null
+          scheduled_date: string
+          scheduled_time?: string | null
+          services_performed?: Json
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id: string
+          warranty_until?: string | null
+          workshop_id: string
+        }
+        Update: {
+          actual_amount_difference?: number | null
+          actual_amount_total?: number | null
+          after_photos_urls?: string[]
+          before_photos_urls?: string[]
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_id?: string | null
+          estimated_duration_hours?: number | null
+          execution_completed_at?: string | null
+          execution_started_at?: string | null
+          execution_status?: string
+          final_notes?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
+          km_at_completion?: number | null
+          km_at_scheduling?: number | null
+          km_at_start?: number | null
+          maintenance_record_id?: string | null
+          maintenance_request_id?: string | null
+          maintenance_schedule_id?: string | null
+          origin_type?: string
+          os_number?: string | null
+          parts_used?: Json
+          payment_due_date?: string | null
+          payment_method?: string | null
+          payment_paid_at?: string | null
+          payment_receipt_url?: string | null
+          payment_status?: string
+          priority?: string
+          problem_category?: string[]
+          quote_amount_labor?: number | null
+          quote_amount_other?: number | null
+          quote_amount_parts?: number | null
+          quote_amount_total?: number | null
+          quote_approval_notes?: string | null
+          quote_approved_at?: string | null
+          quote_approved_by?: string | null
+          quote_attachment_url?: string | null
+          quote_details?: Json
+          quote_notes?: string | null
+          quote_rejected_reason?: string | null
+          quote_sent_at?: string | null
+          quote_status?: string
+          quote_validity_days?: number | null
+          quote_warranty_days?: number | null
+          rated_at?: string | null
+          rated_by?: string | null
+          rating?: number | null
+          rating_comment?: string | null
+          scheduled_date?: string
+          scheduled_time?: string | null
+          services_performed?: Json
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string
+          warranty_until?: string | null
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_work_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_work_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "maintenance_work_orders_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_work_orders_maintenance_record_id_fkey"
+            columns: ["maintenance_record_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_work_orders_maintenance_request_id_fkey"
+            columns: ["maintenance_request_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_work_orders_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_work_orders_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_invitations: {
         Row: {
           accepted_at: string | null
@@ -5522,6 +5764,171 @@ export type Database = {
           },
         ]
       }
+      work_order_messages: {
+        Row: {
+          attachments_urls: string[]
+          company_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          sender_id: string
+          sender_role: string
+          work_order_id: string
+          workshop_id: string
+        }
+        Insert: {
+          attachments_urls?: string[]
+          company_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          sender_id: string
+          sender_role: string
+          work_order_id: string
+          workshop_id: string
+        }
+        Update: {
+          attachments_urls?: string[]
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          sender_id?: string
+          sender_role?: string
+          work_order_id?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_order_messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "work_order_messages_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_work_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_order_messages_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_sequences: {
+        Row: {
+          company_id: string
+          last_number: number
+          year: number
+        }
+        Insert: {
+          company_id: string
+          last_number?: number
+          year: number
+        }
+        Update: {
+          company_id?: string
+          last_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      workshop_users: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          invite_accepted_at: string | null
+          invite_sent_at: string | null
+          invite_token: string | null
+          is_active: boolean
+          last_login_at: string | null
+          name: string
+          password_hash: string | null
+          password_set_at: string | null
+          role: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          invite_accepted_at?: string | null
+          invite_sent_at?: string | null
+          invite_token?: string | null
+          is_active?: boolean
+          last_login_at?: string | null
+          name: string
+          password_hash?: string | null
+          password_set_at?: string | null
+          role?: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          invite_accepted_at?: string | null
+          invite_sent_at?: string | null
+          invite_token?: string | null
+          is_active?: boolean
+          last_login_at?: string | null
+          name?: string
+          password_hash?: string | null
+          password_set_at?: string | null
+          role?: string
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workshop_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workshop_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "workshop_users_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workshops: {
         Row: {
           address_complement: string | null
@@ -5548,6 +5955,7 @@ export type Database = {
           document_type: string | null
           documents_urls: Json
           email: string | null
+          has_portal_access: boolean
           icms_rate: number | null
           id: string
           invoice_type: string | null
@@ -5564,6 +5972,8 @@ export type Database = {
           pis: string | null
           pix_key: string | null
           pix_key_type: string | null
+          portal_activated_at: string | null
+          portal_settings: Json
           preferred: boolean
           rating: number | null
           simples_nacional: boolean | null
@@ -5609,6 +6019,7 @@ export type Database = {
           document_type?: string | null
           documents_urls?: Json
           email?: string | null
+          has_portal_access?: boolean
           icms_rate?: number | null
           id?: string
           invoice_type?: string | null
@@ -5625,6 +6036,8 @@ export type Database = {
           pis?: string | null
           pix_key?: string | null
           pix_key_type?: string | null
+          portal_activated_at?: string | null
+          portal_settings?: Json
           preferred?: boolean
           rating?: number | null
           simples_nacional?: boolean | null
@@ -5670,6 +6083,7 @@ export type Database = {
           document_type?: string | null
           documents_urls?: Json
           email?: string | null
+          has_portal_access?: boolean
           icms_rate?: number | null
           id?: string
           invoice_type?: string | null
@@ -5686,6 +6100,8 @@ export type Database = {
           pis?: string | null
           pix_key?: string | null
           pix_key_type?: string | null
+          portal_activated_at?: string | null
+          portal_settings?: Json
           preferred?: boolean
           rating?: number | null
           simples_nacional?: boolean | null
@@ -5951,6 +6367,7 @@ export type Database = {
         Args: { _driver_id: string; _user_id: string }
         Returns: boolean
       }
+      is_workshop_user: { Args: { _workshop_id: string }; Returns: boolean }
       log_km_override: {
         Args: {
           _company_id: string
