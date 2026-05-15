@@ -4177,6 +4177,101 @@ export type Database = {
         }
         Relationships: []
       }
+      trip_advances: {
+        Row: {
+          advance_date: string
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          driver_confirmation_method: string | null
+          driver_confirmation_notes: string | null
+          driver_confirmed_at: string | null
+          driver_id: string
+          driver_signature_url: string | null
+          gestor_signature_url: string | null
+          id: string
+          notes: string | null
+          payment_method_used: string
+          receipt_number: string | null
+          receipt_url: string | null
+          status: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          advance_date?: string
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          driver_confirmation_method?: string | null
+          driver_confirmation_notes?: string | null
+          driver_confirmed_at?: string | null
+          driver_id: string
+          driver_signature_url?: string | null
+          gestor_signature_url?: string | null
+          id?: string
+          notes?: string | null
+          payment_method_used?: string
+          receipt_number?: string | null
+          receipt_url?: string | null
+          status?: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          advance_date?: string
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          driver_confirmation_method?: string | null
+          driver_confirmation_notes?: string | null
+          driver_confirmed_at?: string | null
+          driver_id?: string
+          driver_signature_url?: string | null
+          gestor_signature_url?: string | null
+          id?: string
+          notes?: string | null
+          payment_method_used?: string
+          receipt_number?: string | null
+          receipt_url?: string | null
+          status?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "trip_advances_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_advances_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_code_seq: {
         Row: {
           company_id: string
