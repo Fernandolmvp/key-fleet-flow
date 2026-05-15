@@ -1015,6 +1015,128 @@ export type Database = {
           },
         ]
       }
+      company_payment_methods: {
+        Row: {
+          assigned_to_driver_id: string | null
+          assigned_to_vehicle_id: string | null
+          bank_account: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_name: string | null
+          card_brand: string | null
+          card_expiry_month: number | null
+          card_expiry_year: number | null
+          card_holder_name: string | null
+          card_last_four_digits: string | null
+          card_limit: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          method_type: string
+          name: string
+          notes: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          updated_at: string
+          updated_by: string | null
+          voucher_card_number: string | null
+          voucher_monthly_credit: number | null
+          voucher_provider: string | null
+        }
+        Insert: {
+          assigned_to_driver_id?: string | null
+          assigned_to_vehicle_id?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          card_brand?: string | null
+          card_expiry_month?: number | null
+          card_expiry_year?: number | null
+          card_holder_name?: string | null
+          card_last_four_digits?: string | null
+          card_limit?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          method_type: string
+          name: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          voucher_card_number?: string | null
+          voucher_monthly_credit?: number | null
+          voucher_provider?: string | null
+        }
+        Update: {
+          assigned_to_driver_id?: string | null
+          assigned_to_vehicle_id?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          card_brand?: string | null
+          card_expiry_month?: number | null
+          card_expiry_year?: number | null
+          card_holder_name?: string | null
+          card_last_four_digits?: string | null
+          card_limit?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          method_type?: string
+          name?: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          voucher_card_number?: string | null
+          voucher_monthly_credit?: number | null
+          voucher_provider?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_payment_methods_assigned_to_driver_id_fkey"
+            columns: ["assigned_to_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_payment_methods_assigned_to_vehicle_id_fkey"
+            columns: ["assigned_to_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       cost_centers: {
         Row: {
           active: boolean
