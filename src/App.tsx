@@ -56,6 +56,9 @@ import RequireJustPaid from "./components/auth/RequireJustPaid";
 import { PostoAuthProvider } from "./contexts/PostoAuthContext";
 import PostoLogin from "./pages/posto/PostoLogin";
 import PostoShell from "./pages/posto/PostoShell";
+import { WorkshopAuthProvider } from "./contexts/WorkshopAuthContext";
+import OficinaLogin from "./pages/oficina/OficinaLogin";
+import OficinaShell from "./pages/oficina/OficinaShell";
 import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 import Termos from "./pages/legal/Termos";
 import Privacidade from "./pages/legal/Privacidade";
@@ -70,6 +73,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
          <PostoAuthProvider>
+         <WorkshopAuthProvider>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/termos" element={<Termos />} />
@@ -95,6 +99,8 @@ const App = () => (
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/posto/login" element={<PostoLogin />} />
             <Route path="/posto" element={<PostoShell />} />
+            <Route path="/oficina/login" element={<OficinaLogin />} />
+            <Route path="/oficina" element={<OficinaShell />} />
             <Route path="/parceiro/convite" element={<PartnerInviteAccept />} />
             <Route element={<RequireAuth />}>
               <Route path="/planos" element={<PlanSelection />} />
@@ -134,6 +140,7 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+         </WorkshopAuthProvider>
          </PostoAuthProvider>
         </AuthProvider>
       </BrowserRouter>
