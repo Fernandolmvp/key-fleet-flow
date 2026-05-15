@@ -1292,6 +1292,70 @@ export type Database = {
           },
         ]
       }
+      driver_notifications: {
+        Row: {
+          company_id: string
+          created_at: string
+          driver_user_id: string
+          id: string
+          message: string
+          notification_type: string
+          read_at: string | null
+          related_id: string | null
+          related_type: string | null
+          title: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          driver_user_id: string
+          id?: string
+          message: string
+          notification_type: string
+          read_at?: string | null
+          related_id?: string | null
+          related_type?: string | null
+          title: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          driver_user_id?: string
+          id?: string
+          message?: string
+          notification_type?: string
+          read_at?: string | null
+          related_id?: string | null
+          related_type?: string | null
+          title?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "driver_notifications_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_onboarding_attempts: {
         Row: {
           attempted_at: string
@@ -3000,6 +3064,139 @@ export type Database = {
           },
           {
             foreignKeyName: "mr_vehicle_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_requests: {
+        Row: {
+          audio_url: string | null
+          company_id: string
+          created_at: string
+          driver_id: string | null
+          driver_user_id: string
+          estimated_cost: number | null
+          gestor_notes: string | null
+          id: string
+          km_at_report: number | null
+          maintenance_record_id: string | null
+          photos_urls: string[]
+          problem_category: string
+          problem_description: string
+          rejection_reason: string | null
+          reported_latitude: number | null
+          reported_location_text: string | null
+          reported_longitude: number | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scheduled_date: string | null
+          scheduled_workshop_id: string | null
+          severity_self_assessment: string
+          status: string
+          updated_at: string
+          vehicle_id: string
+          video_url: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          company_id: string
+          created_at?: string
+          driver_id?: string | null
+          driver_user_id: string
+          estimated_cost?: number | null
+          gestor_notes?: string | null
+          id?: string
+          km_at_report?: number | null
+          maintenance_record_id?: string | null
+          photos_urls?: string[]
+          problem_category: string
+          problem_description: string
+          rejection_reason?: string | null
+          reported_latitude?: number | null
+          reported_location_text?: string | null
+          reported_longitude?: number | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_date?: string | null
+          scheduled_workshop_id?: string | null
+          severity_self_assessment: string
+          status?: string
+          updated_at?: string
+          vehicle_id: string
+          video_url?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          company_id?: string
+          created_at?: string
+          driver_id?: string | null
+          driver_user_id?: string
+          estimated_cost?: number | null
+          gestor_notes?: string | null
+          id?: string
+          km_at_report?: number | null
+          maintenance_record_id?: string | null
+          photos_urls?: string[]
+          problem_category?: string
+          problem_description?: string
+          rejection_reason?: string | null
+          reported_latitude?: number | null
+          reported_location_text?: string | null
+          reported_longitude?: number | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_date?: string | null
+          scheduled_workshop_id?: string | null
+          severity_self_assessment?: string
+          status?: string
+          updated_at?: string
+          vehicle_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_maintenance_record_id_fkey"
+            columns: ["maintenance_record_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_scheduled_workshop_id_fkey"
+            columns: ["scheduled_workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
@@ -5672,6 +5869,15 @@ export type Database = {
       get_company_vehicle_limit: {
         Args: { _company_id: string }
         Returns: number
+      }
+      get_driver_calendar_events: {
+        Args: {
+          p_driver_user_id: string
+          p_end_date: string
+          p_start_date: string
+          p_vehicle_id: string
+        }
+        Returns: Json
       }
       get_my_acquisition_state: {
         Args: never
