@@ -73,7 +73,7 @@ const nav: NavEntry[] = [
       { to: "/app/fuel-stations", label: "Postos", icon: Store, module: "fuel_stations" },
       { to: "/app/workshops", label: "Oficinas", icon: Wrench, module: "workshops", isNew: true },
       { to: "/app/suppliers", label: "Fornecedores", icon: Package, module: "suppliers", isNew: true },
-      { to: "/app/brokers", label: "Corretores de Seguros", icon: Briefcase, module: "brokers" },
+      { to: "/app/brokers", label: "Corretores do Clayton", icon: Briefcase, module: "brokers" },
     ],
   },
   {
