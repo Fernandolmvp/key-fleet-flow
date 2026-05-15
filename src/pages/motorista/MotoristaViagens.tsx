@@ -14,7 +14,7 @@ export default function MotoristaViagens() {
     (async () => {
       if (!user) return;
       // get driver record(s) for this user
-      const { data: drvs } = await supabase.from("drivers").select("id").eq("profile_id", user.id);
+      const { data: drvs } = await supabase.from("drivers").select("id").eq("user_id", user.id);
       const ids = (drvs ?? []).map((d) => d.id);
       if (ids.length === 0) { setItems([]); setLoading(false); return; }
       const { data } = await supabase.from("trips").select("*").in("driver_id", ids).order("scheduled_start_date", { ascending: false });
