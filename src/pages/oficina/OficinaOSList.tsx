@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,14 +27,18 @@ type Row = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Agendada", in_progress: "Em execução", completed: "Concluída",
-  cancelled: "Cancelada", awaiting_parts: "Aguarda peças",
+  aguardando_aprovacao: "Aguardando aprovação", aprovado_aguardando_inicio: "Aprovada",
+  em_execucao: "Em execução", aguardando_pecas: "Aguarda peças",
+  concluido: "Concluída", cancelado: "Cancelada", problema_relatado: "Problema",
 };
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  scheduled: "secondary", in_progress: "default", completed: "outline", cancelled: "destructive", awaiting_parts: "secondary",
+  aguardando_aprovacao: "secondary", aprovado_aguardando_inicio: "secondary",
+  em_execucao: "default", aguardando_pecas: "secondary",
+  concluido: "outline", cancelado: "destructive", problema_relatado: "destructive",
 };
 const QUOTE_LABEL: Record<string, string> = {
-  draft: "Rascunho", pending: "Pendente", sent: "Enviado", approved: "Aprovado", rejected: "Rejeitado",
+  pendente: "Pendente", em_elaboracao: "Em elaboração", enviado: "Enviado",
+  aprovado: "Aprovado", rejeitado: "Rejeitado", expirado: "Expirado",
 };
 
 function fmtMoney(n: number | null) {
@@ -43,6 +48,7 @@ function fmtMoney(n: number | null) {
 
 export default function OficinaOSList() {
   const { authedFetch } = useWorkshopAuth();
+  const nav = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -89,12 +95,12 @@ export default function OficinaOSList() {
             onChange={(e) => setStatus(e.target.value)}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="">Todos</option>
-            <option value="scheduled">Agendadas</option>
-            <option value="in_progress">Em execução</option>
-            <option value="awaiting_parts">Aguardando peças</option>
-            <option value="completed">Concluídas</option>
-            <option value="cancelled">Canceladas</option>
+          <option value="">Todos</option>
+          <option value="aguardando_aprovacao">Aguardando aprovação</option>
+          <option value="aprovado_aguardando_inicio">Aprovadas</option>
+          <option value="em_execucao">Em execução</option>
+          <option value="aguardando_pecas">Aguardando peças</option>
+          <option value="concluido">Concluídas</option>
           </select>
         </div>
         <Button onClick={load} disabled={loading} className="gap-2 bg-gradient-primary text-primary-foreground">
@@ -122,7 +128,7 @@ export default function OficinaOSList() {
                 <tr><td colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma OS</td></tr>
               )}
               {filtered.map((r) => (
-                <tr key={r.id} className="border-t border-border hover:bg-muted/20">
+                <tr key={r.id} onClick={() => nav(`/oficina/os/${r.id}`)} className="border-t border-border hover:bg-muted/20 cursor-pointer">
                   <td className="px-3 py-2 font-mono font-semibold text-primary">{r.os_number}</td>
                   <td className="px-3 py-2">
                     <div className="font-mono">{r.vehicle?.plate ?? "—"}</div>

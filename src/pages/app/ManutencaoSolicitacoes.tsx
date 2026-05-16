@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { PROBLEM_CATEGORIES, SEVERITY_LEVELS, MR_STATUS } from "@/lib/maintenance-requests";
-import { Loader2, Wrench, Calendar, MapPin, Image as ImageIcon, X, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Wrench, Calendar, MapPin, Image as ImageIcon, X, Check, AlertTriangle, ClipboardPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -218,6 +218,10 @@ function RequestDetailDialog({ request, onClose, onChanged }: { request: any | n
             </div>
           )}
 
+          {request.status === "agendada" && (
+            <CreateOSButton request={request} workshops={workshops} onDone={() => { onChanged(); onClose(); }} />
+          )}
+
           {["pendente_aprovacao", "em_analise"].includes(request.status) && (
             <div className="border-t border-border pt-4">
               {!mode && (
@@ -262,5 +266,91 @@ function RequestDetailDialog({ request, onClose, onChanged }: { request: any | n
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CreateOSButton({ request, workshops, onDone }: { request: any; workshops: any[]; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [workshopId, setWorkshopId] = useState(request.scheduled_workshop_id ?? "");
+  const [scheduledDate, setScheduledDate] = useState(request.scheduled_date ?? "");
+  const [priority, setPriority] = useState("normal");
+  const [title, setTitle] = useState(request.problem_description?.slice(0, 80) ?? "Manutenção corretiva");
+
+  // Verifica se já existe OS
+  const [existing, setExisting] = useState<any | null>(null);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("maintenance_work_orders")
+        .select("id, os_number, execution_status").eq("maintenance_request_id", request.id).maybeSingle();
+      setExisting(data);
+    })();
+  }, [request.id]);
+
+  const create = async () => {
+    if (!workshopId || !scheduledDate) { toast.error("Oficina e data são obrigatórias"); return; }
+    setBusy(true);
+    const { error } = await supabase.from("maintenance_work_orders").insert({
+      company_id: request.company_id,
+      workshop_id: workshopId,
+      vehicle_id: request.vehicle_id,
+      driver_id: request.driver_id,
+      origin_type: "corretiva",
+      maintenance_request_id: request.id,
+      title,
+      description: request.problem_description,
+      problem_category: request.problem_category ? [request.problem_category] : [],
+      priority,
+      scheduled_date: scheduledDate,
+      km_at_scheduling: request.km_at_report,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("OS criada e enviada à oficina"); setOpen(false); onDone();
+  };
+
+  if (existing) {
+    return (
+      <div className="surface-card rounded-lg p-3 border border-primary/30 bg-primary/5 text-xs">
+        OS <strong>{existing.os_number}</strong> já criada · status: {existing.execution_status}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} className="w-full"><ClipboardPlus className="h-4 w-4 mr-1" /> Criar OS para a oficina</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Criar Ordem de Serviço</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Título</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+            <div><Label>Oficina *</Label>
+              <Select value={workshopId} onValueChange={setWorkshopId}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {workshops.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label>Data *</Label><Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} /></div>
+              <div><Label>Prioridade</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button onClick={create} disabled={busy} className="w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar OS"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
