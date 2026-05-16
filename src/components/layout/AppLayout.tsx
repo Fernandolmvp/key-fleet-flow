@@ -88,6 +88,7 @@ const nav: NavEntry[] = [
       { to: "/app/approvals", label: "Aprovações", icon: ClipboardCheck, badgeKey: "approvals", module: "approvals" },
       { to: "/app/maintenance", label: "Manutenção", icon: Wrench, module: "maintenance" },
       { to: "/app/manutencao/solicitacoes", label: "Solicitações motorista", icon: Wrench, isNew: true },
+     { to: "/app/manutencao/os", label: "Ordens de serviço (OS)", icon: Wrench, isNew: true },
       { to: "/app/sinistros", label: "Sinistros", icon: CarFront, soon: true },
       { to: "/app/despesas", label: "Despesas", icon: Receipt, soon: true },
       { to: "/app/multas", label: "Multas", icon: AlertTriangle },
