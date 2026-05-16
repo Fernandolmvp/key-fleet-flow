@@ -218,7 +218,7 @@ function ExecutionSection({ os, authedFetch, reload }: any) {
       r.readAsDataURL(file);
     });
     try {
-      const r = await authedFetch<{ path: string }>("workshop-os-upload", {
+      const r: { path: string } = await authedFetch("workshop-os-upload", {
         method: "POST",
         body: JSON.stringify({ os_id: os.id, kind, filename: file.name, content_type: file.type, base64: b64 }),
       });
