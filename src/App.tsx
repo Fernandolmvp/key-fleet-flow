@@ -39,6 +39,7 @@ import Despesas from "./pages/app/Despesas";
 import Multas from "./pages/app/Multas";
 import Viagens from "./pages/app/Viagens";
 import ManutencaoSolicitacoes from "./pages/app/ManutencaoSolicitacoes";
+import WorkOrders from "./pages/app/WorkOrders";
 import VehicleHistory from "./pages/app/VehicleHistory";
 import SuperAdminShell from "./pages/admin/SuperAdminShell";
 import CompaniesPanel from "./pages/admin/CompaniesPanel";
@@ -59,6 +60,7 @@ import PostoShell from "./pages/posto/PostoShell";
 import { WorkshopAuthProvider } from "./contexts/WorkshopAuthContext";
 import OficinaLogin from "./pages/oficina/OficinaLogin";
 import OficinaShell from "./pages/oficina/OficinaShell";
+import OficinaOSDetail from "./pages/oficina/OficinaOSDetail";
 import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 import Termos from "./pages/legal/Termos";
 import Privacidade from "./pages/legal/Privacidade";
@@ -101,6 +103,7 @@ const App = () => (
             <Route path="/posto" element={<PostoShell />} />
             <Route path="/oficina/login" element={<OficinaLogin />} />
             <Route path="/oficina" element={<OficinaShell />} />
+            <Route path="/oficina/os/:id" element={<OficinaOSDetail />} />
             <Route path="/parceiro/convite" element={<PartnerInviteAccept />} />
             <Route element={<RequireAuth />}>
               <Route path="/planos" element={<PlanSelection />} />
@@ -134,6 +137,7 @@ const App = () => (
                   <Route path="multas" element={<Multas />} />
                   <Route path="viagens" element={<Viagens />} />
                   <Route path="manutencao/solicitacoes" element={<ManutencaoSolicitacoes />} />
+                  <Route path="manutencao/os" element={<WorkOrders />} />
                   <Route path="vehicles/:id/historico" element={<VehicleHistory />} />
                 </Route>
               </Route>
