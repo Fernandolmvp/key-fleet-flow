@@ -56,7 +56,7 @@ export default function MotoristaAbastecimento() {
         const up = await supabase.storage.from("fuel-receipts").upload(path, photo, { upsert: false });
         if (!up.error) receiptUrl = up.data.path;
       }
-      const { error } = await supabase.from("fuel_records").insert({
+      const { error } = await supabase.from("fuel_records").insert([{
         company_id: currentCompanyId,
         vehicle_id: vehicle.id,
         fuel_type: form.fuel_type,
@@ -66,7 +66,7 @@ export default function MotoristaAbastecimento() {
         fuel_station_id: form.station_id || null,
         receipt_url: receiptUrl,
         source_origin: "motorista",
-      });
+      } as any]);
       if (error) throw error;
       toast.success("Abastecimento registrado");
       nav("/motorista");
