@@ -61,6 +61,9 @@ import { WorkshopAuthProvider } from "./contexts/WorkshopAuthContext";
 import OficinaLogin from "./pages/oficina/OficinaLogin";
 import OficinaShell from "./pages/oficina/OficinaShell";
 import OficinaOSDetail from "./pages/oficina/OficinaOSDetail";
+import OficinaPerfil from "./pages/oficina/OficinaPerfil";
+import OficinaEquipe from "./pages/oficina/OficinaEquipe";
+import MotoristaAbastecimento from "./pages/motorista/MotoristaAbastecimento";
 import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 import Termos from "./pages/legal/Termos";
 import Privacidade from "./pages/legal/Privacidade";
@@ -89,6 +92,7 @@ const App = () => (
               <Route path="/motorista/viagens/:id" element={<MotoristaViagemDetalhe />} />
               <Route path="/motorista/manutencao" element={<MotoristaManutencao />} />
               <Route path="/motorista/calendario" element={<MotoristaCalendario />} />
+              <Route path="/motorista/abastecimento" element={<MotoristaAbastecimento />} />
             </Route>
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/super-admin" element={<SuperAdminShell />}>
@@ -104,6 +108,8 @@ const App = () => (
             <Route path="/oficina/login" element={<OficinaLogin />} />
             <Route path="/oficina" element={<OficinaShell />} />
             <Route path="/oficina/os/:id" element={<OficinaOSDetail />} />
+            <Route path="/oficina/perfil" element={<OficinaPerfil />} />
+            <Route path="/oficina/equipe" element={<OficinaEquipe />} />
             <Route path="/parceiro/convite" element={<PartnerInviteAccept />} />
             <Route element={<RequireAuth />}>
               <Route path="/planos" element={<PlanSelection />} />
