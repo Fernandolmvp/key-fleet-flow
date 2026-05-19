@@ -2302,6 +2302,67 @@ export type Database = {
           },
         ]
       }
+      fuel_station_prices: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          fuel_type: string
+          id: string
+          notes: string | null
+          price_date: string
+          price_per_liter: number
+          station_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          fuel_type: string
+          id?: string
+          notes?: string | null
+          price_date?: string
+          price_per_liter: number
+          station_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          fuel_type?: string
+          id?: string
+          notes?: string | null
+          price_date?: string
+          price_per_liter?: number
+          station_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_station_prices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_station_prices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "fuel_station_prices_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fuel_station_users: {
         Row: {
           active: boolean
