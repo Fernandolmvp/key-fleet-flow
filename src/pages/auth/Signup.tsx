@@ -79,14 +79,46 @@ export default function Signup() {
     const parsed = schema.safeParse(form);
     if (!parsed.success) return toast.error(parsed.error.errors[0].message);
     setBusy(true);
-    const { data: auth, error } = await supabase.auth.signUp({
+    let { data: auth, error } = await supabase.auth.signUp({
       email: form.email, password: form.password,
       options: {
         emailRedirectTo: `${window.location.origin}/app`,
         data: { full_name: form.fullName },
       },
     });
-    if (error) { setBusy(false); return toast.error(error.message); }
+    if (error) {
+      const msg = String(error.message || "");
+      const alreadyExists = /already|registered|exists/i.test(msg) || (error as any).status === 422;
+      if (!alreadyExists) {
+        setBusy(false);
+        return toast.error(msg || "Falha ao criar conta");
+      }
+      // Recuperação: usuário já existe (possível cadastro travado anteriormente).
+      const { data: signIn, error: sErr } = await supabase.auth.signInWithPassword({
+        email: form.email, password: form.password,
+      });
+      if (sErr || !signIn.user) {
+        setBusy(false);
+        toast.error(
+          "Já existe uma conta com este email. Se for sua, faça login ou recupere a senha.",
+          { duration: 8000 }
+        );
+        nav("/login");
+        return;
+      }
+      // Já tem empresa? Manda direto pro app.
+      const { data: existingMem } = await supabase
+        .from("company_members").select("company_id").eq("user_id", signIn.user.id).limit(1);
+      if (existingMem && existingMem.length > 0) {
+        setBusy(false);
+        toast.success("Você já tinha conta — conectamos você ao sistema.");
+        await refreshCompanies();
+        nav("/app");
+        return;
+      }
+      // Órfão: continua o bootstrap abaixo com a sessão recém-criada.
+      auth = { user: signIn.user, session: signIn.session } as any;
+    }
     if (!auth.user) { setBusy(false); return toast.error("Falha ao criar usuário"); }
 
     // Garantir sessão (caso confirmação de e-mail esteja ativa, faz signIn imediato)
@@ -110,7 +142,14 @@ export default function Signup() {
       _email: form.email,
       _trial_plan_slug: planSlug,
     });
-    if (rpcErr) { setBusy(false); return toast.error(rpcErr.message); }
+    if (rpcErr) {
+      setBusy(false);
+      const m = String(rpcErr.message || "");
+      if (/duplicate|unique|cnpj/i.test(m)) {
+        return toast.error("Já existe uma empresa com este CNPJ. Se for sua, peça acesso ao administrador.");
+      }
+      return toast.error("Sua conta foi criada, mas falhou ao cadastrar a empresa. Faça login para continuar.", { duration: 8000 });
+    }
 
     await refreshCompanies();
 
