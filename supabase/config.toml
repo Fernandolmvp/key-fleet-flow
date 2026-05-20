@@ -41,3 +41,5 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.check-trial-expirations]
     verify_jwt = false
+  [functions.admin-create-company-manual]
+    verify_jwt = false

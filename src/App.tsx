@@ -50,6 +50,7 @@ import UsagePage from "./pages/admin/ai/UsagePage";
 import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import CouponsPanel from "./pages/admin/CouponsPanel";
 import CouponDetail from "./pages/admin/CouponDetail";
+import CompanyManualCreate from "./pages/admin/CompanyManualCreate";
 import NotFound from "./pages/NotFound";
 import PlanSelection from "./pages/auth/PlanSelection";
 import Welcome from "./pages/auth/Welcome";
@@ -105,6 +106,7 @@ const App = () => (
               <Route path="ai/usage" element={<UsagePage />} />
               <Route path="cupons" element={<CouponsPanel />} />
               <Route path="cupons/:id" element={<CouponDetail />} />
+              <Route path="empresas/nova" element={<CompanyManualCreate />} />
             </Route>
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/posto/login" element={<PostoLogin />} />
