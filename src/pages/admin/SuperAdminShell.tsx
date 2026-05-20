@@ -2,7 +2,7 @@ import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
-  ShieldCheck, ArrowLeft, Loader2, Building2, Brain, Cpu, Workflow, BarChart3, Ticket, PlusCircle,
+  ShieldCheck, ArrowLeft, Loader2, Building2, Brain, Cpu, Workflow, BarChart3, Ticket, PlusCircle, UserX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const navGroups = [
     items: [
       { to: "/super-admin", icon: Building2, label: "Empresas", end: true },
       { to: "/super-admin/empresas/nova", icon: PlusCircle, label: "Criar empresa" },
+      { to: "/super-admin/cadastros-incompletos", icon: UserX, label: "Cadastros incompletos" },
       { to: "/super-admin/cupons", icon: Ticket, label: "Cupons" },
     ],
   },
