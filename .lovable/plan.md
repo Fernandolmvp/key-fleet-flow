@@ -1,72 +1,55 @@
-# Diagnóstico: emails de confirmação não chegam
 
-## Causa raiz identificada
+# Fix: "User already registered" + auto-recuperação de cadastro travado
 
-O projeto **NÃO usa Resend direto** — usa **Lovable Emails** (infra gerenciada que internamente roteia para Resend). O hook `auth-email-hook` já está implementado, deployado e usando a fila pgmq corretamente. O problema é puramente de **DNS**.
+## Causa raiz
+Quando o cliente faz signup, o fluxo do `Signup.tsx` executa 2 passos sequenciais:
+1. `supabase.auth.signUp()` — cria o usuário em `auth.users`
+2. `supabase.rpc("bootstrap_company_v2")` — cria empresa, membership, role, profile, subscription
 
-**Evidências coletadas:**
+Se o passo 2 falhar (erro de rede, RPC, CNPJ duplicado, sessão ainda não propagada), o usuário fica **órfão**: existe em `auth.users` mas não tem empresa. Na próxima tentativa, o `signUp` retorna `422 user_already_exists` e a UX só mostra a mensagem crua, sem caminho de saída.
 
-| Verificação | Resultado |
-|---|---|
-| Status do domínio `notify.frotaops.com.br` | ⏳ **Pending — DNS não verificado** |
-| Logs da edge `auth-email-hook` (48h) | **Nenhum log** — função nunca foi invocada |
-| Logs da edge `process-email-queue` (48h) | **Nenhum log** |
-| Registros em `email_send_log` | **0 linhas no total** — nenhum email chegou a ser enfileirado |
-| Tentativas de signup nos logs do Auth | Várias (ex: `claytonroza20@gmail.com` em 2026-05-20 18:13 retornou 200) |
+Caso real confirmado no banco: `claytonroza20@gmail.com` (criado 13/mai, email confirmado, 0 memberships, 0 roles).
 
-**Conclusão:** O Supabase Auth está recebendo os signups (retorna 200), mas como o domínio de envio está pendente de verificação DNS, o hook customizado não chega a ser disparado pelo backend de email da Lovable Cloud. Sem DNS verificado, **nenhum email transacional sai** — nem auth, nem app emails.
+## Solução
 
-## O que NÃO é o problema
+### 1. Recuperação automática no `Signup.tsx`
+Quando `signUp` retornar erro de "usuário já existe":
+- Tentar `signInWithPassword` com o email + senha digitados no formulário.
+- Se o login funcionar:
+  - Verificar se o usuário já tem `company_members`. Se já tiver, redirecionar pra `/app` (mensagem "Você já tem conta, te conectamos").
+  - Se NÃO tiver, executar o mesmo fluxo de bootstrap (`bootstrap_company_v2` + cupom) — é exatamente o cenário do Clayton. Resultado: ele entra no sistema com a base zerada da empresa nova dele.
+- Se o login falhar (senha diferente da que ele usou antes):
+  - Mostrar mensagem clara: "Já existe uma conta com este email. Se for sua, [Entrar](/login) ou [Recuperar senha](/login)."
 
-- ❌ Não é bug na edge function (`auth-email-hook` está correta, usa fila + retry automático via `process-email-queue`)
-- ❌ Não é falta de `RESEND_API_KEY` (Lovable Emails gerencia credenciais, não há Resend direto)
-- ❌ Não é limite de plano estourado (0 emails enviados no período)
-- ❌ Não é template quebrado (templates `signup`, `recovery`, `magic-link`, etc. já existem em `_shared/email-templates/`)
-- ❌ Não é hook não registrado (está registrado e configurado em `supabase/config.toml`)
+### 2. Mensagens de erro mais claras
+Substituir `toast.error(error.message)` (que mostra "User already registered" em inglês) por mensagens em português que orientam a próxima ação.
 
-A retry automática (até 5 tentativas) e o log detalhado em `email_send_log` **já estão implementados** pela infra de fila — não precisam ser adicionados.
+### 3. Recuperação manual do Clayton (caso pontual)
+Como ele já está travado e talvez não lembre a senha que digitou no signup original, oferecer 2 caminhos:
+- **Opção A (recomendada):** orientar Clayton a ir em `/login` → "Esqueci minha senha", redefinir, e ao logar o app detecta que ele não tem empresa e dispara um **onboarding de empresa** (nova tela, descrita abaixo).
+- **Opção B:** você (Super Admin) usa a tela "Criar empresa" que já existe — mas o email dele já está em `auth.users`, então a função `admin-create-company-manual` falharia no `createUser`. Precisaria de uma variante que aceita "usuário existente sem empresa" e só faz o bootstrap.
 
-## Plano de correção
+### 4. Tela de onboarding para usuários órfãos
+Hoje, se um usuário logado não tem empresa, o app pode travar ou redirecionar de forma confusa. Vou adicionar uma rota `/onboarding/empresa` que:
+- Detecta `user && companies.length === 0` no `AuthContext`.
+- Mostra o mesmo formulário (empresa + cupom) do signup, mas sem os campos de auth.
+- Chama `bootstrap_company_v2` + cupom direto.
+- Redireciona pra `/app`.
 
-### Passo 1 — Verificar DNS (única ação necessária)
+Isso fecha o loop pra qualquer caso futuro de bootstrap parcial e resolve o Clayton sem migration manual.
 
-O domínio `notify.frotaops.com.br` precisa ter os registros NS apontando para os nameservers da Lovable. Abrir a tela de Email para ver os registros exatos a configurar:
+## Arquivos afetados
 
-- **Cloud → Emails → Manage Domains → `notify.frotaops.com.br`**
-- Copiar os 2 registros NS exibidos (algo como `ns3.lovable.cloud` / `ns4.lovable.cloud`)
-- Adicioná-los no painel do registrador do `frotaops.com.br` (Registro.br, Cloudflare, GoDaddy, etc.) como:
-  ```
-  Tipo: NS    Nome: notify    Valor: ns3.lovable.cloud
-  Tipo: NS    Nome: notify    Valor: ns4.lovable.cloud
-  ```
-- Propagação: até 72h (geralmente 15min–2h)
-- Clicar em **Verify Domain** após adicionar
+- `src/pages/auth/Signup.tsx` — adicionar fallback de `signInWithPassword` + bootstrap quando `signUp` falhar com `user_already_exists`; mensagens em português.
+- `src/pages/auth/OnboardingEmpresa.tsx` (novo) — formulário de empresa+cupom para usuário logado sem empresa.
+- `src/App.tsx` — registrar rota `/onboarding/empresa` e, no roteamento autenticado, redirecionar pra ela quando `companies.length === 0`.
+- `src/components/auth/RequireAuth.tsx` (verificar) — garantir redirect pra onboarding quando aplicável.
 
-Enquanto isso estiver pendente, nenhum email transacional sai — não há workaround no código.
+## Fora de escopo (confirmado seguro hoje)
+- **Isolamento entre empresas:** as policies RLS já usam `is_company_member(auth.uid(), company_id)`. Validei nos `db-functions` que não há policy permissiva cruzando empresas. Nada vaza — não preciso mexer.
+- **Limpeza de dados de tentativa anterior:** o Clayton nunca chegou a criar empresa, então não existe lixo a limpar. A nova empresa nascerá zerada naturalmente via `bootstrap_company_v2`.
 
-### Passo 2 — Ajustes opcionais (só se você quiser, após DNS ok)
-
-Posso customizar o template `signup.tsx`:
-- Assunto explícito: "Confirme seu email - FrotaOps"
-- Reply-to: `contato@frotaops.com.br`
-- Logo + botão grande
-
-Mas isso é cosmético. O bloqueador é exclusivamente DNS.
-
-### Passo 3 — Teste pós-DNS
-
-Após status virar `active`, disparar signup real com `nandovolpi.jb@gmail.com` e validar:
-```sql
-select status, recipient_email, error_message, created_at
-from email_send_log
-where recipient_email = 'nandovolpi.jb@gmail.com'
-order by created_at desc;
-```
-
-## Resumo executivo
-
-**Causa raiz:** DNS do subdomínio `notify.frotaops.com.br` não verificado → backend bloqueia todo envio.
-**O que preciso que você faça manualmente:** adicionar 2 registros NS no registrador do domínio (passo 1 acima).
-**O que eu faço depois que DNS estiver verde:** ajustar template (assunto/reply-to/logo) se quiser, e rodar teste real.
-
-Confirma que posso implementar os ajustes cosméticos no template enquanto você resolve o DNS?
+## Resultado esperado
+1. Clayton vai em `/login` → "Esqueci senha" → redefine → loga → cai no `/onboarding/empresa` → preenche dados + cupom → entra no sistema com empresa nova e base 100% vazia.
+2. Qualquer novo cliente cujo bootstrap travar consegue se recuperar sozinho (tentando signup de novo com mesma senha, ou via login + onboarding).
+3. Mensagens de erro deixam claro o que fazer.
