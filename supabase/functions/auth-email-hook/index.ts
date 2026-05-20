@@ -17,12 +17,12 @@ const corsHeaders = {
 }
 
 const EMAIL_SUBJECTS: Record<string, string> = {
-  signup: 'Confirm your email',
-  invite: "You've been invited",
-  magiclink: 'Your login link',
-  recovery: 'Reset your password',
-  email_change: 'Confirm your new email',
-  reauthentication: 'Your verification code',
+  signup: 'Confirme seu email - FrotaOps',
+  invite: 'Você foi convidado - FrotaOps',
+  magiclink: 'Seu link de acesso - FrotaOps',
+  recovery: 'Redefina sua senha - FrotaOps',
+  email_change: 'Confirme seu novo email - FrotaOps',
+  reauthentication: 'Seu código de verificação - FrotaOps',
 }
 
 // Template mapping
@@ -36,7 +36,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "key-fleet-flow"
+const SITE_NAME = "FrotaOps"
 const SENDER_DOMAIN = "notify.frotaops.com.br"
 const ROOT_DOMAIN = "frotaops.com.br"
 const FROM_DOMAIN = "notify.frotaops.com.br" // Domain shown in From address (may be root or sender subdomain)
@@ -260,6 +260,7 @@ async function handleWebhook(req: Request): Promise<Response> {
       to: payload.data.email,
       from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
       sender_domain: SENDER_DOMAIN,
+      reply_to: 'contato@frotaops.com.br',
       subject: EMAIL_SUBJECTS[emailType] || 'Notification',
       html,
       text,
