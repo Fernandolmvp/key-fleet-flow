@@ -1,5 +1,13 @@
 import { corsHeaders } from "@supabase/supabase-js/cors";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+function getServiceClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -26,13 +34,48 @@ Deno.serve(async (req) => {
     const price = prices.data[0];
     const isRecurring = price.type === "recurring";
 
+    // Aplica cupom pendente (se houver) — cria um Stripe Coupon na hora e anexa via discounts
+    const supabase = getServiceClient();
+    const { data: pending } = await supabase
+      .from("pending_coupon_discounts")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    let discounts: any[] | undefined;
+    let appliedPendingId: string | null = null;
+    if (pending) {
+      try {
+        const months = Math.max(1, Number(pending.months_remaining) || 1);
+        const couponParams: any = {
+          duration: months > 1 ? "repeating" : "once",
+          ...(months > 1 && { duration_in_months: months }),
+          name: `Cupom FrotaOps`,
+        };
+        if (pending.discount_percent) {
+          couponParams.percent_off = Number(pending.discount_percent);
+        } else if (pending.discount_amount) {
+          couponParams.amount_off = Math.round(Number(pending.discount_amount) * 100);
+          couponParams.currency = "brl";
+        }
+        const stripeCoupon = await stripe.coupons.create(couponParams);
+        discounts = [{ coupon: stripeCoupon.id }];
+        appliedPendingId = pending.id;
+      } catch (e) {
+        console.error("failed to apply pending coupon:", e);
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       line_items: [{ price: price.id, quantity: 1 }],
       mode: isRecurring ? "subscription" : "payment",
       ui_mode: "embedded_page",
       return_url: returnUrl,
       ...(customerEmail && { customer_email: customerEmail }),
-      metadata: { companyId, userId: userId ?? "", priceId },
+      metadata: { companyId, userId: userId ?? "", priceId, pendingDiscountId: appliedPendingId ?? "" },
+      ...(discounts && { discounts }),
       ...(isRecurring && {
         subscription_data: {
           metadata: { companyId, userId: userId ?? "", priceId },
@@ -41,6 +84,11 @@ Deno.serve(async (req) => {
         },
       }),
     });
+
+    // Remove o pending após aplicar (Stripe controla a duração do desconto)
+    if (appliedPendingId) {
+      await supabase.from("pending_coupon_discounts").delete().eq("id", appliedPendingId);
+    }
 
     return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
       status: 200,
