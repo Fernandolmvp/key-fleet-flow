@@ -54,6 +54,7 @@ import CompanyManualCreate from "./pages/admin/CompanyManualCreate";
 import NotFound from "./pages/NotFound";
 import PlanSelection from "./pages/auth/PlanSelection";
 import Welcome from "./pages/auth/Welcome";
+import OnboardingEmpresa from "./pages/auth/OnboardingEmpresa";
 import RequireAuth from "./components/auth/RequireAuth";
 import RequireActiveSubscription from "./components/auth/RequireActiveSubscription";
 import RequireJustPaid from "./components/auth/RequireJustPaid";
@@ -122,6 +123,9 @@ const App = () => (
               <Route element={<RequireJustPaid />}>
                 <Route path="/boas-vindas" element={<Welcome />} />
               </Route>
+            </Route>
+            <Route element={<RequireAuth />}>
+              <Route path="/onboarding/empresa" element={<OnboardingEmpresa />} />
             </Route>
             <Route element={<RequireAuth />}>
               <Route element={<RequireActiveSubscription />}>
