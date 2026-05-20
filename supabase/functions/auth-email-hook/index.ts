@@ -260,6 +260,7 @@ async function handleWebhook(req: Request): Promise<Response> {
       to: payload.data.email,
       from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
       sender_domain: SENDER_DOMAIN,
+      reply_to: 'contato@frotaops.com.br',
       subject: EMAIL_SUBJECTS[emailType] || 'Notification',
       html,
       text,
