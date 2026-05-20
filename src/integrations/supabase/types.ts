@@ -1214,6 +1214,126 @@ export type Database = {
           },
         ]
       }
+      coupon_redemptions: {
+        Row: {
+          applied_type: string
+          applied_value: Json
+          cnpj_at_redemption: string | null
+          company_id: string
+          coupon_id: string
+          id: string
+          redeemed_at: string
+        }
+        Insert: {
+          applied_type: string
+          applied_value?: Json
+          cnpj_at_redemption?: string | null
+          company_id: string
+          coupon_id: string
+          id?: string
+          redeemed_at?: string
+        }
+        Update: {
+          applied_type?: string
+          applied_value?: Json
+          cnpj_at_redemption?: string | null
+          company_id?: string
+          coupon_id?: string
+          id?: string
+          redeemed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_redemptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          current_uses: number
+          description: string | null
+          discount_amount: number | null
+          discount_months: number | null
+          discount_percent: number | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          restrict_to_cnpj: string | null
+          trial_days: number | null
+          type: string
+          updated_at: string
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          description?: string | null
+          discount_amount?: number | null
+          discount_months?: number | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          restrict_to_cnpj?: string | null
+          trial_days?: number | null
+          type: string
+          updated_at?: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          description?: string | null
+          discount_amount?: number | null
+          discount_months?: number | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          restrict_to_cnpj?: string | null
+          trial_days?: number | null
+          type?: string
+          updated_at?: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           ai_extracted: Json
@@ -3681,6 +3801,61 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "company_usage"
             referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      pending_coupon_discounts: {
+        Row: {
+          company_id: string
+          coupon_id: string
+          created_at: string
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          months_remaining: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          coupon_id: string
+          created_at?: string
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          months_remaining?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          coupon_id?: string
+          created_at?: string
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          months_remaining?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_coupon_discounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_coupon_discounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "pending_coupon_discounts_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6503,6 +6678,10 @@ export type Database = {
         Returns: number
       }
       normalize_plate: { Args: { p: string }; Returns: string }
+      preview_coupon: {
+        Args: { p_cnpj?: string; p_code: string }
+        Returns: Json
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -6520,6 +6699,10 @@ export type Database = {
           _stripe_payment_intent_id: string
         }
         Returns: undefined
+      }
+      redeem_coupon: {
+        Args: { p_code: string; p_company_id: string }
+        Returns: Json
       }
       regenerate_authorization_code: {
         Args: { _authorization_id: string }

@@ -2,14 +2,17 @@ import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
-  ShieldCheck, ArrowLeft, Loader2, Building2, Brain, Cpu, Workflow, BarChart3,
+  ShieldCheck, ArrowLeft, Loader2, Building2, Brain, Cpu, Workflow, BarChart3, Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navGroups = [
   {
     label: "Saas",
-    items: [{ to: "/super-admin", icon: Building2, label: "Empresas", end: true }],
+    items: [
+      { to: "/super-admin", icon: Building2, label: "Empresas", end: true },
+      { to: "/super-admin/cupons", icon: Ticket, label: "Cupons" },
+    ],
   },
   {
     label: "Inteligência Artificial",

@@ -46,6 +46,9 @@ export default function Signup() {
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
   const [planSlug, setPlanSlug] = useState<string>("pro");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponPreview, setCouponPreview] = useState<{ valid: boolean; message: string } | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     companyName: "",
@@ -57,6 +60,19 @@ export default function Signup() {
   });
 
   if (!loading && user) return <Navigate to="/app" replace />;
+
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setValidatingCoupon(true);
+    const { data, error } = await supabase.rpc("preview_coupon" as any, {
+      p_code: couponCode.trim(),
+      p_cnpj: onlyDigits(form.cnpj),
+    });
+    setValidatingCoupon(false);
+    if (error) { setCouponPreview({ valid: false, message: error.message }); return; }
+    const r: any = data;
+    setCouponPreview({ valid: !!r?.valid, message: r?.message ?? "" });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +101,7 @@ export default function Signup() {
     }
 
     // Bootstrap empresa + membership + role + profile + subscription placeholder (RPC SECURITY DEFINER)
-    const { error: rpcErr } = await supabase.rpc("bootstrap_company_v2" as any, {
+    const { data: companyIdRet, error: rpcErr } = await supabase.rpc("bootstrap_company_v2" as any, {
       _company_name: form.companyName,
       _full_name: form.fullName,
       _cnpj: onlyDigits(form.cnpj),
@@ -97,6 +113,20 @@ export default function Signup() {
     if (rpcErr) { setBusy(false); return toast.error(rpcErr.message); }
 
     await refreshCompanies();
+
+    // Resgata cupom se informado
+    if (couponCode.trim() && companyIdRet) {
+      try {
+        const { data: r } = await supabase.rpc("redeem_coupon" as any, {
+          p_code: couponCode.trim(),
+          p_company_id: companyIdRet as any,
+        });
+        const res: any = r;
+        if (res?.success) toast.success(res?.message ?? "Cupom aplicado");
+        else if (res?.message) toast.warning(`Cupom: ${res.message}`);
+      } catch (_) { /* silencioso */ }
+    }
+
     // Dispara email de boas-vindas (best-effort, não bloqueia o fluxo)
     try {
       const ends = new Date(Date.now() + 21 * 86400000).toLocaleDateString("pt-BR");
@@ -165,6 +195,25 @@ export default function Signup() {
             <p className="text-xs text-muted-foreground">
               Durante os 21 dias de trial, <strong>todos os módulos estão liberados</strong>. A escolha do plano é só para depois do teste — sem cobrança agora, sem cartão.
             </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Código de cupom (opcional)</Label>
+            <div className="flex gap-2">
+              <Input
+                value={couponCode}
+                onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponPreview(null); }}
+                placeholder="Ex.: FROTA21"
+                className="font-mono uppercase"
+              />
+              <Button type="button" variant="outline" onClick={validateCoupon} disabled={validatingCoupon || !couponCode.trim()}>
+                {validatingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : "Validar"}
+              </Button>
+            </div>
+            {couponPreview && (
+              <p className={`text-xs ${couponPreview.valid ? "text-success" : "text-destructive"}`}>
+                {couponPreview.valid ? `✓ ${couponPreview.message}` : `✗ ${couponPreview.message}`}
+              </p>
+            )}
           </div>
           <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar conta"}

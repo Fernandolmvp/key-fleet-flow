@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditCard, CheckCircle2, AlertTriangle, Truck, Users, Receipt, Loader2, ArrowUpCircle } from "lucide-react";
+import { Ticket, ChevronDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
@@ -41,19 +43,28 @@ export default function Subscription() {
   const [loading, setLoading] = useState(true);
   const [checkoutPriceId, setCheckoutPriceId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [redemptions, setRedemptions] = useState<any[]>([]);
 
   const reload = async () => {
     if (!currentCompanyId) return;
     setLoading(true);
-    const [{ data: u, error: eu }, { data: p }, { data: pays }] = await Promise.all([
+    const [{ data: u, error: eu }, { data: p }, { data: pays }, { data: reds }] = await Promise.all([
       supabase.from("company_usage").select("*").eq("company_id", currentCompanyId).maybeSingle(),
       supabase.from("plans").select("*").eq("active", true).order("sort_order"),
       supabase.from("subscription_payments").select("*").eq("company_id", currentCompanyId).order("paid_at", { ascending: false }).limit(10),
+      supabase.from("coupon_redemptions" as any)
+        .select("*, coupons:coupon_id(code, type, description)")
+        .eq("company_id", currentCompanyId)
+        .order("redeemed_at", { ascending: false }),
     ]);
     if (eu) toast.error(eu.message);
     setData(u);
     setPlans(p ?? []);
     setPayments(pays ?? []);
+    setRedemptions((reds as any) ?? []);
     setLoading(false);
   };
 
@@ -98,6 +109,27 @@ export default function Subscription() {
     } finally {
       setPortalLoading(false);
     }
+  };
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim() || !currentCompanyId) return;
+    setCouponBusy(true);
+    const { data: r, error } = await supabase.rpc("redeem_coupon" as any, {
+      p_code: couponCode.trim(),
+      p_company_id: currentCompanyId,
+    });
+    setCouponBusy(false);
+    if (error) return toast.error(error.message);
+    const res: any = r;
+    if (!res?.success) return toast.error(res?.message ?? "Falha ao aplicar cupom");
+    if (res?.type === "trial_days") {
+      toast.success(res?.message ?? "Trial estendido");
+      await trial.refetch();
+    } else {
+      toast.success("Desconto registrado — será aplicado na próxima cobrança");
+    }
+    setCouponCode("");
+    reload();
   };
 
   if (loading) return <div className="text-muted-foreground">Carregando...</div>;
@@ -189,6 +221,50 @@ export default function Subscription() {
       </div>
 
       {/* Planos disponíveis */}
+      <div className="surface-card rounded-xl">
+        <button
+          type="button"
+          onClick={() => setCouponOpen((o) => !o)}
+          className="w-full flex items-center justify-between p-4 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Ticket className="h-4 w-4 text-primary" />
+            <span className="font-medium">Tenho um cupom</span>
+          </div>
+          <ChevronDown className={`h-4 w-4 transition-transform ${couponOpen ? "rotate-180" : ""}`} />
+        </button>
+        {couponOpen && (
+          <div className="p-4 pt-0 space-y-3">
+            <div className="flex gap-2">
+              <Input
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                placeholder="Digite o código do cupom"
+                className="font-mono uppercase"
+              />
+              <Button onClick={applyCoupon} disabled={couponBusy || !couponCode.trim()}>
+                {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+              </Button>
+            </div>
+            {redemptions.length > 0 && (
+              <div className="pt-3 border-t border-border">
+                <div className="text-xs uppercase text-muted-foreground mb-2">Cupons já resgatados</div>
+                <ul className="space-y-1.5 text-xs">
+                  {redemptions.map((r: any) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-semibold">{r.coupons?.code ?? "—"}</span>
+                      <span className="text-muted-foreground">
+                        {r.applied_type} · {new Date(r.redeemed_at).toLocaleDateString("pt-BR")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div>
         <h2 className="font-display text-xl font-bold mb-3">Planos disponíveis</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
