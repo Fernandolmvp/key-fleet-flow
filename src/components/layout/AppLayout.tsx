@@ -46,6 +46,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { TrialBanner } from "@/components/TrialBanner";
 import { NewCompanyDialog } from "@/components/NewCompanyDialog";
 
 type NavItem = {
@@ -414,6 +415,7 @@ export default function AppLayout() {
           </DropdownMenu>
         </header>
 
+        <TrialBanner />
         <PaymentTestModeBanner />
         <SubscriptionBanner />
         <main className="flex-1 overflow-auto p-6 lg:p-8">
