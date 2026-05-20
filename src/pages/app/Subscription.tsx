@@ -221,6 +221,49 @@ export default function Subscription() {
       </div>
 
       {/* Planos disponíveis */}
+      <div className="surface-card rounded-xl">
+        <button
+          type="button"
+          onClick={() => setCouponOpen((o) => !o)}
+          className="w-full flex items-center justify-between p-4 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Ticket className="h-4 w-4 text-primary" />
+            <span className="font-medium">Tenho um cupom</span>
+          </div>
+          <ChevronDown className={`h-4 w-4 transition-transform ${couponOpen ? "rotate-180" : ""}`} />
+        </button>
+        {couponOpen && (
+          <div className="p-4 pt-0 space-y-3">
+            <div className="flex gap-2">
+              <Input
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                placeholder="Digite o código do cupom"
+                className="font-mono uppercase"
+              />
+              <Button onClick={applyCoupon} disabled={couponBusy || !couponCode.trim()}>
+                {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+              </Button>
+            </div>
+            {redemptions.length > 0 && (
+              <div className="pt-3 border-t border-border">
+                <div className="text-xs uppercase text-muted-foreground mb-2">Cupons já resgatados</div>
+                <ul className="space-y-1.5 text-xs">
+                  {redemptions.map((r: any) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-semibold">{r.coupons?.code ?? "—"}</span>
+                      <span className="text-muted-foreground">
+                        {r.applied_type} · {new Date(r.redeemed_at).toLocaleDateString("pt-BR")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div>
         <h2 className="font-display text-xl font-bold mb-3">Planos disponíveis</h2>
