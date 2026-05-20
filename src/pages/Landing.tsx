@@ -135,6 +135,10 @@ export default function Landing() {
                   Começar agora <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 text-success border border-success/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                21 dias grátis — sem cartão de crédito
+              </span>
               <a href="#planos">
                 <Button size="lg" variant="outline" className="h-12 px-7">
                   Ver planos
