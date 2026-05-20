@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, UserX, Mail, Trash2, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-type Orphan = {
+type SignupRow = {
   id: string;
   email: string;
   full_name: string | null;
@@ -14,26 +14,31 @@ type Orphan = {
   created_at: string;
   email_confirmed_at: string | null;
   last_sign_in_at: string | null;
+  kind: "orphan" | "company" | "super_admin" | "driver";
+  is_orphan: boolean;
+  companies: { id: string; name: string; cnpj: string | null; status: string | null; created_at: string }[];
 };
 
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleString("pt-BR") : "—");
 
 export default function OrphanSignups() {
-  const [items, setItems] = useState<Orphan[]>([]);
+  const [items, setItems] = useState<SignupRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [scope, setScope] = useState<"all" | "orphans" | "with_company">("all");
+  const [search, setSearch] = useState("");
 
   const load = async () => {
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("admin-orphan-signups", {
-      body: { action: "list" },
+      body: { action: "list", scope: "all" },
     });
     setLoading(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || "Erro");
       return;
     }
-    setItems((data as any).orphans ?? []);
+    setItems((data as any).users ?? (data as any).orphans ?? []);
   };
 
   useEffect(() => { load(); }, []);
@@ -51,7 +56,11 @@ export default function OrphanSignups() {
     toast.success(`Link de redefinição enviado para ${email}`);
   }
 
-  async function deleteUser(o: Orphan) {
+  async function deleteUser(o: SignupRow) {
+    if (!o.is_orphan) {
+      toast.error("Só é possível excluir cadastros sem empresa vinculada por aqui.");
+      return;
+    }
     if (!confirm(`Excluir definitivamente ${o.email}?\n\nIsso libera o email pra novo cadastro.`)) return;
     setBusy(o.id);
     const { data, error } = await supabase.functions.invoke("admin-orphan-signups", {
@@ -66,15 +75,33 @@ export default function OrphanSignups() {
     load();
   }
 
+  const q = search.trim().toLowerCase();
+  const filtered = items
+    .filter((u) =>
+      scope === "orphans" ? u.is_orphan : scope === "with_company" ? u.companies.length > 0 : true,
+    )
+    .filter((u) =>
+      !q ||
+      u.email?.toLowerCase().includes(q) ||
+      u.full_name?.toLowerCase().includes(q) ||
+      u.companies.some((c) => c.name?.toLowerCase().includes(q) || c.cnpj?.includes(q)),
+    );
+
+  const counts = {
+    all: items.length,
+    orphans: items.filter((u) => u.is_orphan).length,
+    with_company: items.filter((u) => u.companies.length > 0).length,
+  };
+
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <UserX className="h-6 w-6 text-warning" />
           <div>
-            <h1 className="text-2xl font-display font-bold">Cadastros incompletos</h1>
+            <h1 className="text-2xl font-display font-bold">Cadastros de usuários</h1>
             <p className="text-sm text-muted-foreground">
-              Usuários que se cadastraram mas não concluíram a criação da empresa.
+              Todos os usuários que se cadastraram no FrotaOps — com ou sem empresa vinculada.
             </p>
           </div>
         </div>
@@ -83,13 +110,36 @@ export default function OrphanSignups() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        {([
+          ["all", `Todos (${counts.all})`],
+          ["orphans", `Sem empresa (${counts.orphans})`],
+          ["with_company", `Com empresa (${counts.with_company})`],
+        ] as const).map(([k, label]) => (
+          <Button
+            key={k}
+            size="sm"
+            variant={scope === k ? "default" : "outline"}
+            onClick={() => setScope(k as any)}
+          >
+            {label}
+          </Button>
+        ))}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por email, nome, empresa ou CNPJ"
+          className="ml-auto h-9 px-3 rounded-md border border-border bg-background text-sm w-72"
+        />
+      </div>
+
       <Card className="border-warning/30 bg-warning/5">
         <CardContent className="pt-6 flex gap-3 text-sm">
           <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p><strong>Como funciona:</strong> o cliente que aparece aqui já tem login no FrotaOps mas nunca cadastrou empresa.</p>
-            <p><strong>Para destravar:</strong> envie o link de redefinição de senha. Ao logar, ele cai automaticamente na tela de "Finalizar cadastro da empresa" e pode usar o cupom dele.</p>
-            <p><strong>Email não confirmado:</strong> se nunca confirmou o email, recomende excluir e pedir pra cadastrar de novo com email válido.</p>
+            <p><strong>Sem empresa:</strong> o usuário tem login mas nunca finalizou a criação da empresa. Use "Reenviar acesso" — ao logar ele cai na tela de finalizar cadastro.</p>
+            <p><strong>Com empresa:</strong> cadastro concluído. Use a tela "Empresas" do super admin pra gerenciar.</p>
+            <p><strong>Email não confirmado:</strong> só dá pra reenviar link após confirmação. Recomende excluir cadastros antigos sem confirmação.</p>
           </div>
         </CardContent>
       </Card>
@@ -98,17 +148,17 @@ export default function OrphanSignups() {
         <div className="text-center py-12 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Carregando...
         </div>
-      ) : items.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <UserX className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            Nenhum cadastro incompleto.
+            Nenhum cadastro encontrado.
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{items.length} usuário(s) órfão(s)</CardTitle>
+            <CardTitle className="text-base">{filtered.length} usuário(s)</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -117,13 +167,14 @@ export default function OrphanSignups() {
                   <tr>
                     <th className="text-left px-4 py-3">Usuário</th>
                     <th className="text-left px-4 py-3">Email</th>
+                    <th className="text-left px-4 py-3">Empresa(s)</th>
                     <th className="text-left px-4 py-3">Cadastrado</th>
                     <th className="text-left px-4 py-3">Último acesso</th>
                     <th className="text-right px-4 py-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((o) => {
+                  {filtered.map((o) => {
                     const confirmed = !!o.email_confirmed_at;
                     return (
                       <tr key={o.id} className="border-t border-border hover:bg-muted/20">
@@ -136,6 +187,22 @@ export default function OrphanSignups() {
                           <Badge className={`mt-1 text-[10px] ${confirmed ? "bg-success/15 text-success border-success/30" : "bg-warning/15 text-warning border-warning/30"}`}>
                             {confirmed ? "Email confirmado" : "Email não confirmado"}
                           </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          {o.companies.length === 0 ? (
+                            <Badge className="bg-warning/15 text-warning border-warning/30 text-[10px]">
+                              {o.kind === "super_admin" ? "Super Admin" : o.kind === "driver" ? "Motorista" : "Sem empresa"}
+                            </Badge>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {o.companies.map((c) => (
+                                <div key={c.id} className="text-xs">
+                                  <span className="font-medium">{c.name}</span>
+                                  {c.cnpj && <span className="text-muted-foreground ml-1">· {c.cnpj}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-xs">{fmt(o.created_at)}</td>
                         <td className="px-4 py-3 text-xs">{fmt(o.last_sign_in_at)}</td>
@@ -156,7 +223,8 @@ export default function OrphanSignups() {
                               variant="ghost"
                               className="text-destructive hover:text-destructive"
                               onClick={() => deleteUser(o)}
-                              disabled={busy === o.id}
+                              disabled={busy === o.id || !o.is_orphan}
+                              title={o.is_orphan ? "Excluir usuário" : "Só órfãos podem ser excluídos aqui"}
                             >
                               {busy === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </Button>
