@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
         admin.from("drivers").select("id").eq("user_id", userId).limit(1),
       ]);
       if ((mem && mem.length) || (sa2 && sa2.length) || (dr && dr.length)) {
-        return json({ error: "Usuário não é órfão (tem vínculos). Exclusão bloqueada." }, 409);
+        return json({ error: "Usuário não é órfão (tem vínculos: empresa, super admin ou motorista). Exclusão bloqueada." }, 200);
       }
       await admin.from("profiles").delete().eq("id", userId);
       const { error } = await admin.auth.admin.deleteUser(userId);
