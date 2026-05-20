@@ -6257,17 +6257,30 @@ export type Database = {
         Args: { _company_name: string; _full_name: string }
         Returns: string
       }
-      bootstrap_company_v2: {
-        Args: {
-          _cnpj?: string
-          _company_name: string
-          _contact_name?: string
-          _email?: string
-          _full_name: string
-          _phone?: string
-        }
-        Returns: string
-      }
+      bootstrap_company_v2:
+        | {
+            Args: {
+              _cnpj?: string
+              _company_name: string
+              _contact_name?: string
+              _email?: string
+              _full_name: string
+              _phone?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _cnpj?: string
+              _company_name: string
+              _contact_name?: string
+              _email?: string
+              _full_name: string
+              _phone?: string
+              _trial_plan_slug?: string
+            }
+            Returns: string
+          }
       bootstrap_super_admin: { Args: { _email: string }; Returns: string }
       calculate_group_monthly_amount: {
         Args: { _group_id: string }
@@ -6374,7 +6387,10 @@ export type Database = {
           company_id: string
           has_company: boolean
           is_active: boolean
+          is_exempt: boolean
           subscription_status: string
+          trial_days_remaining: number
+          trial_ends_at: string
         }[]
       }
       get_routing_for_feature: {
@@ -6397,6 +6413,10 @@ export type Database = {
           primary_provider_id: string
           primary_provider_secret: string
         }[]
+      }
+      get_trial_days_remaining: {
+        Args: { p_company_id: string }
+        Returns: number
       }
       has_enough_ai_tokens: {
         Args: { _company_id: string; _required: number }
@@ -6436,6 +6456,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_trial_active: { Args: { p_company_id: string }; Returns: boolean }
       is_trip_driver: {
         Args: { _driver_id: string; _user_id: string }
         Returns: boolean
