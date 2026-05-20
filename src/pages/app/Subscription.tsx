@@ -115,6 +115,21 @@ export default function Subscription() {
         <p className="text-muted-foreground">Gerencie seu plano e pagamentos</p>
       </div>
 
+      {trial.subscriptionStatus === "trial" && !trial.isExempt && (
+        <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          <div className="flex-1">
+            <div className="font-medium text-primary">
+              Você está no trial gratuito — {trial.daysRemaining ?? 0} dia(s) restante(s).
+            </div>
+            <div className="text-muted-foreground">
+              {trial.trialEndsAt && <>Expira em {new Date(trial.trialEndsAt).toLocaleDateString("pt-BR")}. </>}
+              Todos os módulos estão liberados. Escolha um plano abaixo para continuar após o trial — sem interrupção.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Card principal */}
       <div className="surface-card rounded-xl p-6 space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
