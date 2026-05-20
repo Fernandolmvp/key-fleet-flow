@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
 
     if (action === "list") {
       // Pagina por auth.admin.listUsers (até 1000 por chamada). Em SaaS pequeno cobre o caso.
+      const scope = String(body.scope ?? "all"); // all | orphans | with_company
       const all: any[] = [];
       let page = 1;
       while (true) {
@@ -53,16 +54,33 @@ Deno.serve(async (req) => {
       const userIds = all.map((u) => u.id);
 
       // Filtra os que NÃO têm membership e NÃO são super admin
-      const { data: mems } = await admin.from("company_members").select("user_id").in("user_id", userIds);
-      const memSet = new Set((mems ?? []).map((m: any) => m.user_id));
+      const { data: mems } = await admin
+        .from("company_members")
+        .select("user_id, company_id, companies(id,name,cnpj,status,created_at)")
+        .in("user_id", userIds);
+      const memMap = new Map<string, any[]>();
+      (mems ?? []).forEach((m: any) => {
+        const arr = memMap.get(m.user_id) ?? [];
+        arr.push(m);
+        memMap.set(m.user_id, arr);
+      });
       const { data: sas } = await admin.from("super_admins").select("user_id").in("user_id", userIds);
       const saSet = new Set((sas ?? []).map((s: any) => s.user_id));
-      const { data: drv } = await admin.from("drivers").select("user_id").in("user_id", userIds.filter(Boolean));
-      const drvSet = new Set((drv ?? []).map((d: any) => d.user_id).filter(Boolean));
+      const { data: drv } = await admin.from("drivers").select("user_id,name").in("user_id", userIds.filter(Boolean));
+      const drvMap = new Map<string, any>();
+      (drv ?? []).forEach((d: any) => { if (d.user_id) drvMap.set(d.user_id, d); });
 
-      const orphans = all
-        .filter((u) => !memSet.has(u.id) && !saSet.has(u.id) && !drvSet.has(u.id))
-        .map((u) => ({
+      const everyone = all.map((u) => {
+        const memberships = memMap.get(u.id) ?? [];
+        const companies = memberships.map((m: any) => m.companies).filter(Boolean);
+        const isSuper = saSet.has(u.id);
+        const isDriver = drvMap.has(u.id);
+        const isOrphan = memberships.length === 0 && !isSuper && !isDriver;
+        let kind: string = "orphan";
+        if (isSuper) kind = "super_admin";
+        else if (companies.length > 0) kind = "company";
+        else if (isDriver) kind = "driver";
+        return {
           id: u.id,
           email: u.email,
           full_name: u.user_metadata?.full_name ?? null,
@@ -70,10 +88,20 @@ Deno.serve(async (req) => {
           created_at: u.created_at,
           email_confirmed_at: u.email_confirmed_at ?? null,
           last_sign_in_at: u.last_sign_in_at ?? null,
-        }))
-        .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+          kind,
+          is_orphan: isOrphan,
+          companies,
+        };
+      }).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
 
-      return json({ orphans });
+      const filtered = scope === "orphans"
+        ? everyone.filter((u) => u.is_orphan)
+        : scope === "with_company"
+        ? everyone.filter((u) => u.companies.length > 0)
+        : everyone;
+
+      // Retorna ambos os campos pra retrocompatibilidade
+      return json({ users: filtered, orphans: everyone.filter((u) => u.is_orphan), total: everyone.length });
     }
 
     if (action === "send_recovery") {
