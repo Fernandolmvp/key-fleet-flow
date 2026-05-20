@@ -196,6 +196,25 @@ export default function Signup() {
               Durante os 21 dias de trial, <strong>todos os módulos estão liberados</strong>. A escolha do plano é só para depois do teste — sem cobrança agora, sem cartão.
             </p>
           </div>
+          <div className="space-y-2">
+            <Label>Código de cupom (opcional)</Label>
+            <div className="flex gap-2">
+              <Input
+                value={couponCode}
+                onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponPreview(null); }}
+                placeholder="Ex.: FROTA21"
+                className="font-mono uppercase"
+              />
+              <Button type="button" variant="outline" onClick={validateCoupon} disabled={validatingCoupon || !couponCode.trim()}>
+                {validatingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : "Validar"}
+              </Button>
+            </div>
+            {couponPreview && (
+              <p className={`text-xs ${couponPreview.valid ? "text-success" : "text-destructive"}`}>
+                {couponPreview.valid ? `✓ ${couponPreview.message}` : `✗ ${couponPreview.message}`}
+              </p>
+            )}
+          </div>
           <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar conta"}
           </Button>
