@@ -51,6 +51,7 @@ import SuperAdminBootstrap from "./pages/admin/SuperAdminBootstrap";
 import CouponsPanel from "./pages/admin/CouponsPanel";
 import CouponDetail from "./pages/admin/CouponDetail";
 import CompanyManualCreate from "./pages/admin/CompanyManualCreate";
+import OrphanSignups from "./pages/admin/OrphanSignups";
 import NotFound from "./pages/NotFound";
 import PlanSelection from "./pages/auth/PlanSelection";
 import Welcome from "./pages/auth/Welcome";
@@ -108,6 +109,7 @@ const App = () => (
               <Route path="cupons" element={<CouponsPanel />} />
               <Route path="cupons/:id" element={<CouponDetail />} />
               <Route path="empresas/nova" element={<CompanyManualCreate />} />
+              <Route path="cadastros-incompletos" element={<OrphanSignups />} />
             </Route>
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/posto/login" element={<PostoLogin />} />
