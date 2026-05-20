@@ -14,6 +14,36 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/permissions";
+import TripApprovalsSection from "./approvals/TripApprovalsSection";
+import MaintenanceApprovalsSection from "./approvals/MaintenanceApprovalsSection";
+import ApprovalsHistorySection from "./approvals/ApprovalsHistorySection";
+import { Wrench, Route as RouteIcon, History } from "lucide-react";
+
+export default function Approvals() {
+  const [main, setMain] = useState<string>("abastecimento");
+  return (
+    <div className="space-y-5 animate-fade-in">
+      <div>
+        <h1 className="font-display text-2xl font-bold flex items-center gap-2">
+          <ShieldCheck className="h-6 w-6 text-primary" /> Aprovações
+        </h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Solicitações dos motoristas que aguardam decisão do gestor</p>
+      </div>
+      <Tabs value={main} onValueChange={setMain}>
+        <TabsList>
+          <TabsTrigger value="abastecimento" className="gap-2"><Fuel className="h-3.5 w-3.5" /> Abastecimento</TabsTrigger>
+          <TabsTrigger value="viagens" className="gap-2"><RouteIcon className="h-3.5 w-3.5" /> Viagens</TabsTrigger>
+          <TabsTrigger value="manutencoes" className="gap-2"><Wrench className="h-3.5 w-3.5" /> Manutenção</TabsTrigger>
+          <TabsTrigger value="historico" className="gap-2"><History className="h-3.5 w-3.5" /> Histórico</TabsTrigger>
+        </TabsList>
+        <TabsContent value="abastecimento" className="mt-4"><FuelApprovalsSection /></TabsContent>
+        <TabsContent value="viagens" className="mt-4"><TripApprovalsSection /></TabsContent>
+        <TabsContent value="manutencoes" className="mt-4"><MaintenanceApprovalsSection /></TabsContent>
+        <TabsContent value="historico" className="mt-4"><ApprovalsHistorySection /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
 interface AuthRow {
   id: string;
