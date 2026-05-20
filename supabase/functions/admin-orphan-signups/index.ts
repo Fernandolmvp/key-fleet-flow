@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const { data: claims, error: cErr } = await userClient.auth.getClaims(authHeader.slice(7));
-    if (cErr || !claims?.claims?.sub) return json({ error: "Token inválido" }, 401);
-    const callerId = claims.claims.sub as string;
+    const { data: userData, error: cErr } = await userClient.auth.getUser(authHeader.slice(7));
+    if (cErr || !userData?.user?.id) return json({ error: "Token inválido" }, 401);
+    const callerId = userData.user.id;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
