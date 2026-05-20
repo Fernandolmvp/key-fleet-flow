@@ -1,17 +1,18 @@
 import { NavLink } from "react-router-dom";
-import { Home, Fuel, ClipboardCheck, Wrench, Calendar } from "lucide-react";
+import { Home, Fuel, Wrench, Calendar, Route } from "lucide-react";
 
 const items = [
   { to: "/motorista", icon: Home, label: "Início", end: true },
+  { to: "/motorista/abastecimento", icon: Fuel, label: "Abastecer" },
   { to: "/motorista/manutencao", icon: Wrench, label: "Manutenção" },
   { to: "/motorista/calendario", icon: Calendar, label: "Calendário" },
-  { to: "/motorista/viagens", icon: Fuel, label: "Viagens" },
+  { to: "/motorista/viagens", icon: Route, label: "Viagens" },
 ];
 
 export default function MotoristaBottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur border-t border-border">
-      <div className="grid grid-cols-4 max-w-md mx-auto">
+      <div className="grid grid-cols-5 max-w-md mx-auto">
         {items.map((it) => (
           <NavLink
             key={it.to}

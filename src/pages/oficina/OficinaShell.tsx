@@ -8,6 +8,8 @@ import OficinaDashboard from "./OficinaDashboard";
 import OficinaOSList from "./OficinaOSList";
 import OficinaAgenda from "./OficinaAgenda";
 import OficinaAvaliacoes from "./OficinaAvaliacoes";
+import OficinaPerfil from "./OficinaPerfil";
+import OficinaEquipe from "./OficinaEquipe";
 
 export default function OficinaShell() {
   const { token, user, workshop, loading, logout } = useWorkshopAuth();
@@ -42,11 +44,15 @@ export default function OficinaShell() {
             <TabsTrigger value="os">Ordens de Serviço</TabsTrigger>
             <TabsTrigger value="agenda">Agenda</TabsTrigger>
             <TabsTrigger value="avaliacoes">Avaliações</TabsTrigger>
+            <TabsTrigger value="perfil">Perfil</TabsTrigger>
+            <TabsTrigger value="equipe">Equipe</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="mt-4"><OficinaDashboard /></TabsContent>
           <TabsContent value="os" className="mt-4"><OficinaOSList /></TabsContent>
           <TabsContent value="agenda" className="mt-4"><OficinaAgenda /></TabsContent>
           <TabsContent value="avaliacoes" className="mt-4"><OficinaAvaliacoes /></TabsContent>
+          <TabsContent value="perfil" className="mt-4"><OficinaPerfil /></TabsContent>
+          <TabsContent value="equipe" className="mt-4"><OficinaEquipe /></TabsContent>
         </Tabs>
       </main>
     </div>
