@@ -74,6 +74,7 @@ export const MODULE_TABS: Partial<Record<PermModule, { value: string; label: str
     { value: "historico", label: "Histórico" },
   ],
   maintenance: [
+    { value: "agenda", label: "Agenda" },
     { value: "records", label: "Histórico" },
     { value: "schedules", label: "Agendamentos" },
     { value: "calendar", label: "Calendário Preventivo" },
