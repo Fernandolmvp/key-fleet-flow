@@ -51,7 +51,7 @@ const STATUS_TONE: Record<string, string> = {
   cancelada: "bg-muted text-muted-foreground border-border",
 };
 
-export default function Approvals() {
+function FuelApprovalsSection() {
   const { currentCompanyId, user, isManager } = useAuth();
   const { can } = usePermissions();
   const [auths, setAuths] = useState<AuthRow[]>([]);
@@ -189,14 +189,9 @@ export default function Approvals() {
   }
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-primary" /> Aprovações
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Solicitações de abastecimento dos motoristas</p>
-        </div>
+        <p className="text-xs text-muted-foreground">Solicitações de abastecimento dos motoristas</p>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Atualizar"}
         </Button>
