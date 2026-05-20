@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { useTrialStatus } from "@/hooks/useTrialStatus";
 
 const fmtBRL = (v: number | null | undefined) =>
   v == null ? "a combinar" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -17,18 +18,21 @@ const fmtDate = (d: string | null | undefined) =>
 
 const statusTone: Record<string, string> = {
   ativa: "bg-success/20 text-success border-success/30",
+  trial: "bg-primary/20 text-primary border-primary/30",
   aguardando_pagamento: "bg-warning/20 text-warning border-warning/30",
   atrasada: "bg-destructive/20 text-destructive border-destructive/30",
   suspensa: "bg-destructive/30 text-destructive border-destructive/40",
   cancelada: "bg-muted text-muted-foreground",
+  expirada: "bg-destructive/30 text-destructive border-destructive/40",
 };
 const statusLabel: Record<string, string> = {
-  ativa: "Ativa", aguardando_pagamento: "Aguardando pagamento", atrasada: "Atrasada",
-  suspensa: "Suspensa", cancelada: "Cancelada",
+  ativa: "Ativa", trial: "Trial 21 dias", aguardando_pagamento: "Aguardando pagamento",
+  atrasada: "Atrasada", suspensa: "Suspensa", cancelada: "Cancelada", expirada: "Trial expirado",
 };
 
 export default function Subscription() {
   const { user, currentCompanyId } = useAuth();
+  const trial = useTrialStatus();
   const [searchParams, setSearchParams] = useSearchParams();
   const nav = useNavigate();
   const [data, setData] = useState<any>(null);
@@ -110,6 +114,21 @@ export default function Subscription() {
         <h1 className="font-display text-3xl font-bold">Assinatura</h1>
         <p className="text-muted-foreground">Gerencie seu plano e pagamentos</p>
       </div>
+
+      {trial.subscriptionStatus === "trial" && !trial.isExempt && (
+        <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          <div className="flex-1">
+            <div className="font-medium text-primary">
+              Você está no trial gratuito — {trial.daysRemaining ?? 0} dia(s) restante(s).
+            </div>
+            <div className="text-muted-foreground">
+              {trial.trialEndsAt && <>Expira em {new Date(trial.trialEndsAt).toLocaleDateString("pt-BR")}. </>}
+              Todos os módulos estão liberados. Escolha um plano abaixo para continuar após o trial — sem interrupção.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Card principal */}
       <div className="surface-card rounded-xl p-6 space-y-4">

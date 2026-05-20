@@ -45,6 +45,7 @@ export default function Signup() {
   const { user, loading, refreshCompanies } = useAuth();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [planSlug, setPlanSlug] = useState<string>("pro");
   const [form, setForm] = useState({
     fullName: "",
     companyName: "",
@@ -91,13 +92,25 @@ export default function Signup() {
       _phone: onlyDigits(form.phone),
       _contact_name: form.contactName,
       _email: form.email,
+      _trial_plan_slug: planSlug,
     });
     if (rpcErr) { setBusy(false); return toast.error(rpcErr.message); }
 
     await refreshCompanies();
+    // Dispara email de boas-vindas (best-effort, não bloqueia o fluxo)
+    try {
+      const ends = new Date(Date.now() + 21 * 86400000).toLocaleDateString("pt-BR");
+      await supabase.functions.invoke("send-partner-email", {
+        body: {
+          to: form.email,
+          subject: "Bem-vindo ao FrotaOps — 21 dias grátis liberados",
+          html: `<p>Olá ${form.fullName},</p><p>Sua conta no <strong>FrotaOps</strong> foi criada com <strong>21 dias grátis</strong> de todos os módulos liberados. Aproveite até <strong>${ends}</strong>.</p><p><a href="${window.location.origin}/app">Acessar a plataforma</a></p><p>Após o período de teste, basta ativar sua assinatura para continuar sem interrupção.</p>`,
+        },
+      });
+    } catch (_) { /* silencioso */ }
     setBusy(false);
-    toast.success("Conta criada! Escolha seu plano para começar.");
-    nav("/planos");
+    toast.success("Conta criada! Você tem 21 dias grátis para testar tudo.");
+    nav("/app");
   };
 
   return (
@@ -136,6 +149,22 @@ export default function Signup() {
           </div>
           <div className="space-y-2"><Label>Senha</Label>
             <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
+          </div>
+          <div className="space-y-2">
+            <Label>Plano de interesse (após o trial)</Label>
+            <select
+              value={planSlug}
+              onChange={(e) => setPlanSlug(e.target.value)}
+              className="w-full h-10 rounded-md bg-background border border-input px-3 text-sm"
+            >
+              <option value="starter">Starter</option>
+              <option value="pro">Pro</option>
+              <option value="business">Business</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Durante os 21 dias de trial, <strong>todos os módulos estão liberados</strong>. A escolha do plano é só para depois do teste — sem cobrança agora, sem cartão.
+            </p>
           </div>
           <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar conta"}

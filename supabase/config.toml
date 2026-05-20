@@ -39,3 +39,5 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.send-partner-email]
     verify_jwt = false
+  [functions.check-trial-expirations]
+    verify_jwt = false
