@@ -879,6 +879,7 @@ export type Database = {
           fuel_auth_code_ttl_minutes: number
           group_id: string | null
           id: string
+          is_exempt_from_trial: boolean
           logo_url: string | null
           name: string
           neighborhood: string | null
@@ -886,6 +887,8 @@ export type Database = {
           require_invoice_for_categories: string[]
           state: string | null
           status: string
+          trial_ends_at: string | null
+          trial_started_at: string | null
           updated_at: string
         }
         Insert: {
@@ -902,6 +905,7 @@ export type Database = {
           fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
+          is_exempt_from_trial?: boolean
           logo_url?: string | null
           name: string
           neighborhood?: string | null
@@ -909,6 +913,8 @@ export type Database = {
           require_invoice_for_categories?: string[]
           state?: string | null
           status?: string
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -925,6 +931,7 @@ export type Database = {
           fuel_auth_code_ttl_minutes?: number
           group_id?: string | null
           id?: string
+          is_exempt_from_trial?: boolean
           logo_url?: string | null
           name?: string
           neighborhood?: string | null
@@ -932,6 +939,8 @@ export type Database = {
           require_invoice_for_categories?: string[]
           state?: string | null
           status?: string
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3997,6 +4006,7 @@ export type Database = {
           stripe_subscription_id: string | null
           suspended_at: string | null
           suspended_reason: string | null
+          trial_plan_snapshot: string | null
           updated_at: string
         }
         Insert: {
@@ -4019,6 +4029,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           suspended_at?: string | null
           suspended_reason?: string | null
+          trial_plan_snapshot?: string | null
           updated_at?: string
         }
         Update: {
@@ -4041,6 +4052,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           suspended_at?: string | null
           suspended_reason?: string | null
+          trial_plan_snapshot?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -6639,6 +6651,8 @@ export type Database = {
         | "atrasada"
         | "suspensa"
         | "cancelada"
+        | "trial"
+        | "expirada"
       tire_kind: "novo" | "recapado" | "remold"
       tire_movement_type:
         | "instalacao"
@@ -6921,6 +6935,8 @@ export const Constants = {
         "atrasada",
         "suspensa",
         "cancelada",
+        "trial",
+        "expirada",
       ],
       tire_kind: ["novo", "recapado", "remold"],
       tire_movement_type: [
