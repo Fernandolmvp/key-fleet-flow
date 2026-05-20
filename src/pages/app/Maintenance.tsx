@@ -15,6 +15,7 @@ import { STATUS_TONE, TYPE_TONE, SCHEDULE_STATUS_TONE, fmtBRL } from "@/lib/main
 import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { Label } from "@/components/ui/label";
 import { useTabPermissions } from "@/lib/permissions";
+import AgendaSection from "./maintenance/AgendaSection";
 
 interface MRec {
   id: string; vehicle_id: string; type: string; status: string; category: string | null;
@@ -43,9 +44,9 @@ export default function Maintenance() {
   const [loading, setLoading] = useState(true);
   const intervalKey = `maint_interval_km:${currentCompanyId ?? "_"}`;
   const [intervalKm, setIntervalKm] = useState<number>(DEFAULT_INTERVAL_KM);
-  const [tab, setTab] = useState<string>("records");
+  const [tab, setTab] = useState<string>("agenda");
   const { canViewTab, isVisible, fallback } = useTabPermissions(
-    "maintenance", ["records", "schedules", "calendar", "costs"], tab,
+    "maintenance", ["agenda", "records", "schedules", "calendar", "costs"], tab,
   );
   useEffect(() => {
     if (!isVisible && fallback) setTab(fallback);
@@ -186,11 +187,16 @@ export default function Maintenance() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          {canViewTab("agenda") && <TabsTrigger value="agenda">Agenda</TabsTrigger>}
           {canViewTab("records") && <TabsTrigger value="records">Histórico</TabsTrigger>}
           {canViewTab("schedules") && <TabsTrigger value="schedules">Agendamentos {overdue + upcoming > 0 && <Badge className="ml-2 bg-warning/30 text-warning">{overdue + upcoming}</Badge>}</TabsTrigger>}
           {canViewTab("calendar") && <TabsTrigger value="calendar">Calendário Preventivo</TabsTrigger>}
           {canViewTab("costs") && <TabsTrigger value="costs">Custos por veículo</TabsTrigger>}
         </TabsList>
+
+        <TabsContent value="agenda" className="mt-4">
+          <AgendaSection />
+        </TabsContent>
 
         <TabsContent value="records" className="space-y-4 mt-4">
           <div className="surface-card rounded-xl p-4">
