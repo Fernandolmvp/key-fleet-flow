@@ -29,9 +29,15 @@ Deno.serve(async (req) => {
     const env: StripeEnv = environment;
     const stripe = createStripeClient(env);
 
-    const prices = await stripe.prices.list({ lookup_keys: [priceId], expand: ["data.product"] });
-    if (!prices.data.length) throw new Error("Preço não encontrado");
-    const price = prices.data[0];
+    // Aceita tanto Stripe price IDs (price_xxx) quanto lookup_keys
+    let price: any;
+    if (priceId.startsWith("price_")) {
+      price = await stripe.prices.retrieve(priceId, { expand: ["product"] });
+    } else {
+      const prices = await stripe.prices.list({ lookup_keys: [priceId], expand: ["data.product"] });
+      if (!prices.data.length) throw new Error("Preço não encontrado");
+      price = prices.data[0];
+    }
     const isRecurring = price.type === "recurring";
 
     // Aplica cupom pendente (se houver) — cria um Stripe Coupon na hora e anexa via discounts
