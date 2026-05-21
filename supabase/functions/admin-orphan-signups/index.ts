@@ -53,15 +53,28 @@ Deno.serve(async (req) => {
       }
       const userIds = all.map((u) => u.id);
 
-      // Filtra os que NÃO têm membership e NÃO são super admin
-      const { data: mems } = await admin
+      // Filtra os que NÃO têm membership e NÃO são super admin.
+      // OBS: company_members tem 2 FKs para companies (legado) — o embed do PostgREST
+      // fica ambíguo e retorna vazio. Por isso buscamos em duas queries separadas.
+      const { data: mems, error: memsErr } = await admin
         .from("company_members")
-        .select("user_id, company_id, companies(id,name,cnpj,status,created_at)")
+        .select("user_id, company_id")
         .in("user_id", userIds);
+      if (memsErr) console.error("[admin-orphan-signups] mems error", memsErr);
+      const companyIds = Array.from(new Set((mems ?? []).map((m: any) => m.company_id).filter(Boolean)));
+      const compMap = new Map<string, any>();
+      if (companyIds.length) {
+        const { data: comps, error: cErr } = await admin
+          .from("companies")
+          .select("id,name,cnpj,status,created_at")
+          .in("id", companyIds);
+        if (cErr) console.error("[admin-orphan-signups] companies error", cErr);
+        (comps ?? []).forEach((c: any) => compMap.set(c.id, c));
+      }
       const memMap = new Map<string, any[]>();
       (mems ?? []).forEach((m: any) => {
         const arr = memMap.get(m.user_id) ?? [];
-        arr.push(m);
+        arr.push({ ...m, companies: compMap.get(m.company_id) ?? null });
         memMap.set(m.user_id, arr);
       });
       const { data: sas } = await admin.from("super_admins").select("user_id").in("user_id", userIds);
