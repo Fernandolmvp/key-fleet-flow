@@ -25,20 +25,21 @@ export default function OrphanSignups() {
   const [items, setItems] = useState<SignupRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [scope, setScope] = useState<"all" | "orphans" | "with_company">("orphans");
   const [search, setSearch] = useState("");
 
   const load = async () => {
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("admin-orphan-signups", {
-      body: { action: "list", scope: "all" },
+      body: { action: "list", scope: "orphans" },
     });
     setLoading(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || "Erro");
       return;
     }
-    setItems((data as any).users ?? (data as any).orphans ?? []);
+    const all: SignupRow[] = (data as any).users ?? (data as any).orphans ?? [];
+    // Garantia extra no client: só exibe quem realmente não tem empresa vinculada.
+    setItems(all.filter((u) => u.is_orphan && (u.companies?.length ?? 0) === 0));
   };
 
   useEffect(() => { load(); }, []);
@@ -78,20 +79,10 @@ export default function OrphanSignups() {
   const q = search.trim().toLowerCase();
   const filtered = items
     .filter((u) =>
-      scope === "orphans" ? u.is_orphan : scope === "with_company" ? u.companies.length > 0 : true,
-    )
-    .filter((u) =>
       !q ||
       u.email?.toLowerCase().includes(q) ||
-      u.full_name?.toLowerCase().includes(q) ||
-      u.companies.some((c) => c.name?.toLowerCase().includes(q) || c.cnpj?.includes(q)),
+      u.full_name?.toLowerCase().includes(q),
     );
-
-  const counts = {
-    all: items.length,
-    orphans: items.filter((u) => u.is_orphan).length,
-    with_company: items.filter((u) => u.companies.length > 0).length,
-  };
 
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
@@ -111,24 +102,13 @@ export default function OrphanSignups() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {([
-          ["all", `Todos (${counts.all})`],
-          ["orphans", `Sem empresa (${counts.orphans})`],
-          ["with_company", `Com empresa (${counts.with_company})`],
-        ] as const).map(([k, label]) => (
-          <Button
-            key={k}
-            size="sm"
-            variant={scope === k ? "default" : "outline"}
-            onClick={() => setScope(k as any)}
-          >
-            {label}
-          </Button>
-        ))}
+        <Badge className="bg-warning/15 text-warning border-warning/30">
+          {items.length} sem empresa
+        </Badge>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por email, nome, empresa ou CNPJ"
+          placeholder="Buscar por email ou nome"
           className="ml-auto h-9 px-3 rounded-md border border-border bg-background text-sm w-72"
         />
       </div>
