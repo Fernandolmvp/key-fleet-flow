@@ -883,6 +883,7 @@ export type Database = {
           logo_url: string | null
           name: string
           neighborhood: string | null
+          onboarding_dismissed_at: string | null
           phone: string | null
           require_invoice_for_categories: string[]
           state: string | null
@@ -909,6 +910,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           neighborhood?: string | null
+          onboarding_dismissed_at?: string | null
           phone?: string | null
           require_invoice_for_categories?: string[]
           state?: string | null
@@ -935,6 +937,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           neighborhood?: string | null
+          onboarding_dismissed_at?: string | null
           phone?: string | null
           require_invoice_for_categories?: string[]
           state?: string | null
@@ -6716,6 +6719,10 @@ export type Database = {
       seed_default_role_permissions: {
         Args: { _company_id: string }
         Returns: undefined
+      }
+      set_company_onboarding_dismissed: {
+        Args: { p_company_id: string; p_dismissed?: boolean }
+        Returns: string
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
