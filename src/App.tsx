@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
+import Agendar from "./pages/Agendar";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import AppLayout from "./components/layout/AppLayout";
@@ -53,6 +54,7 @@ import CouponsPanel from "./pages/admin/CouponsPanel";
 import CouponDetail from "./pages/admin/CouponDetail";
 import CompanyManualCreate from "./pages/admin/CompanyManualCreate";
 import OrphanSignups from "./pages/admin/OrphanSignups";
+import LeadsPanel from "./pages/admin/LeadsPanel";
 import NotFound from "./pages/NotFound";
 import PlanSelection from "./pages/auth/PlanSelection";
 import Welcome from "./pages/auth/Welcome";
@@ -87,6 +89,7 @@ const App = () => (
          <WorkshopAuthProvider>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/agendar" element={<Agendar />} />
             <Route path="/termos" element={<Termos />} />
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/login" element={<Login />} />
@@ -111,6 +114,7 @@ const App = () => (
               <Route path="cupons/:id" element={<CouponDetail />} />
               <Route path="empresas/nova" element={<CompanyManualCreate />} />
               <Route path="cadastros-incompletos" element={<OrphanSignups />} />
+              <Route path="leads" element={<LeadsPanel />} />
             </Route>
             <Route path="/super-admin/ativar" element={<SuperAdminBootstrap />} />
             <Route path="/posto/login" element={<PostoLogin />} />

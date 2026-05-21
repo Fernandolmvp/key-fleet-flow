@@ -43,3 +43,7 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.admin-create-company-manual]
     verify_jwt = false
+  [functions.cal-webhook]
+    verify_jwt = false
+  [functions.create-lead]
+    verify_jwt = false

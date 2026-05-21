@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ type Result = {
 
 export default function CompanyManualCreate() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const leadId = params.get("leadId");
   const [form, setForm] = useState({
     name: "", cnpj: "", phone: "", city: "", state: "",
     mgrName: "", mgrEmail: "", mgrPhone: "",
@@ -29,6 +31,26 @@ export default function CompanyManualCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Pre-fill form when converting a lead
+  useEffect(() => {
+    if (!leadId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("leads").select("*").eq("id", leadId).maybeSingle();
+      if (error || !data) return;
+      setForm((f) => ({
+        ...f,
+        name: data.empresa ?? f.name,
+        cnpj: data.cnpj ? formatCnpj(data.cnpj) : f.cnpj,
+        phone: data.telefone ?? f.phone,
+        mgrName: data.nome ?? f.mgrName,
+        mgrEmail: data.email ?? f.mgrEmail,
+        mgrPhone: data.telefone ?? f.mgrPhone,
+      }));
+      toast.info("Dados do lead pré-preenchidos");
+    })();
+  }, [leadId]);
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -78,6 +100,14 @@ export default function CompanyManualCreate() {
     }
     setResult(data as Result);
     toast.success("Empresa criada!");
+
+    // Mark lead as converted
+    if (leadId && (data as any)?.company_id) {
+      await supabase
+        .from("leads")
+        .update({ status: "CONVERTIDO", converted_company_id: (data as any).company_id })
+        .eq("id", leadId);
+    }
   }
 
   function copy(text: string, key: string) {

@@ -3062,6 +3062,75 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          cal_booking_id: string | null
+          cnpj: string | null
+          converted_company_id: string | null
+          created_at: string
+          email: string | null
+          empresa: string | null
+          id: string
+          maior_dor: string | null
+          nome: string | null
+          notes: string | null
+          origem: string
+          quantidade_veiculos: string | null
+          status: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          cal_booking_id?: string | null
+          cnpj?: string | null
+          converted_company_id?: string | null
+          created_at?: string
+          email?: string | null
+          empresa?: string | null
+          id?: string
+          maior_dor?: string | null
+          nome?: string | null
+          notes?: string | null
+          origem?: string
+          quantidade_veiculos?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cal_booking_id?: string | null
+          cnpj?: string | null
+          converted_company_id?: string | null
+          created_at?: string
+          email?: string | null
+          empresa?: string | null
+          id?: string
+          maior_dor?: string | null
+          nome?: string | null
+          notes?: string | null
+          origem?: string
+          quantidade_veiculos?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_converted_company_id_fkey"
+            columns: ["converted_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_company_id_fkey"
+            columns: ["converted_company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       maintenance_checklist_items: {
         Row: {
           category: string | null

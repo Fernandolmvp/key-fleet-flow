@@ -1,6 +1,7 @@
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import WhatsappFloatingButton from "@/components/WhatsappFloatingButton";
 import {
   Truck,
   Gauge,
@@ -40,36 +41,6 @@ const metrics = [
   { v: "<2min", l: "para registrar abastecimento" },
 ];
 
-const plans = [
-  {
-    name: "Starter",
-    price: "R$ 149",
-    suffix: "/mês",
-    desc: "Para frotas em estruturação.",
-    features: ["Até 10 veículos", "Motoristas ilimitados", "Combustível + manutenção", "Suporte por email"],
-    cta: "Começar",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: "R$ 449",
-    suffix: "/mês",
-    desc: "Operação consolidada com BI.",
-    features: ["Até 50 veículos", "Checklists & seguros", "Detecção de anomalias", "Posto integrado", "Suporte prioritário"],
-    cta: "Assinar Pro",
-    highlight: true,
-  },
-  {
-    name: "Enterprise",
-    price: "Sob consulta",
-    suffix: "",
-    desc: "Multi-empresa, SSO e SLA.",
-    features: ["Veículos ilimitados", "Multi-empresa / grupo", "SSO + auditoria avançada", "Onboarding dedicado"],
-    cta: "Falar com vendas",
-    highlight: false,
-  },
-];
-
 export default function Landing() {
   const { user, loading } = useAuth();
 
@@ -97,15 +68,14 @@ export default function Landing() {
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#recursos" className="hover:text-foreground transition-colors">Recursos</a>
             <a href="#metricas" className="hover:text-foreground transition-colors">Resultados</a>
-            <a href="#planos" className="hover:text-foreground transition-colors">Planos</a>
           </nav>
           <div className="flex items-center gap-2">
             <Link to="/login">
               <Button variant="ghost" size="sm">Entrar</Button>
             </Link>
-            <Link to="/signup">
+            <Link to="/agendar">
               <Button size="sm" className="bg-gradient-primary text-primary-foreground shadow-glow font-semibold">
-                Começar grátis
+                Agendar demonstração
               </Button>
             </Link>
           </div>
@@ -130,23 +100,18 @@ export default function Landing() {
               plataforma com auditoria fiscal e detecção de anomalias por IA.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <Link to="/signup">
+              <Link to="/agendar">
                 <Button size="lg" className="bg-gradient-primary text-primary-foreground shadow-glow font-semibold h-12 px-7">
-                  Começar agora <ArrowRight className="h-4 w-4" />
+                  Agendar demonstração <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 text-success border border-success/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                21 dias grátis — sem cartão de crédito
+                Demonstração gratuita · 30 minutos
               </span>
-              <a href="#planos">
-                <Button size="lg" variant="outline" className="h-12 px-7">
-                  Ver planos
-                </Button>
-              </a>
             </div>
             <p className="text-xs text-muted-foreground pt-2">
-              Sem cartão para começar · Cancele quando quiser · Dados em conformidade LGPD
+              Venda consultiva · Onboarding assistido · Dados em conformidade LGPD
             </p>
           </div>
         </div>
@@ -216,58 +181,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Plans */}
-      <section id="planos" className="max-w-7xl mx-auto px-6 py-24">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="font-display text-4xl font-bold">Planos que escalam com sua frota</h2>
-          <p className="text-muted-foreground mt-4">Comece pequeno. Cresça sem trocar de sistema.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((p) => (
-            <div
-              key={p.name}
-              className={`rounded-2xl p-7 flex flex-col ${
-                p.highlight
-                  ? "ring-glow bg-gradient-card border border-primary/40"
-                  : "surface-card"
-              }`}
-            >
-              <div className="flex items-baseline justify-between">
-                <h3 className="font-display text-xl font-semibold">{p.name}</h3>
-                {p.highlight && (
-                  <span className="text-[10px] uppercase tracking-wider font-mono text-primary">Mais popular</span>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">{p.desc}</p>
-              <div className="mt-5 mb-6">
-                <span className="font-display text-4xl font-bold">{p.price}</span>
-                <span className="text-muted-foreground">{p.suffix}</span>
-              </div>
-              <ul className="space-y-2.5 text-sm flex-1">
-                {p.features.map((it) => (
-                  <li key={it} className="flex gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    <span>{it}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link to="/signup" className="mt-7">
-                <Button
-                  className={`w-full h-11 font-semibold ${
-                    p.highlight
-                      ? "bg-gradient-primary text-primary-foreground shadow-glow"
-                      : ""
-                  }`}
-                  variant={p.highlight ? "default" : "outline"}
-                >
-                  {p.cta}
-                </Button>
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="max-w-7xl mx-auto px-6 pb-24">
         <div className="surface-card rounded-3xl p-10 lg:p-14 text-center relative overflow-hidden">
@@ -279,11 +192,11 @@ export default function Landing() {
             <h2 className="font-display text-3xl lg:text-4xl font-bold">
               Coloque sua frota no piloto executivo.
             </h2>
-            <p className="text-muted-foreground">Crie sua conta em 2 minutos. Cancele quando quiser.</p>
+            <p className="text-muted-foreground">Agende uma demonstração de 30 minutos e veja na prática.</p>
             <div className="flex flex-wrap justify-center gap-3 pt-2">
-              <Link to="/signup">
+              <Link to="/agendar">
                 <Button size="lg" className="bg-gradient-primary text-primary-foreground shadow-glow font-semibold h-12 px-7">
-                  Criar conta gratuita <ArrowRight className="h-4 w-4" />
+                  Agendar demonstração <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link to="/login">
@@ -306,13 +219,14 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-5">
             <Link to="/login" className="hover:text-foreground">Entrar</Link>
-            <Link to="/signup" className="hover:text-foreground">Criar conta</Link>
+            <Link to="/agendar" className="hover:text-foreground">Agendar demonstração</Link>
             <Link to="/termos" className="hover:text-foreground">Termos</Link>
             <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>
             <a href="mailto:contato@frotaops.com.br" className="hover:text-foreground">contato@frotaops.com.br</a>
           </div>
         </div>
       </footer>
+      <WhatsappFloatingButton />
     </div>
   );
 }

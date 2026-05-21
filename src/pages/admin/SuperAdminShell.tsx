@@ -1,35 +1,54 @@
+import { useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  ShieldCheck, ArrowLeft, Loader2, Building2, Brain, Cpu, Workflow, BarChart3, Ticket, PlusCircle, UserX,
+  ShieldCheck, ArrowLeft, Loader2, Building2, Brain, Cpu, Workflow, BarChart3, Ticket, PlusCircle, UserX, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navGroups = [
-  {
-    label: "Saas",
-    items: [
-      { to: "/super-admin", icon: Building2, label: "Empresas", end: true },
-      { to: "/super-admin/empresas/nova", icon: PlusCircle, label: "Criar empresa" },
-      { to: "/super-admin/cadastros-incompletos", icon: UserX, label: "Cadastros incompletos" },
-      { to: "/super-admin/cupons", icon: Ticket, label: "Cupons" },
-    ],
-  },
-  {
-    label: "Inteligência Artificial",
-    items: [
-      { to: "/super-admin/ai/providers", icon: Brain, label: "Provedores" },
-      { to: "/super-admin/ai/models", icon: Cpu, label: "Modelos" },
-      { to: "/super-admin/ai/routing", icon: Workflow, label: "Roteamento" },
-      { to: "/super-admin/ai/usage", icon: BarChart3, label: "Uso & Logs" },
-    ],
-  },
-];
 
 export default function SuperAdminShell() {
   const { user, loading: authLoading, isSuperAdmin, signOut } = useAuth();
   const location = useLocation();
+  const [newLeadsCount, setNewLeadsCount] = useState(0);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let active = true;
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "NOVO");
+      if (active) setNewLeadsCount(count ?? 0);
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+    return () => { active = false; clearInterval(interval); };
+  }, [isSuperAdmin, location.pathname]);
+
+  const navGroups = [
+    {
+      label: "Saas",
+      items: [
+        { to: "/super-admin", icon: Building2, label: "Empresas", end: true },
+        { to: "/super-admin/empresas/nova", icon: PlusCircle, label: "Criar empresa" },
+        { to: "/super-admin/leads", icon: Sparkles, label: "Leads", badge: newLeadsCount },
+        { to: "/super-admin/cadastros-incompletos", icon: UserX, label: "Cadastros incompletos" },
+        { to: "/super-admin/cupons", icon: Ticket, label: "Cupons" },
+      ] as Array<{ to: string; icon: any; label: string; end?: boolean; badge?: number }>,
+    },
+    {
+      label: "Inteligência Artificial",
+      items: [
+        { to: "/super-admin/ai/providers", icon: Brain, label: "Provedores" },
+        { to: "/super-admin/ai/models", icon: Cpu, label: "Modelos" },
+        { to: "/super-admin/ai/routing", icon: Workflow, label: "Roteamento" },
+        { to: "/super-admin/ai/usage", icon: BarChart3, label: "Uso & Logs" },
+      ] as Array<{ to: string; icon: any; label: string; end?: boolean; badge?: number }>,
+    },
+  ];
 
   if (authLoading) {
     return (
@@ -75,7 +94,12 @@ export default function SuperAdminShell() {
                         )}
                       >
                         <it.icon className="h-4 w-4" />
-                        {it.label}
+                        <span className="flex-1">{it.label}</span>
+                        {!!it.badge && it.badge > 0 && (
+                          <span className="ml-auto text-[10px] font-bold rounded-full bg-destructive text-destructive-foreground px-1.5 py-0.5 min-w-[18px] text-center">
+                            {it.badge}
+                          </span>
+                        )}
                       </NavLink>
                     </li>
                   );
@@ -131,6 +155,11 @@ export default function SuperAdminShell() {
                   >
                     <it.icon className="h-3.5 w-3.5" />
                     {it.label}
+                    {!!it.badge && it.badge > 0 && (
+                      <span className="text-[9px] font-bold rounded-full bg-destructive text-destructive-foreground px-1 min-w-[16px] text-center">
+                        {it.badge}
+                      </span>
+                    )}
                   </NavLink>
                 );
               }),
