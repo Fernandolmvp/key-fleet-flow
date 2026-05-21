@@ -1,6 +1,11 @@
-import { corsHeaders } from "@supabase/supabase-js/cors";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 function getServiceClient() {
   return createClient(
