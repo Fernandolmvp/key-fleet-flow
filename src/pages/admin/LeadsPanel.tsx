@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, RefreshCw, Search, UserPlus, Trash2, ArrowRight, MessageCircle, Mail, Phone } from "lucide-react";
+import { Loader2, RefreshCw, Search, UserPlus, Trash2, ArrowRight, MessageCircle, Mail, Phone, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 type Lead = {
@@ -23,8 +23,8 @@ type Lead = {
   cnpj: string | null;
   quantidade_veiculos: string | null;
   maior_dor: string | null;
-  origem: "CAL_COM" | "WHATSAPP" | "FORMULARIO_DIRETO" | "OUTRO";
-  status: "NOVO" | "CONTATADO" | "EM_NEGOCIACAO" | "CONVERTIDO" | "PERDIDO";
+  origem: "CAL_COM" | "WHATSAPP" | "FORMULARIO_DIRETO" | "INDICACAO" | "OUTRO";
+  status: "NOVO" | "CONTATADO" | "DEMO_AGENDADA" | "EM_NEGOCIACAO" | "CONVERTIDO" | "PERDIDO";
   cal_booking_id: string | null;
   converted_company_id: string | null;
   notes: string | null;
@@ -32,12 +32,15 @@ type Lead = {
   updated_at: string;
 };
 
-const STATUS_OPTS: Lead["status"][] = ["NOVO", "CONTATADO", "EM_NEGOCIACAO", "CONVERTIDO", "PERDIDO"];
-const ORIGEM_OPTS: Lead["origem"][] = ["CAL_COM", "WHATSAPP", "FORMULARIO_DIRETO", "OUTRO"];
+const STATUS_OPTS: Lead["status"][] = ["NOVO", "CONTATADO", "DEMO_AGENDADA", "EM_NEGOCIACAO", "CONVERTIDO", "PERDIDO"];
+const ORIGEM_OPTS: Lead["origem"][] = ["CAL_COM", "WHATSAPP", "FORMULARIO_DIRETO", "INDICACAO", "OUTRO"];
+const VEICULOS_OPTS = ["1-10", "11-30", "31-100", "Mais de 100"];
+type Period = "ALL" | "TODAY" | "7D" | "30D";
 
 const statusColor: Record<Lead["status"], string> = {
   NOVO: "bg-primary/15 text-primary border-primary/40",
   CONTATADO: "bg-warning/15 text-warning border-warning/40",
+  DEMO_AGENDADA: "bg-purple-500/15 text-purple-400 border-purple-500/40",
   EM_NEGOCIACAO: "bg-blue-500/15 text-blue-400 border-blue-500/40",
   CONVERTIDO: "bg-success/15 text-success border-success/40",
   PERDIDO: "bg-destructive/15 text-destructive border-destructive/40",
@@ -50,11 +53,15 @@ export default function LeadsPanel() {
   const [items, setItems] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [origemFilter, setOrigemFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [origemFilter, setOrigemFilter] = useState<Set<string>>(new Set());
+  const [veiculosFilter, setVeiculosFilter] = useState<Set<string>>(new Set());
+  const [period, setPeriod] = useState<Period>("ALL");
   const [selected, setSelected] = useState<Lead | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
 
   async function load() {
     setLoading(true);
@@ -74,9 +81,20 @@ export default function LeadsPanel() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const since = (() => {
+      const now = Date.now();
+      if (period === "TODAY") {
+        const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();
+      }
+      if (period === "7D") return now - 7 * 86400_000;
+      if (period === "30D") return now - 30 * 86400_000;
+      return 0;
+    })();
     return items.filter((l) => {
-      if (statusFilter !== "ALL" && l.status !== statusFilter) return false;
-      if (origemFilter !== "ALL" && l.origem !== origemFilter) return false;
+      if (statusFilter.size > 0 && !statusFilter.has(l.status)) return false;
+      if (origemFilter.size > 0 && !origemFilter.has(l.origem)) return false;
+      if (veiculosFilter.size > 0 && !veiculosFilter.has(l.quantidade_veiculos ?? "")) return false;
+      if (since && new Date(l.created_at).getTime() < since) return false;
       if (!q) return true;
       return (
         (l.nome ?? "").toLowerCase().includes(q) ||
@@ -84,7 +102,7 @@ export default function LeadsPanel() {
         (l.empresa ?? "").toLowerCase().includes(q)
       );
     });
-  }, [items, search, statusFilter, origemFilter]);
+  }, [items, search, statusFilter, origemFilter, veiculosFilter, period]);
 
   async function changeStatus(lead: Lead, status: Lead["status"]) {
     const prev = items;
@@ -136,10 +154,15 @@ export default function LeadsPanel() {
           <h1 className="font-display text-2xl font-bold">Leads</h1>
           <p className="text-sm text-muted-foreground">Potenciais clientes vindos da landing, Cal.com e WhatsApp.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            Atualizar
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Novo lead
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -149,7 +172,7 @@ export default function LeadsPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_180px] gap-2">
+          <div className="space-y-2">
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -159,20 +182,20 @@ export default function LeadsPanel() {
                 className="pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todos os status</SelectItem>
-                {STATUS_OPTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={origemFilter} onValueChange={setOrigemFilter}>
-              <SelectTrigger><SelectValue placeholder="Origem" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todas as origens</SelectItem>
-                {ORIGEM_OPTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <MultiFilter label="Status" options={STATUS_OPTS} value={statusFilter} onChange={setStatusFilter} />
+              <MultiFilter label="Origem" options={ORIGEM_OPTS} value={origemFilter} onChange={setOrigemFilter} />
+              <MultiFilter label="Qtd. veículos" options={VEICULOS_OPTS} value={veiculosFilter} onChange={setVeiculosFilter} />
+              <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+                <SelectTrigger><SelectValue placeholder="Período" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todo o período</SelectItem>
+                  <SelectItem value="TODAY">Hoje</SelectItem>
+                  <SelectItem value="7D">Últimos 7 dias</SelectItem>
+                  <SelectItem value="30D">Últimos 30 dias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {loading ? (
@@ -221,6 +244,9 @@ export default function LeadsPanel() {
                       <td className="py-2 px-2">
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openDetail(l)}>Ver</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditLead(l)} className="hidden md:inline-flex">
+                            Editar
+                          </Button>
                           {l.status !== "CONVERTIDO" && (
                             <Button size="sm" variant="outline" onClick={() => convert(l)} className="hidden md:inline-flex">
                               <UserPlus className="h-3.5 w-3.5 mr-1" /> Converter
@@ -313,6 +339,19 @@ export default function LeadsPanel() {
           )}
         </DialogContent>
       </Dialog>
+
+      <LeadFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSaved={(lead) => { setItems((arr) => [lead, ...arr]); }}
+      />
+
+      <LeadFormDialog
+        open={!!editLead}
+        editing={editLead}
+        onOpenChange={(o) => !o && setEditLead(null)}
+        onSaved={(lead) => { setItems((arr) => arr.map((x) => x.id === lead.id ? lead : x)); }}
+      />
     </div>
   );
 }
@@ -323,5 +362,165 @@ function Info({ label, value, icon }: { label: string; value: string | null; ico
       <div className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</div>
       <div className="mt-0.5 font-medium">{value || "—"}</div>
     </div>
+  );
+}
+
+function MultiFilter({
+  label, options, value, onChange,
+}: { label: string; options: string[]; value: Set<string>; onChange: (s: Set<string>) => void }) {
+  const toggle = (o: string) => {
+    const n = new Set(value);
+    if (n.has(o)) n.delete(o); else n.add(o);
+    onChange(n);
+  };
+  const summary = value.size === 0 ? label : `${label}: ${value.size}`;
+  return (
+    <Select open={undefined} onValueChange={() => {}} value="">
+      <SelectTrigger asChild>
+        <Button variant="outline" size="sm" className="justify-between h-10 w-full">
+          <span className="truncate">{summary}</span>
+          {value.size > 0 && (
+            <X className="h-3.5 w-3.5 opacity-60 ml-1" onClick={(e) => { e.stopPropagation(); onChange(new Set()); }} />
+          )}
+        </Button>
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <div
+            key={o}
+            onClick={(e) => { e.preventDefault(); toggle(o); }}
+            className="cursor-pointer px-2 py-1.5 text-sm hover:bg-muted/50 rounded flex items-center gap-2"
+          >
+            <input type="checkbox" readOnly checked={value.has(o)} />
+            <span>{o}</span>
+          </div>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function LeadFormDialog({
+  open, onOpenChange, onSaved, editing,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSaved: (l: Lead) => void;
+  editing?: Lead | null;
+}) {
+  const empty = {
+    nome: "", email: "", telefone: "", empresa: "", cnpj: "",
+    quantidade_veiculos: "", maior_dor: "",
+    origem: "INDICACAO" as Lead["origem"],
+    status: "NOVO" as Lead["status"],
+    notes: "",
+  };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (editing) {
+      setForm({
+        nome: editing.nome ?? "",
+        email: editing.email ?? "",
+        telefone: editing.telefone ?? "",
+        empresa: editing.empresa ?? "",
+        cnpj: editing.cnpj ?? "",
+        quantidade_veiculos: editing.quantidade_veiculos ?? "",
+        maior_dor: editing.maior_dor ?? "",
+        origem: editing.origem,
+        status: editing.status,
+        notes: editing.notes ?? "",
+      });
+    } else if (open) {
+      setForm(empty);
+    }
+  }, [editing, open]);
+
+  async function save() {
+    if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
+    if (!form.empresa.trim()) { toast.error("Informe a empresa"); return; }
+    setSaving(true);
+    if (editing) {
+      const { data, error } = await supabase
+        .from("leads").update(form).eq("id", editing.id).select("*").single();
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Lead atualizado");
+      onSaved(data as Lead);
+      onOpenChange(false);
+    } else {
+      const { data, error } = await supabase
+        .from("leads").insert(form).select("*").single();
+      setSaving(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Lead criado");
+      onSaved(data as Lead);
+      onOpenChange(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{editing ? "Editar lead" : "Novo lead"}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="md:col-span-2"><Label>Nome *</Label>
+            <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+          </div>
+          <div><Label>Email</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <div><Label>Telefone</Label>
+            <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+          </div>
+          <div><Label>Empresa *</Label>
+            <Input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })} />
+          </div>
+          <div><Label>CNPJ</Label>
+            <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} />
+          </div>
+          <div><Label>Qtd. veículos</Label>
+            <Select value={form.quantidade_veiculos} onValueChange={(v) => setForm({ ...form, quantidade_veiculos: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {VEICULOS_OPTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label>Origem</Label>
+            <Select value={form.origem} onValueChange={(v) => setForm({ ...form, origem: v as Lead["origem"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ORIGEM_OPTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label>Status</Label>
+            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Lead["status"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-2"><Label>Maior dor</Label>
+            <Textarea rows={2} value={form.maior_dor} onChange={(e) => setForm({ ...form, maior_dor: e.target.value })} />
+          </div>
+          <div className="md:col-span-2"><Label>Notas internas</Label>
+            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {editing ? "Salvar" : "Criar lead"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
