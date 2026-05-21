@@ -253,9 +253,14 @@ export default function CompaniesPanel() {
                         </td>
                         <td className="px-4 py-3 text-xs">{i.plan_name}</td>
                         <td className="px-4 py-3">
-                          <Badge className={`border ${statusTone[i.subscription_status] ?? ""}`}>
-                            {statusLabel[i.subscription_status] ?? i.subscription_status}
-                          </Badge>
+                          {(() => {
+                            const eff = isTrialExpired(i) ? "trial_expirado" : i.subscription_status;
+                            return (
+                              <Badge className={`border ${statusTone[eff] ?? ""}`}>
+                                {statusLabel[eff] ?? eff}
+                              </Badge>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           <div className={overLimit ? "text-destructive font-medium" : ""}>
@@ -307,9 +312,14 @@ export default function CompaniesPanel() {
                             </td>
                             <td className="px-4 py-2.5 text-xs">{ch.plan_name}</td>
                             <td className="px-4 py-2.5">
-                              <Badge className={`border ${statusTone[ch.subscription_status] ?? ""}`}>
-                                {statusLabel[ch.subscription_status] ?? ch.subscription_status}
-                              </Badge>
+                              {(() => {
+                                const eff = isTrialExpired(ch) ? "trial_expirado" : ch.subscription_status;
+                                return (
+                                  <Badge className={`border ${statusTone[eff] ?? ""}`}>
+                                    {statusLabel[eff] ?? eff}
+                                  </Badge>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-2.5 text-xs">
                               <div className={chOver ? "text-destructive font-medium" : ""}>
