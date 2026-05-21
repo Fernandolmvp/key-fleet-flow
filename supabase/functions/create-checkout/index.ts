@@ -1,6 +1,11 @@
-import { corsHeaders } from "@supabase/supabase-js/cors";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 function getServiceClient() {
   return createClient(
@@ -29,9 +34,15 @@ Deno.serve(async (req) => {
     const env: StripeEnv = environment;
     const stripe = createStripeClient(env);
 
-    const prices = await stripe.prices.list({ lookup_keys: [priceId], expand: ["data.product"] });
-    if (!prices.data.length) throw new Error("Preço não encontrado");
-    const price = prices.data[0];
+    // Aceita tanto Stripe price IDs (price_xxx) quanto lookup_keys
+    let price: any;
+    if (priceId.startsWith("price_")) {
+      price = await stripe.prices.retrieve(priceId, { expand: ["product"] });
+    } else {
+      const prices = await stripe.prices.list({ lookup_keys: [priceId], expand: ["data.product"] });
+      if (!prices.data.length) throw new Error("Preço não encontrado");
+      price = prices.data[0];
+    }
     const isRecurring = price.type === "recurring";
 
     // Aplica cupom pendente (se houver) — cria um Stripe Coupon na hora e anexa via discounts
