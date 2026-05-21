@@ -34,6 +34,7 @@ import Insurance from "./pages/app/Insurance";
 import InsuranceOrphans from "./pages/app/insurance/Orphans";
 import ReviewMatches from "./pages/app/insurance/ReviewMatches";
 import Configuracoes from "./pages/app/Configuracoes";
+import Equipe from "./pages/app/Equipe";
 import Sinistros from "./pages/app/Sinistros";
 import Despesas from "./pages/app/Despesas";
 import Multas from "./pages/app/Multas";
@@ -148,7 +149,8 @@ const App = () => (
               <Route path="brokers" element={<Brokers />} />
               <Route path="workshops" element={<Workshops />} />
               <Route path="suppliers" element={<Suppliers />} />
-              <Route path="assinatura" element={<Subscription />} />
+                  <Route path="assinatura" element={<Subscription />} />
+                  <Route path="equipe" element={<Equipe />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
                   <Route path="sinistros" element={<Sinistros />} />
                   <Route path="despesas" element={<Despesas />} />
