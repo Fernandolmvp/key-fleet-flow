@@ -181,6 +181,12 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
           );
         })}
       </div>
+
+      <div className="text-center max-w-2xl mx-auto">
+        <Link to="/app/equipe" className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2">
+          Quer convidar alguém da sua equipe? Clique aqui
+        </Link>
+      </div>
     </div>
   );
 }
