@@ -8,14 +8,14 @@ const corsHeaders = {
 }
 
 const Schema = z.object({
-  nome: z.string().trim().max(200).optional().nullable(),
-  email: z.string().trim().email().max(255).optional().nullable(),
-  telefone: z.string().trim().max(40).optional().nullable(),
-  empresa: z.string().trim().max(200).optional().nullable(),
+  nome: z.string().trim().min(2).max(200),
+  email: z.string().trim().email().max(255),
+  telefone: z.string().trim().min(10).max(40),
+  empresa: z.string().trim().min(2).max(200),
+  quantidade_veiculos: z.string().trim().min(1).max(50),
   cnpj: z.string().trim().max(20).optional().nullable(),
-  quantidade_veiculos: z.string().trim().max(50).optional().nullable(),
   maior_dor: z.string().trim().max(2000).optional().nullable(),
-  origem: z.enum(['CAL_COM','WHATSAPP','FORMULARIO_DIRETO','OUTRO']).optional(),
+  origem: z.enum(['CAL_COM','WHATSAPP','FORMULARIO_DIRETO','INDICACAO','OUTRO']).optional(),
 })
 
 Deno.serve(async (req) => {
@@ -32,9 +32,22 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
+    // Anti-spam: reject if same email submitted more than 3 leads in the last hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: recentCount } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('email', parsed.data.email)
+      .gte('created_at', oneHourAgo)
+    if ((recentCount ?? 0) >= 3) {
+      return new Response(
+        JSON.stringify({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
     const { data, error } = await supabase
       .from('leads')
-      .insert({ ...parsed.data, origem: parsed.data.origem ?? 'FORMULARIO_DIRETO', status: 'NOVO' })
+      .insert({ ...parsed.data, origem: parsed.data.origem ?? 'CAL_COM', status: 'NOVO' })
       .select('id')
       .single()
     if (error) {
