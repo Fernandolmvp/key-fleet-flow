@@ -6534,6 +6534,7 @@ export type Database = {
             }
             Returns: Json
           }
+      dashboard_get_summary: { Args: { p_company_id: string }; Returns: Json }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
