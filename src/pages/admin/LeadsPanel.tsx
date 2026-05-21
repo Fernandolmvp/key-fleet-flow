@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, RefreshCw, Search, UserPlus, Trash2, ArrowRight, MessageCircle, Mail, Phone, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -375,28 +377,34 @@ function MultiFilter({
   };
   const summary = value.size === 0 ? label : `${label}: ${value.size}`;
   return (
-    <Select open={undefined} onValueChange={() => {}} value="">
-      <SelectTrigger asChild>
-        <Button variant="outline" size="sm" className="justify-between h-10 w-full">
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="justify-between h-10 w-full font-normal">
           <span className="truncate">{summary}</span>
-          {value.size > 0 && (
-            <X className="h-3.5 w-3.5 opacity-60 ml-1" onClick={(e) => { e.stopPropagation(); onChange(new Set()); }} />
+          {value.size > 0 ? (
+            <X
+              className="h-3.5 w-3.5 opacity-60 ml-1"
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(new Set()); }}
+            />
+          ) : (
+            <span className="text-muted-foreground text-xs">▾</span>
           )}
         </Button>
-      </SelectTrigger>
-      <SelectContent>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1" align="start">
         {options.map((o) => (
-          <div
+          <button
+            type="button"
             key={o}
-            onClick={(e) => { e.preventDefault(); toggle(o); }}
-            className="cursor-pointer px-2 py-1.5 text-sm hover:bg-muted/50 rounded flex items-center gap-2"
+            onClick={() => toggle(o)}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted/50 text-left"
           >
-            <input type="checkbox" readOnly checked={value.has(o)} />
+            <Checkbox checked={value.has(o)} className="pointer-events-none" />
             <span>{o}</span>
-          </div>
+          </button>
         ))}
-      </SelectContent>
-    </Select>
+      </PopoverContent>
+    </Popover>
   );
 }
 
