@@ -45,10 +45,13 @@ const statusTone: Record<string, string> = {
   atrasada: "bg-destructive/20 text-destructive border-destructive/30",
   suspensa: "bg-destructive/30 text-destructive border-destructive/40",
   cancelada: "bg-muted text-muted-foreground",
+  trial: "bg-primary/15 text-primary border-primary/30",
+  trial_expirado: "bg-destructive/20 text-destructive border-destructive/30",
 };
 const statusLabel: Record<string, string> = {
   ativa: "Ativa", aguardando_pagamento: "Aguardando", atrasada: "Atrasada",
   suspensa: "Suspensa", cancelada: "Cancelada",
+  trial: "Trial", trial_expirado: "Trial expirado",
 };
 
 const fmtBRL = (v: number | null | undefined) =>
@@ -103,9 +106,18 @@ export default function CompaniesPanel() {
 
   useEffect(() => { load(); }, []);
 
+  const isTrialExpired = (i: Usage) =>
+    i.subscription_status === "trial" &&
+    !!i.current_period_end &&
+    new Date(i.current_period_end) < new Date();
+  const isTrialActive = (i: Usage) =>
+    i.subscription_status === "trial" && !isTrialExpired(i);
+
   const byTab = items.filter((i) => {
     if (tab === "todas") return true;
     if (tab === "ativas") return i.subscription_status === "ativa";
+    if (tab === "trial") return isTrialActive(i);
+    if (tab === "trial_expirado") return isTrialExpired(i);
     if (tab === "aguardando") return i.subscription_status === "aguardando_pagamento";
     if (tab === "atrasadas") return ["atrasada","suspensa"].includes(i.subscription_status);
     if (tab === "canceladas") return i.subscription_status === "cancelada";
@@ -144,6 +156,8 @@ export default function CompaniesPanel() {
   const counts = {
     todas: items.length,
     ativas: items.filter(i => i.subscription_status === "ativa").length,
+    trial: items.filter(isTrialActive).length,
+    trial_expirado: items.filter(isTrialExpired).length,
     aguardando: items.filter(i => i.subscription_status === "aguardando_pagamento").length,
     atrasadas: items.filter(i => ["atrasada","suspensa"].includes(i.subscription_status)).length,
     canceladas: items.filter(i => i.subscription_status === "cancelada").length,
@@ -162,9 +176,11 @@ export default function CompaniesPanel() {
         {/* Filtros */}
         <div className="surface-card rounded-xl p-4">
           <Tabs value={tab} onValueChange={setTab} className="mb-4">
-            <TabsList className="grid grid-cols-5 w-full sm:w-auto sm:inline-grid">
+            <TabsList className="grid grid-cols-7 w-full sm:w-auto sm:inline-grid">
               <TabsTrigger value="todas">Todas · {counts.todas}</TabsTrigger>
               <TabsTrigger value="ativas">Ativas · {counts.ativas}</TabsTrigger>
+              <TabsTrigger value="trial">Trial · {counts.trial}</TabsTrigger>
+              <TabsTrigger value="trial_expirado">Trial expirado · {counts.trial_expirado}</TabsTrigger>
               <TabsTrigger value="aguardando">Aguardando · {counts.aguardando}</TabsTrigger>
               <TabsTrigger value="atrasadas">Atrasadas · {counts.atrasadas}</TabsTrigger>
               <TabsTrigger value="canceladas">Canceladas · {counts.canceladas}</TabsTrigger>
@@ -237,9 +253,14 @@ export default function CompaniesPanel() {
                         </td>
                         <td className="px-4 py-3 text-xs">{i.plan_name}</td>
                         <td className="px-4 py-3">
-                          <Badge className={`border ${statusTone[i.subscription_status] ?? ""}`}>
-                            {statusLabel[i.subscription_status] ?? i.subscription_status}
-                          </Badge>
+                          {(() => {
+                            const eff = isTrialExpired(i) ? "trial_expirado" : i.subscription_status;
+                            return (
+                              <Badge className={`border ${statusTone[eff] ?? ""}`}>
+                                {statusLabel[eff] ?? eff}
+                              </Badge>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           <div className={overLimit ? "text-destructive font-medium" : ""}>
@@ -291,9 +312,14 @@ export default function CompaniesPanel() {
                             </td>
                             <td className="px-4 py-2.5 text-xs">{ch.plan_name}</td>
                             <td className="px-4 py-2.5">
-                              <Badge className={`border ${statusTone[ch.subscription_status] ?? ""}`}>
-                                {statusLabel[ch.subscription_status] ?? ch.subscription_status}
-                              </Badge>
+                              {(() => {
+                                const eff = isTrialExpired(ch) ? "trial_expirado" : ch.subscription_status;
+                                return (
+                                  <Badge className={`border ${statusTone[eff] ?? ""}`}>
+                                    {statusLabel[eff] ?? eff}
+                                  </Badge>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-2.5 text-xs">
                               <div className={chOver ? "text-destructive font-medium" : ""}>
