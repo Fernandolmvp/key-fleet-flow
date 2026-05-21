@@ -23,20 +23,23 @@ const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov"
 const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function Dashboard() {
-  const { currentCompanyId } = useAuth();
+  const { currentCompanyId, companies } = useAuth();
+  const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
   const [counts, setCounts] = useState<Counts>(defaultCounts);
   const [loading, setLoading] = useState(true);
   const [consumo, setConsumo] = useState<{ mes: string; custo: number; km: number }[]>([]);
   const [ranking, setRanking] = useState<{ placa: string; kmL: number }[]>([]);
 
   useEffect(() => {
+    // Reset imediato a cada troca de empresa — nunca mostrar dados da empresa anterior
+    setCounts(defaultCounts);
+    setConsumo([]);
+    setRanking([]);
     if (!currentCompanyId) {
-      setCounts(defaultCounts);
-      setConsumo([]);
-      setRanking([]);
       setLoading(false);
       return;
     }
+    const scopedCompanyId = currentCompanyId; // captura para evitar race
     (async () => {
       setLoading(true);
       // Últimos 12 meses para gráfico de custo
@@ -45,19 +48,22 @@ export default function Dashboard() {
       since.setDate(1); since.setHours(0,0,0,0);
 
       const [{ data: vehicles }, { data: drivers }, { data: documents }, { data: fuel }] = await Promise.all([
-        supabase.from("vehicles").select("id,plate,status").eq("company_id", currentCompanyId),
-        supabase.from("drivers").select("cnh_expires_at").eq("company_id", currentCompanyId),
-        supabase.from("documents").select("status").eq("company_id", currentCompanyId),
+        supabase.from("vehicles").select("id,plate,status,company_id").eq("company_id", scopedCompanyId),
+        supabase.from("drivers").select("cnh_expires_at,company_id").eq("company_id", scopedCompanyId),
+        supabase.from("documents").select("status,company_id").eq("company_id", scopedCompanyId),
         supabase
           .from("fuel_records")
-          .select("vehicle_id, fueled_at, total_value, km_driven, km_per_liter")
-          .eq("company_id", currentCompanyId)
+          .select("vehicle_id, fueled_at, total_value, km_driven, km_per_liter, company_id")
+          .eq("company_id", scopedCompanyId)
           .gte("fueled_at", since.toISOString()),
       ]);
-      const vs = vehicles ?? [];
-      const ds = drivers ?? [];
-      const docs = documents ?? [];
-      const fs = fuel ?? [];
+      // Defesa em profundidade: descarta qualquer linha que não pertença à empresa atual
+      const vs = (vehicles ?? []).filter((v: any) => v.company_id === scopedCompanyId);
+      const ds = (drivers ?? []).filter((d: any) => d.company_id === scopedCompanyId);
+      const docs = (documents ?? []).filter((d: any) => d.company_id === scopedCompanyId);
+      const fs = (fuel ?? []).filter((f: any) => f.company_id === scopedCompanyId);
+      // Se a empresa atual mudou enquanto buscávamos, descarta o resultado
+      if (scopedCompanyId !== currentCompanyId) return;
       const in30 = new Date(); in30.setDate(in30.getDate() + 30);
 
       // Custo /km e consumo médio reais
@@ -126,7 +132,10 @@ export default function Dashboard() {
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="font-display text-3xl font-bold">Dashboard executivo</h1>
-        <p className="text-muted-foreground">Visão consolidada da operação · {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+        <p className="text-muted-foreground">
+          {currentCompany ? <><span className="text-foreground font-medium">{currentCompany.name}</span> · </> : null}
+          Visão consolidada da operação · {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
