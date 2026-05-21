@@ -124,7 +124,7 @@ export default function Dashboard() {
     setGuideOverride("hide");
     setIsPersistingGuide(true);
 
-    const { error } = await supabase.rpc("set_company_onboarding_dismissed", {
+    const { error } = await supabase.rpc("set_company_onboarding_dismissed" as any, {
       p_company_id: currentCompanyId,
       p_dismissed: true,
     });
@@ -144,7 +144,7 @@ export default function Dashboard() {
     if (!currentCompanyId || !data.onboarding_dismissed_at || isPersistingGuide) return;
 
     setIsPersistingGuide(true);
-    const { error } = await supabase.rpc("set_company_onboarding_dismissed", {
+    const { error } = await supabase.rpc("set_company_onboarding_dismissed" as any, {
       p_company_id: currentCompanyId,
       p_dismissed: false,
     });
