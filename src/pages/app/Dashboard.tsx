@@ -94,27 +94,25 @@ export default function Dashboard() {
 
 function WelcomeMode({ greeting, firstName, company }: { greeting: string; firstName: string; company?: string | null }) {
   const { currentCompanyId } = useAuth();
-  const [steps, setSteps] = useState({ vehicle: false, driver: false, link: false, policy: false, team: false });
+  const [steps, setSteps] = useState({ vehicle: false, driver: false, link: false, policy: false });
   const [loadingSteps, setLoadingSteps] = useState(true);
 
   useEffect(() => {
     if (!currentCompanyId) return;
     (async () => {
       setLoadingSteps(true);
-      const [v, d, link, p, t] = await Promise.all([
+      const [v, d, link, p] = await Promise.all([
         supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
         supabase.from("drivers").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
         supabase.from("drivers").select("id", { count: "exact", head: true })
           .eq("company_id", currentCompanyId).eq("has_assigned_vehicle", true),
         supabase.from("insurance_policies").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
-        supabase.from("company_members").select("user_id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
       ]);
       setSteps({
         vehicle: (v.count ?? 0) > 0,
         driver: (d.count ?? 0) > 0,
         link: (link.count ?? 0) > 0,
         policy: (p.count ?? 0) > 0,
-        team: (t.count ?? 0) > 1,
       });
       setLoadingSteps(false);
     })();
@@ -125,7 +123,6 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
     { key: "driver", icon: Users, title: "Cadastrar motorista", desc: "Crie o cadastro do primeiro motorista.", to: "/app/drivers" },
     { key: "link", icon: Link2, title: "Vincular motorista ao veículo", desc: "Defina quem dirige cada veículo.", to: "/app/vehicles" },
     { key: "policy", icon: Shield, title: "Cadastrar apólice", desc: "Importe o PDF — a IA preenche tudo.", to: "/app/insurance" },
-    { key: "team", icon: UserPlus, title: "Convidar equipe", desc: "Adicione gestores e colaboradores.", to: "/app/configuracoes" },
   ] as const;
 
   const done = Object.values(steps).filter(Boolean).length;
