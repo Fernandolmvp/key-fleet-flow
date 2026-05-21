@@ -1,239 +1,480 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
-  Truck, Users, Wrench, Fuel, AlertTriangle, FileWarning, Activity, Gauge
+  Truck, Users, Wrench, Fuel, AlertTriangle, FileWarning,
+  ArrowRight, ArrowUpRight, ArrowDownRight, CheckCircle2, Circle,
+  Shield, UserPlus, Link2, Calendar, Receipt, Activity, TrendingUp,
+  CircleDollarSign, FileText, ChevronRight, Sparkles
 } from "lucide-react";
-import {
-  ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar
-} from "recharts";
 
-interface Counts {
-  total: number; ativo: number; manutencao: number; parado: number;
-  drivers: number; cnhVencendo: number;
-  docsVencidos: number; docsVencendo: number;
-  custoPorKm: number | null;
-  consumoMedio: number | null;
-}
+type Alert = { kind: string; severity: string; title: string; subtitle: string; date: string; link: string };
+type TopVehicle = { vehicle_id: string; plate: string; model: string; total: number };
+type Upcoming = { kind: string; date: string; title: string; amount: number | null; link: string };
+type Recent = { kind: string; date: string; title: string; link: string };
 
-const defaultCounts: Counts = { total: 0, ativo: 0, manutencao: 0, parado: 0, drivers: 0, cnhVencendo: 0, docsVencidos: 0, docsVencendo: 0, custoPorKm: null, consumoMedio: null };
+type Summary = {
+  company_id: string;
+  mode: "new" | "active";
+  vehicles: { total: number; active: number; maintenance: number; parado: number };
+  drivers: { total: number; available: number };
+  trips_running: number;
+  month: {
+    total: number; prev_total: number; km: number;
+    breakdown: { fuel: number; maintenance: number; expenses: number; fines: number; trip_expenses: number };
+  };
+  alerts: Alert[];
+  top_vehicles: TopVehicle[];
+  upcoming: Upcoming[];
+  recent: Recent[];
+};
 
-const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtBRL = (n: number) =>
+  (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const fmtBRLp = (n: number) =>
+  (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtDate = (s: string) => {
+  try { return new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }); }
+  catch { return s; }
+};
 
 export default function Dashboard() {
-  const { currentCompanyId, companies } = useAuth();
+  const { user, currentCompanyId, companies } = useAuth();
   const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
-  const [counts, setCounts] = useState<Counts>(defaultCounts);
+  const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [consumo, setConsumo] = useState<{ mes: string; custo: number; km: number }[]>([]);
-  const [ranking, setRanking] = useState<{ placa: string; kmL: number }[]>([]);
 
   useEffect(() => {
-    // Reset imediato a cada troca de empresa — nunca mostrar dados da empresa anterior
-    setCounts(defaultCounts);
-    setConsumo([]);
-    setRanking([]);
-    if (!currentCompanyId) {
-      setLoading(false);
-      return;
-    }
-    const scopedCompanyId = currentCompanyId; // captura para evitar race
+    setData(null);
+    if (!currentCompanyId) { setLoading(false); return; }
+    const scoped = currentCompanyId;
     (async () => {
       setLoading(true);
-      // Últimos 12 meses para gráfico de custo
-      const since = new Date();
-      since.setMonth(since.getMonth() - 11);
-      since.setDate(1); since.setHours(0,0,0,0);
-
-      const [{ data: vehicles }, { data: drivers }, { data: documents }, { data: fuel }] = await Promise.all([
-        supabase.from("vehicles").select("id,plate,status,company_id").eq("company_id", scopedCompanyId),
-        supabase.from("drivers").select("cnh_expires_at,company_id").eq("company_id", scopedCompanyId),
-        supabase.from("documents").select("status,company_id").eq("company_id", scopedCompanyId),
-        supabase
-          .from("fuel_records")
-          .select("vehicle_id, fueled_at, total_value, km_driven, km_per_liter, company_id")
-          .eq("company_id", scopedCompanyId)
-          .gte("fueled_at", since.toISOString()),
-      ]);
-      // Defesa em profundidade: descarta qualquer linha que não pertença à empresa atual
-      const vs = (vehicles ?? []).filter((v: any) => v.company_id === scopedCompanyId);
-      const ds = (drivers ?? []).filter((d: any) => d.company_id === scopedCompanyId);
-      const docs = (documents ?? []).filter((d: any) => d.company_id === scopedCompanyId);
-      const fs = (fuel ?? []).filter((f: any) => f.company_id === scopedCompanyId);
-      // Se a empresa atual mudou enquanto buscávamos, descarta o resultado
-      if (scopedCompanyId !== currentCompanyId) return;
-      const in30 = new Date(); in30.setDate(in30.getDate() + 30);
-
-      // Custo /km e consumo médio reais
-      let totalCusto = 0, totalKm = 0, somaKmL = 0, nKmL = 0;
-      for (const r of fs as any[]) {
-        if (r.total_value) totalCusto += Number(r.total_value);
-        if (r.km_driven && r.km_driven > 0) totalKm += Number(r.km_driven);
-        if (r.km_per_liter && r.km_per_liter > 0) { somaKmL += Number(r.km_per_liter); nKmL++; }
+      const { data: res, error } = await supabase.rpc("dashboard_get_summary", { p_company_id: scoped });
+      if (scoped !== currentCompanyId) return;
+      if (error) {
+        console.error("[dashboard]", error);
+        setData(null);
+      } else if (res && (res as any).company_id === scoped) {
+        setData(res as unknown as Summary);
       }
-      const custoPorKm = totalKm > 0 ? totalCusto / totalKm : null;
-      const consumoMedio = nKmL > 0 ? somaKmL / nKmL : null;
-
-      // Série mensal de custo
-      const buckets = new Map<string, number>();
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(since); d.setMonth(since.getMonth() + i);
-        buckets.set(`${d.getFullYear()}-${d.getMonth()}`, 0);
-      }
-      for (const r of fs as any[]) {
-        const d = new Date(r.fueled_at);
-        const key = `${d.getFullYear()}-${d.getMonth()}`;
-        if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + Number(r.total_value || 0));
-      }
-      const serie = Array.from(buckets.entries()).map(([k, v]) => {
-        const [, m] = k.split("-").map(Number);
-        return { mes: MESES[m], custo: Math.round(v), km: 0 };
-      });
-      setConsumo(serie);
-
-      // Ranking km/L por veículo
-      const porVeic = new Map<string, { soma: number; n: number }>();
-      for (const r of fs as any[]) {
-        if (!r.vehicle_id || !r.km_per_liter || r.km_per_liter <= 0) continue;
-        const cur = porVeic.get(r.vehicle_id) ?? { soma: 0, n: 0 };
-        cur.soma += Number(r.km_per_liter); cur.n++;
-        porVeic.set(r.vehicle_id, cur);
-      }
-      const placas = new Map<string, string>();
-      for (const v of vs as any[]) placas.set(v.id, v.plate);
-      const rk = Array.from(porVeic.entries())
-        .map(([id, x]) => ({ placa: placas.get(id) || "—", kmL: +(x.soma / x.n).toFixed(1) }))
-        .sort((a, b) => b.kmL - a.kmL)
-        .slice(0, 6);
-      setRanking(rk);
-
-      setCounts({
-        total: vs.length,
-        ativo: vs.filter((v: any) => v.status === "ativo").length,
-        manutencao: vs.filter((v: any) => v.status === "manutencao").length,
-        parado: vs.filter((v: any) => v.status === "parado").length,
-        drivers: ds.length,
-        cnhVencendo: ds.filter((d: any) => d.cnh_expires_at && new Date(d.cnh_expires_at) <= in30).length,
-        docsVencidos: docs.filter((d: any) => d.status === "vencido").length,
-        docsVencendo: docs.filter((d: any) => d.status === "vencendo").length,
-        custoPorKm,
-        consumoMedio,
-      });
       setLoading(false);
     })();
   }, [currentCompanyId]);
 
-  const temCusto = consumo.some((c) => c.custo > 0);
-  const temRanking = ranking.length > 0;
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+  }, []);
+  const firstName =
+    (user?.user_metadata as any)?.full_name?.split(" ")?.[0]
+    ?? user?.email?.split("@")[0]
+    ?? "gestor";
+
+  if (loading) return <DashboardSkeleton />;
+  if (!currentCompanyId) {
+    return <div className="p-6 text-muted-foreground">Selecione uma empresa para visualizar o dashboard.</div>;
+  }
+  if (!data) {
+    return <div className="p-6 text-muted-foreground">Não foi possível carregar os dados.</div>;
+  }
+
+  return data.mode === "new"
+    ? <NewCompanyMode data={data} greeting={greeting} firstName={firstName} company={currentCompany?.name} />
+    : <ActiveCompanyMode data={data} greeting={greeting} firstName={firstName} company={currentCompany?.name} />;
+}
+
+/* ---------- NEW COMPANY MODE ---------- */
+
+function NewCompanyMode({
+  data, greeting, firstName, company,
+}: { data: Summary; greeting: string; firstName: string; company?: string | null }) {
+  const { currentCompanyId } = useAuth();
+  const [steps, setSteps] = useState({
+    vehicle: false, driver: false, link: false, policy: false, team: false,
+  });
+  const [loadingSteps, setLoadingSteps] = useState(true);
+
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    (async () => {
+      setLoadingSteps(true);
+      const [v, d, link, p, t] = await Promise.all([
+        supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
+        supabase.from("drivers").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
+        supabase.from("drivers").select("id", { count: "exact", head: true })
+          .eq("company_id", currentCompanyId).eq("has_assigned_vehicle", true),
+        supabase.from("insurance_policies").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
+        supabase.from("company_members").select("user_id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
+      ]);
+      setSteps({
+        vehicle: (v.count ?? 0) > 0,
+        driver: (d.count ?? 0) > 0,
+        link: (link.count ?? 0) > 0,
+        policy: (p.count ?? 0) > 0,
+        team: (t.count ?? 0) > 1,
+      });
+      setLoadingSteps(false);
+    })();
+  }, [currentCompanyId]);
+
+  const items = [
+    { key: "vehicle", icon: Truck, title: "Cadastrar primeiro veículo", desc: "Comece adicionando um carro, caminhão ou moto da frota.", to: "/app/vehicles", cta: "Cadastrar veículo" },
+    { key: "driver", icon: Users, title: "Cadastrar primeiro motorista", desc: "Adicione um motorista para vincular aos veículos.", to: "/app/drivers", cta: "Cadastrar motorista" },
+    { key: "link", icon: Link2, title: "Vincular motorista ao veículo", desc: "Defina quem dirige cada veículo da frota.", to: "/app/vehicles", cta: "Abrir veículos" },
+    { key: "policy", icon: Shield, title: "Cadastrar apólice de seguro", desc: "Importe a apólice (PDF) e a IA preenche tudo.", to: "/app/insurance", cta: "Adicionar apólice" },
+    { key: "team", icon: UserPlus, title: "Convidar equipe (opcional)", desc: "Adicione gestores e colaboradores ao sistema.", to: "/app/configuracoes", cta: "Convidar pessoa" },
+  ] as const;
+
+  const done = Object.values(steps).filter(Boolean).length;
+  const total = items.length;
+  const pct = Math.round((done / total) * 100);
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="font-display text-3xl font-bold">Dashboard executivo</h1>
+    <div className="space-y-6 animate-fade-in pb-10">
+      <header className="space-y-1">
+        <div className="flex items-center gap-2 text-primary text-sm font-medium">
+          <Sparkles className="h-4 w-4" /> Vamos colocar sua frota no ar
+        </div>
+        <h1 className="font-display text-3xl md:text-4xl font-bold">
+          {greeting}, <span className="text-primary">{firstName}</span>!
+        </h1>
         <p className="text-muted-foreground">
-          {currentCompany ? <><span className="text-foreground font-medium">{currentCompany.name}</span> · </> : null}
-          Visão consolidada da operação · {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+          {company ? <><span className="text-foreground font-medium">{company}</span> · </> : null}
+          Em poucos minutos você terá sua operação rodando. Siga os próximos passos.
+        </p>
+      </header>
+
+      <div className="surface-card rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Progresso da configuração</p>
+            <p className="font-display text-2xl font-bold mt-1">{done} de {total} passos</p>
+          </div>
+          <span className="text-sm font-mono text-muted-foreground">{pct}%</span>
+        </div>
+        <Progress value={pct} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {items.map((it) => {
+          const Icon = it.icon;
+          const ok = (steps as any)[it.key] && !loadingSteps;
+          return (
+            <Link
+              key={it.key}
+              to={it.to}
+              className={cn(
+                "surface-card rounded-xl p-4 flex gap-4 items-start transition-colors hover:border-primary/50 min-h-[112px]",
+                ok && "opacity-70"
+              )}
+            >
+              <div className={cn(
+                "h-11 w-11 rounded-lg grid place-items-center shrink-0",
+                ok ? "bg-success/15 text-success" : "bg-primary/10 text-primary"
+              )}>
+                {ok ? <CheckCircle2 className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className={cn("font-display font-semibold leading-tight", ok && "line-through")}>{it.title}</h3>
+                <p className="text-xs text-muted-foreground mt-1">{it.desc}</p>
+                <div className="mt-3 inline-flex items-center text-xs font-medium text-primary">
+                  {ok ? "Concluído" : it.cta} <ArrowRight className="h-3 w-3 ml-1" />
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="surface-card rounded-xl p-5">
+        <h3 className="font-display font-semibold mb-1">Dica</h3>
+        <p className="text-sm text-muted-foreground">
+          Assim que você cadastrar <strong>3 veículos</strong> ou o <strong>primeiro abastecimento</strong>,
+          o painel automaticamente mostrará seus indicadores de custo, alertas e operação.
         </p>
       </div>
+    </div>
+  );
+}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Veículos ativos" value={loading ? "—" : counts.ativo} icon={Truck} tone="success" hint={`${counts.total} no total`} />
-        <KpiCard label="Em manutenção" value={loading ? "—" : counts.manutencao} icon={Wrench} tone="warning" />
-        <KpiCard label="Veículos parados" value={loading ? "—" : counts.parado} icon={Activity} tone="destructive" />
-        <KpiCard label="Motoristas" value={loading ? "—" : counts.drivers} icon={Users} tone="primary" hint={`${counts.cnhVencendo} c/ CNH vencendo`} />
-      </div>
+/* ---------- ACTIVE COMPANY MODE ---------- */
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          label="Custo médio /km"
-          value={loading ? "—" : counts.custoPorKm != null ? fmtBRL(counts.custoPorKm) : "—"}
-          icon={Gauge}
-          hint={counts.custoPorKm == null ? "Sem abastecimentos registrados" : "Últimos 12 meses"}
-        />
-        <KpiCard
-          label="Consumo médio"
-          value={loading ? "—" : counts.consumoMedio != null ? `${counts.consumoMedio.toFixed(1)} km/L` : "—"}
-          icon={Fuel}
-          tone={counts.consumoMedio != null ? "success" : undefined}
-          hint={counts.consumoMedio == null ? "Sem abastecimentos registrados" : "Últimos 12 meses"}
-        />
-        <KpiCard label="Alertas críticos" value={counts.cnhVencendo} icon={AlertTriangle} tone="warning" hint="CNH vencendo em 30 dias" />
-          <KpiCard
-            label="Documentos vencendo"
-            value={loading ? "—" : counts.docsVencendo + counts.docsVencidos}
-            icon={FileWarning}
-            tone={counts.docsVencidos > 0 ? "destructive" : counts.docsVencendo > 0 ? "warning" : undefined}
-            hint={`${counts.docsVencidos} vencidos · ${counts.docsVencendo} a vencer`}
-          />
-      </div>
+function ActiveCompanyMode({
+  data, greeting, firstName, company,
+}: { data: Summary; greeting: string; firstName: string; company?: string | null }) {
+  const { month, vehicles, drivers, trips_running, alerts, top_vehicles, upcoming, recent } = data;
+  const variation = month.prev_total > 0 ? ((month.total - month.prev_total) / month.prev_total) * 100 : null;
+  const variationUp = (variation ?? 0) > 0;
+  const costPerKm = month.km > 0 ? month.total / month.km : null;
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="surface-card rounded-xl p-6 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold">Custo da frota — últimos 12 meses</h3>
-            <span className="text-xs font-mono text-muted-foreground">R$</span>
+  const breakdownItems = [
+    { key: "fuel", label: "Combustível", value: month.breakdown.fuel, color: "bg-primary" },
+    { key: "maintenance", label: "Manutenção", value: month.breakdown.maintenance, color: "bg-warning" },
+    { key: "expenses", label: "Despesas", value: month.breakdown.expenses, color: "bg-info" },
+    { key: "fines", label: "Multas", value: month.breakdown.fines, color: "bg-destructive" },
+    { key: "trip_expenses", label: "Viagens", value: month.breakdown.trip_expenses, color: "bg-success" },
+  ].filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+  const breakdownMax = breakdownItems.reduce((m, x) => Math.max(m, x.value), 0);
+  const topMax = top_vehicles.reduce((m, x) => Math.max(m, Number(x.total)), 0);
+  const upcomingTotal = upcoming.reduce((s, x) => s + Number(x.amount || 0), 0);
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-10">
+      <header>
+        <h1 className="font-display text-2xl md:text-3xl font-bold">
+          {greeting}, <span className="text-primary">{firstName}</span>
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {company ? <><span className="text-foreground font-medium">{company}</span> · </> : null}
+          Visão consolidada · {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+        </p>
+      </header>
+
+      {/* BLOCO 1 - alertas */}
+      {alerts.length > 0 && (
+        <section className="rounded-xl border border-warning/40 bg-warning/5 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <h2 className="font-display font-semibold text-warning">Precisa de atenção</h2>
+            <span className="text-xs font-mono text-muted-foreground ml-auto">{alerts.length} itens</span>
           </div>
-          <div className="h-64">
-            {temCusto ? <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={consumo}>
-                <defs>
-                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(190 100% 50%)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="hsl(190 100% 50%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 30% 18%)" />
-                <XAxis dataKey="mes" stroke="hsl(215 15% 65%)" fontSize={12} />
-                <YAxis stroke="hsl(215 15% 65%)" fontSize={12} />
-                <Tooltip contentStyle={{ background: "hsl(215 38% 11%)", border: "1px solid hsl(215 30% 18%)", borderRadius: 8 }} />
-                <Area type="monotone" dataKey="custo" stroke="hsl(190 100% 50%)" strokeWidth={2} fill="url(#g1)" />
-              </AreaChart>
-            </ResponsiveContainer> : (
-              <div className="h-full grid place-items-center text-sm text-muted-foreground">
-                Sem abastecimentos registrados nesta empresa ainda.
-              </div>
-            )}
-          </div>
+          <ul className="space-y-1">
+            {alerts.slice(0, 6).map((a, i) => (
+              <li key={i}>
+                <Link
+                  to={a.link}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-warning/10 min-h-[44px]"
+                >
+                  <span className={cn(
+                    "h-2 w-2 rounded-full shrink-0",
+                    a.severity === "high" ? "bg-destructive" : "bg-warning"
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{a.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{a.subtitle}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* BLOCO 2 - custos */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-display text-lg font-semibold">Quanto você gastou este mês</h2>
+          <p className="text-xs text-muted-foreground">
+            {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+          </p>
         </div>
 
-        <div className="surface-card rounded-xl p-6">
-          <h3 className="font-display font-semibold mb-4">Ranking eficiência (km/L)</h3>
-          <div className="h-64">
-            {temRanking ? <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ranking} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 30% 18%)" />
-                <XAxis type="number" stroke="hsl(215 15% 65%)" fontSize={12} />
-                <YAxis type="category" dataKey="placa" stroke="hsl(215 15% 65%)" fontSize={11} width={70} />
-                <Tooltip contentStyle={{ background: "hsl(215 38% 11%)", border: "1px solid hsl(215 30% 18%)", borderRadius: 8 }} />
-                <Bar dataKey="kmL" fill="hsl(190 100% 50%)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer> : (
-              <div className="h-full grid place-items-center text-sm text-muted-foreground text-center px-4">
-                Ainda não há dados de consumo por veículo.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="surface-card rounded-xl p-6">
-        <h3 className="font-display font-semibold mb-4">Roadmap dos módulos</h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-          {[
-            { l: "Veículos", s: "ativo" }, { l: "Motoristas", s: "ativo" },
-            { l: "Abastecimentos", s: "soon" }, { l: "Manutenção", s: "soon" },
-            { l: "Pneus", s: "soon" }, { l: "Documentos", s: "soon" },
-            { l: "Multas", s: "soon" }, { l: "Checklist", s: "soon" },
-          ].map((m) => (
-            <div key={m.l} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
-              <span>{m.l}</span>
-              <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${m.s === "ativo" ? "bg-success/20 text-success" : "bg-muted/50 text-muted-foreground"}`}>{m.s === "ativo" ? "live" : "fase 2"}</span>
+        <div className="grid gap-3 grid-cols-2">
+          <div className="surface-card rounded-xl p-4 col-span-2 sm:col-span-1">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wider">
+              <CircleDollarSign className="h-4 w-4" /> Gasto total
             </div>
-          ))}
+            <p className="font-display text-3xl font-bold mt-2">{fmtBRL(month.total)}</p>
+            {variation != null ? (
+              <p className={cn(
+                "text-xs mt-1 flex items-center gap-1",
+                variationUp ? "text-destructive" : "text-success"
+              )}>
+                {variationUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {Math.abs(variation).toFixed(1)}% vs mês anterior
+              </p>
+            ) : (
+              <p className="text-xs mt-1 text-muted-foreground">Sem comparativo do mês anterior</p>
+            )}
+          </div>
+
+          <KpiCard
+            label="Custo /km"
+            value={costPerKm != null ? fmtBRLp(costPerKm) : "—"}
+            icon={TrendingUp}
+            hint={costPerKm != null ? `${month.km.toLocaleString("pt-BR")} km no mês` : "Sem km registrado"}
+          />
+
+          <KpiCard
+            label="Mês anterior"
+            value={fmtBRL(month.prev_total)}
+            icon={Receipt}
+            tone="primary"
+            hint="Total gasto no mês passado"
+          />
         </div>
+
+        {/* breakdown */}
+        <div className="surface-card rounded-xl p-5">
+          <h3 className="font-display font-semibold mb-4">Onde está indo seu dinheiro</h3>
+          {breakdownItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum gasto registrado este mês.</p>
+          ) : (
+            <div className="space-y-3">
+              {breakdownItems.map((b) => {
+                const pct = breakdownMax > 0 ? (b.value / breakdownMax) * 100 : 0;
+                const share = month.total > 0 ? (b.value / month.total) * 100 : 0;
+                return (
+                  <div key={b.key}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{b.label}</span>
+                      <span className="font-mono text-muted-foreground">
+                        {fmtBRL(b.value)} <span className="text-xs">({share.toFixed(0)}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted/40 rounded-full overflow-hidden">
+                      <div className={cn("h-full rounded-full", b.color)} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* top vehicles */}
+        <div className="surface-card rounded-xl p-5">
+          <h3 className="font-display font-semibold mb-4">Top 3 veículos que mais custaram</h3>
+          {top_vehicles.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sem dados de custo por veículo este mês.</p>
+          ) : (
+            <ul className="space-y-3">
+              {top_vehicles.map((v) => {
+                const pct = topMax > 0 ? (Number(v.total) / topMax) * 100 : 0;
+                return (
+                  <li key={v.vehicle_id}>
+                    <Link
+                      to={`/app/vehicles/${v.vehicle_id}/historico`}
+                      className="block rounded-lg hover:bg-muted/30 px-2 py-2 min-h-[44px]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono font-bold tracking-wider">{v.plate}</p>
+                          <p className="text-xs text-muted-foreground truncate">{v.model.trim() || "—"}</p>
+                        </div>
+                        <p className="font-display font-semibold whitespace-nowrap">{fmtBRL(Number(v.total))}</p>
+                      </div>
+                      <div className="mt-2 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* BLOCO 3 - operação atual */}
+      <section>
+        <h2 className="font-display text-lg font-semibold mb-3">Operação agora</h2>
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <OpsTile to="/app/vehicles" icon={Truck} label="Veículos ativos" value={vehicles.active} hint={`de ${vehicles.total}`} tone="success" />
+          <OpsTile to="/app/maintenance" icon={Wrench} label="Em manutenção" value={vehicles.maintenance} tone="warning" />
+          <OpsTile to="/app/drivers" icon={Users} label="Motoristas disponíveis" value={drivers.available} hint={`de ${drivers.total}`} tone="primary" />
+          <OpsTile to="/app/viagens" icon={Activity} label="Viagens em andamento" value={trips_running} />
+        </div>
+      </section>
+
+      {/* BLOCO 4 - próximas saídas */}
+      <section className="surface-card rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-display text-lg font-semibold">Próximas saídas (30 dias)</h2>
+          {upcomingTotal > 0 && (
+            <span className="text-sm font-mono text-muted-foreground">~{fmtBRL(upcomingTotal)}</span>
+          )}
+        </div>
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nada com vencimento nos próximos 30 dias.</p>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {upcoming.slice(0, 8).map((u, i) => (
+              <li key={i}>
+                <Link to={u.link} className="flex items-center gap-3 py-2.5 min-h-[44px] hover:opacity-90">
+                  <div className="h-9 w-9 rounded-lg bg-muted/40 grid place-items-center shrink-0 text-muted-foreground">
+                    {u.kind === "maintenance" ? <Wrench className="h-4 w-4" />
+                      : u.kind === "fine" ? <AlertTriangle className="h-4 w-4" />
+                      : <FileText className="h-4 w-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{u.title}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDate(u.date)}</p>
+                  </div>
+                  {u.amount != null && u.amount > 0 && (
+                    <span className="font-mono text-sm whitespace-nowrap">{fmtBRL(Number(u.amount))}</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* BLOCO 5 - atividade recente */}
+      <section className="surface-card rounded-xl p-5">
+        <h2 className="font-display text-base font-semibold mb-3">Atividade recente</h2>
+        {recent.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma atividade registrada ainda.</p>
+        ) : (
+          <ul className="space-y-2">
+            {recent.map((r, i) => (
+              <li key={i}>
+                <Link to={r.link} className="flex items-center gap-3 text-sm py-1.5 hover:opacity-90">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  <span className="truncate flex-1">{r.title}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(r.date)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function OpsTile({
+  to, icon: Icon, label, value, hint, tone = "default",
+}: { to: string; icon: any; label: string; value: number; hint?: string; tone?: "default"|"primary"|"success"|"warning"|"destructive" }) {
+  const toneCls = {
+    default: "text-foreground",
+    primary: "text-primary",
+    success: "text-success",
+    warning: "text-warning",
+    destructive: "text-destructive",
+  }[tone];
+  return (
+    <Link to={to} className="surface-card rounded-xl p-4 hover:border-primary/50 transition-colors min-h-[112px] flex flex-col justify-between">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
+        <Icon className={cn("h-4 w-4", toneCls)} />
       </div>
+      <div>
+        <p className={cn("font-display text-3xl font-bold", toneCls)}>{value}</p>
+        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+      </div>
+    </Link>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <Skeleton className="h-10 w-72" />
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+      </div>
+      <Skeleton className="h-48" />
+      <Skeleton className="h-64" />
     </div>
   );
 }
