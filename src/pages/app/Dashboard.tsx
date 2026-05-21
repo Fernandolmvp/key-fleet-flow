@@ -100,18 +100,6 @@ export default function Dashboard() {
     (user?.user_metadata as any)?.full_name?.split(" ")?.[0]
     ?? user?.email?.split("@")[0] ?? "gestor";
 
-  if (!currentCompanyId) {
-    return <div className="p-6 text-muted-foreground">Selecione uma empresa para visualizar o dashboard.</div>;
-  }
-  if (isLoading || !data) return <DashboardSkeleton />;
-
-  const shouldShowWelcome =
-    guideOverride === "show"
-      ? true
-      : guideOverride === "hide"
-        ? false
-        : data.mode === "new" && !data.onboarding_dismissed_at;
-
   const handleGuideCompleted = useCallback(async () => {
     setGuideOverride("hide");
     await refetch();
@@ -141,7 +129,7 @@ export default function Dashboard() {
 
   const handleShowGuide = useCallback(async () => {
     setGuideOverride("show");
-    if (!currentCompanyId || !data.onboarding_dismissed_at || isPersistingGuide) return;
+    if (!currentCompanyId || !data?.onboarding_dismissed_at || isPersistingGuide) return;
 
     setIsPersistingGuide(true);
     const { error } = await supabase.rpc("set_company_onboarding_dismissed" as any, {
@@ -156,7 +144,19 @@ export default function Dashboard() {
     }
 
     setIsPersistingGuide(false);
-  }, [currentCompanyId, data.onboarding_dismissed_at, isPersistingGuide, refetch]);
+  }, [currentCompanyId, data?.onboarding_dismissed_at, isPersistingGuide, refetch]);
+
+  if (!currentCompanyId) {
+    return <div className="p-6 text-muted-foreground">Selecione uma empresa para visualizar o dashboard.</div>;
+  }
+  if (isLoading || !data) return <DashboardSkeleton />;
+
+  const shouldShowWelcome =
+    guideOverride === "show"
+      ? true
+      : guideOverride === "hide"
+        ? false
+        : data.mode === "new" && !data.onboarding_dismissed_at;
 
   return shouldShowWelcome
     ? (
