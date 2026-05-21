@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -23,10 +24,21 @@ type TopVehicle = { vehicle_id: string; plate: string; model: string; total: num
 type Upcoming = { kind: string; date: string; title: string; amount: number | null; link: string };
 type SeriesPoint = { month: string; total: number };
 type RankPoint = { vehicle_id: string; plate: string; km_l: number };
+type SetupState = {
+  vehicle: boolean;
+  driver: boolean;
+  link: boolean;
+  policy: boolean;
+  done: number;
+  total: number;
+  completed: boolean;
+};
 
 type Summary = {
   company_id: string;
+  onboarding_dismissed_at: string | null;
   mode: "new" | "active";
+  setup: SetupState;
   vehicles: { total: number; active: number; maintenance: number; parado: number };
   drivers: { total: number; active: number; cnh_expiring: number };
   trips_running: number;
@@ -57,11 +69,19 @@ const fmtDate = (s: string) => {
 export default function Dashboard() {
   const { user, currentCompanyId, companies } = useAuth();
   const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
+  const [guideOverride, setGuideOverride] = useState<"auto" | "show" | "hide">("auto");
+  const [isPersistingGuide, setIsPersistingGuide] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  useEffect(() => {
+    setGuideOverride("auto");
+    setIsPersistingGuide(false);
+  }, [currentCompanyId]);
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["dashboard-summary", currentCompanyId],
     enabled: !!currentCompanyId,
     staleTime: 2 * 60 * 1000,
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await supabase.rpc("dashboard_get_summary", { p_company_id: currentCompanyId! });
       if (error) throw error;
@@ -85,20 +105,116 @@ export default function Dashboard() {
   }
   if (isLoading || !data) return <DashboardSkeleton />;
 
-  return data.mode === "new"
-    ? <WelcomeMode greeting={greeting} firstName={firstName} company={currentCompany?.name} />
-    : <FullDashboard data={data} greeting={greeting} firstName={firstName} company={currentCompany?.name} />;
+  const shouldShowWelcome =
+    guideOverride === "show"
+      ? true
+      : guideOverride === "hide"
+        ? false
+        : data.mode === "new" && !data.onboarding_dismissed_at;
+
+  const handleGuideCompleted = useCallback(async () => {
+    setGuideOverride("hide");
+    await refetch();
+  }, [refetch]);
+
+  const handleDismissGuide = useCallback(async () => {
+    if (!currentCompanyId || isPersistingGuide) return;
+
+    const previousOverride = guideOverride;
+    setGuideOverride("hide");
+    setIsPersistingGuide(true);
+
+    const { error } = await supabase.rpc("set_company_onboarding_dismissed", {
+      p_company_id: currentCompanyId,
+      p_dismissed: true,
+    });
+
+    if (error) {
+      console.error("[dashboard] failed to dismiss onboarding", error);
+      setGuideOverride(previousOverride);
+    } else {
+      await refetch();
+    }
+
+    setIsPersistingGuide(false);
+  }, [currentCompanyId, guideOverride, isPersistingGuide, refetch]);
+
+  const handleShowGuide = useCallback(async () => {
+    setGuideOverride("show");
+    if (!currentCompanyId || !data.onboarding_dismissed_at || isPersistingGuide) return;
+
+    setIsPersistingGuide(true);
+    const { error } = await supabase.rpc("set_company_onboarding_dismissed", {
+      p_company_id: currentCompanyId,
+      p_dismissed: false,
+    });
+
+    if (error) {
+      console.error("[dashboard] failed to reopen onboarding", error);
+    } else {
+      await refetch();
+    }
+
+    setIsPersistingGuide(false);
+  }, [currentCompanyId, data.onboarding_dismissed_at, isPersistingGuide, refetch]);
+
+  return shouldShowWelcome
+    ? (
+        <WelcomeMode
+          greeting={greeting}
+          firstName={firstName}
+          company={currentCompany?.name}
+          setup={data.setup}
+          onCompleted={handleGuideCompleted}
+          onDismiss={handleDismissGuide}
+          isDismissing={isPersistingGuide}
+        />
+      )
+    : (
+        <FullDashboard
+          data={data}
+          greeting={greeting}
+          firstName={firstName}
+          company={currentCompany?.name}
+          onShowGuide={handleShowGuide}
+          isReopeningGuide={isPersistingGuide}
+        />
+      );
 }
 
 /* ===================== WELCOME (NEW COMPANY) ===================== */
 
-function WelcomeMode({ greeting, firstName, company }: { greeting: string; firstName: string; company?: string | null }) {
+function WelcomeMode({
+  greeting,
+  firstName,
+  company,
+  setup: initialSetup,
+  onCompleted,
+  onDismiss,
+  isDismissing,
+}: {
+  greeting: string;
+  firstName: string;
+  company?: string | null;
+  setup: SetupState;
+  onCompleted: () => Promise<void>;
+  onDismiss: () => Promise<void>;
+  isDismissing: boolean;
+}) {
   const { currentCompanyId } = useAuth();
-  const [steps, setSteps] = useState({ vehicle: false, driver: false, link: false, policy: false });
-  const [loadingSteps, setLoadingSteps] = useState(true);
+  const [steps, setSteps] = useState<SetupState>(initialSetup);
+  const [loadingSteps, setLoadingSteps] = useState(false);
+  const lastCompletedRef = useRef(initialSetup.completed);
+
+  useEffect(() => {
+    setSteps(initialSetup);
+    lastCompletedRef.current = initialSetup.completed;
+  }, [currentCompanyId, initialSetup]);
 
   useEffect(() => {
     if (!currentCompanyId) return;
+    let active = true;
+
     (async () => {
       setLoadingSteps(true);
       const [v, d, link, p] = await Promise.all([
@@ -108,15 +224,38 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
           .eq("company_id", currentCompanyId).eq("has_assigned_vehicle", true),
         supabase.from("insurance_policies").select("id", { count: "exact", head: true }).eq("company_id", currentCompanyId),
       ]);
-      setSteps({
+
+      if (!active) return;
+
+      const nextSteps: SetupState = {
         vehicle: (v.count ?? 0) > 0,
         driver: (d.count ?? 0) > 0,
         link: (link.count ?? 0) > 0,
         policy: (p.count ?? 0) > 0,
-      });
+        done: 0,
+        total: 4,
+        completed: false,
+      };
+
+      nextSteps.done = [nextSteps.vehicle, nextSteps.driver, nextSteps.link, nextSteps.policy].filter(Boolean).length;
+      nextSteps.completed = nextSteps.done >= nextSteps.total;
+
+      setSteps(nextSteps);
       setLoadingSteps(false);
+
+      if (nextSteps.completed && !lastCompletedRef.current) {
+        lastCompletedRef.current = true;
+        await onCompleted();
+        return;
+      }
+
+      lastCompletedRef.current = nextSteps.completed;
     })();
-  }, [currentCompanyId]);
+
+    return () => {
+      active = false;
+    };
+  }, [currentCompanyId, onCompleted]);
 
   const items = [
     { key: "vehicle", icon: Truck, title: "Cadastrar veículo", desc: "Adicione o primeiro veículo da sua frota.", to: "/app/vehicles" },
@@ -125,8 +264,8 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
     { key: "policy", icon: Shield, title: "Cadastrar apólice", desc: "Importe o PDF — a IA preenche tudo.", to: "/app/insurance" },
   ] as const;
 
-  const done = Object.values(steps).filter(Boolean).length;
-  const pct = Math.round((done / items.length) * 100);
+  const done = steps.done;
+  const pct = Math.round((done / steps.total) * 100);
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
@@ -147,7 +286,7 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Progresso</p>
-            <p className="font-display text-2xl font-bold mt-1">{done} de {items.length} passos</p>
+            <p className="font-display text-2xl font-bold mt-1">{done} de {steps.total} passos</p>
           </div>
           <span className="text-sm font-mono text-muted-foreground">{pct}%</span>
         </div>
@@ -157,7 +296,7 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
       <div className="grid gap-3 sm:grid-cols-2 max-w-3xl mx-auto w-full">
         {items.map((it) => {
           const Icon = it.icon;
-          const ok = (steps as any)[it.key] && !loadingSteps;
+          const ok = steps[it.key] && !loadingSteps;
           return (
             <Link key={it.key} to={it.to}
               className={cn(
@@ -182,10 +321,22 @@ function WelcomeMode({ greeting, firstName, company }: { greeting: string; first
         })}
       </div>
 
-      <div className="text-center max-w-2xl mx-auto">
-        <Link to="/app/equipe" className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2">
-          Quer convidar alguém da sua equipe? Clique aqui
-        </Link>
+      <div className="text-center max-w-2xl mx-auto space-y-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => void onDismiss()}
+          disabled={isDismissing}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Não quero fazer agora
+        </Button>
+        <div>
+          <Link to="/app/equipe" className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2">
+            Quer convidar alguém da sua equipe? Clique aqui
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -202,8 +353,15 @@ const PIE_COLORS = [
 ];
 
 function FullDashboard({
-  data, greeting, firstName, company,
-}: { data: Summary; greeting: string; firstName: string; company?: string | null }) {
+  data, greeting, firstName, company, onShowGuide, isReopeningGuide,
+}: {
+  data: Summary;
+  greeting: string;
+  firstName: string;
+  company?: string | null;
+  onShowGuide: () => Promise<void>;
+  isReopeningGuide: boolean;
+}) {
   const { vehicles, drivers, counts, month, alerts, top_vehicles, upcoming, series_12m, ranking_km_l } = data;
 
   const fleetPctMaint = vehicles.total > 0 ? Math.round((vehicles.maintenance / vehicles.total) * 100) : 0;
@@ -254,12 +412,24 @@ function FullDashboard({
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="font-display text-3xl font-bold">Dashboard executivo</h1>
-        <p className="text-muted-foreground">
-          {company ? <><span className="text-foreground font-medium">{company}</span> · </> : null}
-          Visão consolidada da operação · {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-bold">Dashboard executivo</h1>
+          <p className="text-muted-foreground">
+            {company ? <><span className="text-foreground font-medium">{company}</span> · </> : null}
+            Visão consolidada da operação · {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          onClick={() => void onShowGuide()}
+          disabled={isReopeningGuide}
+          className="h-auto self-start px-0 text-xs sm:text-sm"
+        >
+          Ver guia inicial
+        </Button>
       </div>
 
       {/* LINHA 1 - operação */}
