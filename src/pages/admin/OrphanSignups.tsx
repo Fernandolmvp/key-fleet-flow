@@ -25,7 +25,7 @@ export default function OrphanSignups() {
   const [items, setItems] = useState<SignupRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [scope, setScope] = useState<"all" | "orphans" | "with_company">("all");
+  const [scope, setScope] = useState<"all" | "orphans" | "with_company">("orphans");
   const [search, setSearch] = useState("");
 
   const load = async () => {
@@ -99,9 +99,9 @@ export default function OrphanSignups() {
         <div className="flex items-center gap-3">
           <UserX className="h-6 w-6 text-warning" />
           <div>
-            <h1 className="text-2xl font-display font-bold">Cadastros de usuários</h1>
+            <h1 className="text-2xl font-display font-bold">Cadastros incompletos</h1>
             <p className="text-sm text-muted-foreground">
-              Todos os usuários que se cadastraram no FrotaOps — com ou sem empresa vinculada.
+              Usuários que criaram login mas ainda não vincularam empresa. Quem já tem empresa aparece em <strong>Empresas</strong>.
             </p>
           </div>
         </div>
