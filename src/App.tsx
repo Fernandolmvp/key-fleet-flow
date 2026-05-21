@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
 import Agendar from "./pages/Agendar";
+import AgendarCalendario from "./pages/AgendarCalendario";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import AppLayout from "./components/layout/AppLayout";
@@ -90,6 +91,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/agendar" element={<Agendar />} />
+            <Route path="/agendar/calendario" element={<AgendarCalendario />} />
             <Route path="/termos" element={<Termos />} />
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/login" element={<Login />} />
