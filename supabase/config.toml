@@ -47,3 +47,9 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.create-lead]
     verify_jwt = false
+  [functions.send-welcome-email]
+    verify_jwt = false
+  [functions.validate-first-access-token]
+    verify_jwt = false
+  [functions.set-first-access-password]
+    verify_jwt = false
