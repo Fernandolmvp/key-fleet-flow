@@ -68,6 +68,9 @@ Deno.serve(async (req) => {
     const manager = body.manager ?? {};
     const couponCode: string | null = body.coupon_code ? String(body.coupon_code).trim().toUpperCase() : null;
     const isExempt: boolean = !!body.is_exempt_from_trial;
+    // Modo padrão: enviar email de boas-vindas com link de primeiro acesso.
+    // Se send_welcome_email === false, mantém fluxo legado (senha temporária retornada).
+    const sendWelcomeEmail: boolean = body.send_welcome_email !== false;
 
     const name = String(company.name ?? "").trim();
     const cnpj = onlyDigits(company.cnpj);
@@ -81,7 +84,8 @@ Deno.serve(async (req) => {
     const { data: dup } = await admin.from("companies").select("id").eq("cnpj", cnpj).maybeSingle();
     if (dup) return json({ error: "Já existe empresa com este CNPJ" }, 409);
 
-    const tempPassword = genTempPassword(10);
+    // Em modo welcome email, geramos uma senha aleatória longa que o cliente nunca usa.
+    const tempPassword = sendWelcomeEmail ? genTempPassword(32) : genTempPassword(10);
     const { data: created, error: cuErr } = await admin.auth.admin.createUser({
       email: mgrEmail,
       password: tempPassword,
@@ -186,13 +190,69 @@ Deno.serve(async (req) => {
         manager_email: mgrEmail,
         is_exempt_from_trial: isExempt,
         coupon_applied: couponApplied,
+        mode: sendWelcomeEmail ? "welcome_email" : "temp_password",
       },
     });
+
+    // Fluxo welcome email: gera token e dispara envio.
+    if (sendWelcomeEmail) {
+      const tokenBytes = new Uint8Array(32);
+      crypto.getRandomValues(tokenBytes);
+      const token = btoa(String.fromCharCode(...tokenBytes))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      await admin.from("first_access_tokens").insert({
+        user_id: userId,
+        token,
+        expires_at: expiresAt,
+      });
+      const welcomeLink = `https://frotaops.com.br/primeiro-acesso?token=${encodeURIComponent(token)}`;
+
+      // Dispara envio do email (não bloqueia criação se falhar)
+      let emailSent = false;
+      let emailError: string | null = null;
+      try {
+        const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ email: mgrEmail, nome: mgrName, empresa: name, token }),
+        });
+        const j = await r.json().catch(() => ({}));
+        emailSent = r.ok && !!(j as any)?.ok;
+        if (!emailSent) emailError = (j as any)?.error || `HTTP ${r.status}`;
+      } catch (e) {
+        emailError = (e as Error).message;
+      }
+
+      await admin.from("audit_logs").insert({
+        company_id: companyId,
+        user_id: callerId,
+        table_name: "companies",
+        record_id: companyId,
+        action: "welcome_email_sent",
+        changes: { manager_email: mgrEmail, email_sent: emailSent, email_error: emailError },
+      });
+
+      return json({
+        success: true,
+        company_id: companyId,
+        manager_email: mgrEmail,
+        mode: "welcome_email",
+        email_sent: emailSent,
+        email_error: emailError,
+        welcome_link: welcomeLink,
+        coupon_applied: couponApplied,
+      });
+    }
 
     return json({
       success: true,
       company_id: companyId,
       manager_email: mgrEmail,
+      mode: "temp_password",
       temp_password: tempPassword,
       coupon_applied: couponApplied,
     });
