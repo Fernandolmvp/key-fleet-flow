@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +27,27 @@ export default function Login() {
   const [cpf, setCpf] = useState("");
   const [pwdMot, setPwdMot] = useState("");
 
+  // Rate limit no frontend: 5 tentativas falhas → bloqueio de 30s
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockSeconds, setLockSeconds] = useState(0);
+
+  useEffect(() => {
+    if (lockSeconds <= 0) return;
+    const t = setTimeout(() => setLockSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [lockSeconds]);
+
+  const registerFailure = () => {
+    setFailedAttempts((n) => {
+      const next = n + 1;
+      if (next >= 5) {
+        setLockSeconds(30);
+        return 0;
+      }
+      return next;
+    });
+  };
+
   // Reset senha motorista
   const [resetOpen, setResetOpen] = useState(false);
   const [resetStep, setResetStep] = useState<"cpf" | "sent">("cpf");
@@ -54,32 +75,60 @@ export default function Login() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockSeconds > 0) return;
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return toast.error(error.message);
-    toast.success("Bem-vindo de volta");
-    await routeAfterLogin();
-    setBusy(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error("[login-empresa]", error.message);
+        registerFailure();
+        toast.error("Email ou senha incorretos. Tente novamente ou clique em 'Esqueci minha senha'.");
+        return;
+      }
+      setFailedAttempts(0);
+      toast.success("Bem-vindo de volta");
+      await routeAfterLogin();
+    } catch (e: any) {
+      console.error("[login-empresa]", e);
+      registerFailure();
+      toast.error("Não foi possível entrar. Tente novamente em alguns instantes.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submitDriver = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockSeconds > 0) return;
     const cpfDigits = cpf.replace(/\D/g, "");
     if (cpfDigits.length !== 11) return toast.error("CPF inválido");
     if (!pwdMot) return toast.error("Informe a senha");
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "lookup-by-cpf", cpf: cpfDigits },
-    });
-    if (error || data?.error) {
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-onboarding", {
+        body: { action: "lookup-by-cpf", cpf: cpfDigits },
+      });
+      if (error || data?.error) {
+        registerFailure();
+        toast.error("CPF ou senha incorretos. Tente novamente.");
+        return;
+      }
+      const { error: sErr } = await supabase.auth.signInWithPassword({ email: data.email, password: pwdMot });
+      if (sErr) {
+        registerFailure();
+        toast.error("CPF ou senha incorretos. Tente novamente.");
+        return;
+      }
+      setFailedAttempts(0);
+      toast.success("Bem-vindo");
+      nav("/motorista");
+    } catch (e: any) {
+      console.error("[login-motorista]", e);
+      registerFailure();
+      toast.error("Não foi possível entrar. Tente novamente em alguns instantes.");
+    } finally {
       setBusy(false);
-      return toast.error(data?.error || error?.message || "Falha");
     }
-    const { error: sErr } = await supabase.auth.signInWithPassword({ email: data.email, password: pwdMot });
-    setBusy(false);
-    if (sErr) return toast.error("CPF ou senha inválidos");
-    toast.success("Bem-vindo");
-    nav("/motorista");
   };
 
   const openReset = () => {
@@ -94,18 +143,24 @@ export default function Login() {
     const d = resetCpf.replace(/\D/g, "");
     if (d.length !== 11) return toast.error("CPF inválido");
     setResetBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: {
-        action: "reset-password-send-email",
-        cpf: d,
-        redirect_to: `${window.location.origin}/reset-password`,
-      },
-    });
-    setResetBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
-    setResetMaskedEmail(data.masked_email || "");
-    setResetStep("sent");
-    toast.success("Email de redefinição enviado");
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-onboarding", {
+        body: {
+          action: "reset-password-send-email",
+          cpf: d,
+          redirect_to: `${window.location.origin}/reset-password`,
+        },
+      });
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || "Falha");
+        return;
+      }
+      setResetMaskedEmail(data.masked_email || "");
+      setResetStep("sent");
+      toast.success("Email de redefinição enviado");
+    } finally {
+      setResetBusy(false);
+    }
   };
 
   const openResetCompany = () => {
@@ -119,14 +174,16 @@ export default function Login() {
     const value = resetCoEmail.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return toast.error("Email inválido");
     setResetCoBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(value, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setResetCoBusy(false);
-    // Mensagem neutra (não revela existência da conta)
-    setResetCoSent(true);
-    if (error) console.warn("[reset-empresa]", error.message);
-    toast.success("Se o email existir, enviaremos instruções em alguns minutos");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(value, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setResetCoSent(true);
+      if (error) console.warn("[reset-empresa]", error.message);
+      toast.success("Se o email existir, enviaremos instruções em alguns minutos");
+    } finally {
+      setResetCoBusy(false);
+    }
   };
 
   return (
@@ -194,8 +251,8 @@ export default function Login() {
                   <Label htmlFor="pwd">Senha</Label>
                   <Input id="pwd" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
                 </div>
-                <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
+                <Button type="submit" disabled={busy || lockSeconds > 0} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : lockSeconds > 0 ? `Aguarde ${lockSeconds}s antes de tentar novamente` : "Entrar"}
                 </Button>
               </form>
               <button
@@ -220,8 +277,8 @@ export default function Login() {
                   <Label htmlFor="pwd-mot">Senha</Label>
                   <Input id="pwd-mot" type="password" inputMode="numeric" maxLength={6} required value={pwdMot} onChange={(e) => setPwdMot(e.target.value.replace(/\D/g, "").slice(0, 6))} />
                 </div>
-                <Button type="submit" disabled={busy} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar como motorista"}
+                <Button type="submit" disabled={busy || lockSeconds > 0} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow font-semibold h-11">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : lockSeconds > 0 ? `Aguarde ${lockSeconds}s antes de tentar novamente` : "Entrar como motorista"}
                 </Button>
               </form>
               <button
