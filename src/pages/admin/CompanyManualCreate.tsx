@@ -6,14 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Copy, Check, AlertTriangle, Building2 } from "lucide-react";
+import { Loader2, Copy, Check, AlertTriangle, Building2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { formatCnpj, isValidCnpj, onlyDigits } from "@/lib/document";
 
 type Result = {
   company_id: string;
   manager_email: string;
-  temp_password: string;
+  mode: "welcome_email" | "temp_password";
+  temp_password?: string;
+  welcome_link?: string;
+  email_sent?: boolean;
+  email_error?: string | null;
   coupon_applied: any;
 };
 
@@ -24,7 +28,7 @@ export default function CompanyManualCreate() {
   const [form, setForm] = useState({
     name: "", cnpj: "", phone: "", city: "", state: "",
     mgrName: "", mgrEmail: "", mgrPhone: "",
-    couponCode: "", isExempt: false,
+    couponCode: "", isExempt: false, useTempPassword: false,
   });
   const [couponPreview, setCouponPreview] = useState<any>(null);
   const [validating, setValidating] = useState(false);
@@ -91,6 +95,7 @@ export default function CompanyManualCreate() {
         },
         coupon_code: form.couponCode.trim() || null,
         is_exempt_from_trial: form.isExempt,
+        send_welcome_email: !form.useTempPassword,
       },
     });
     setSubmitting(false);
@@ -118,7 +123,10 @@ export default function CompanyManualCreate() {
   }
 
   if (result) {
-    const wa = `Olá! Sua conta no FrotaOps está pronta. Acesse https://frotaops.com.br com email ${result.manager_email} e senha temporária ${result.temp_password}. Recomendo trocar a senha no primeiro acesso em Perfil → Alterar senha.`;
+    const isWelcome = result.mode === "welcome_email";
+    const wa = isWelcome
+      ? `Olá! Sua conta no FrotaOps está pronta. Acesse o link abaixo (válido por 48h) para definir sua senha:\n${result.welcome_link}`
+      : `Olá! Sua conta no FrotaOps está pronta. Acesse https://frotaops.com.br com email ${result.manager_email} e senha temporária ${result.temp_password}. Recomendo trocar a senha no primeiro acesso em Perfil → Alterar senha.`;
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-4">
         <Card className="border-success bg-success/10">
@@ -128,10 +136,21 @@ export default function CompanyManualCreate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/30 text-sm">
-              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-              <span><strong>Atenção:</strong> a senha temporária NÃO será exibida novamente. Copie agora.</span>
-            </div>
+            {isWelcome ? (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-primary/10 border border-primary/30 text-sm">
+                <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                <span>
+                  {result.email_sent
+                    ? <>Email de boas-vindas enviado para <strong>{result.manager_email}</strong>. Caso o cliente não receba, copie o link abaixo e envie por WhatsApp.</>
+                    : <><strong>Falha ao enviar email</strong> ({result.email_error || "erro desconhecido"}). Envie o link manualmente.</>}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/30 text-sm">
+                <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <span><strong>Atenção:</strong> a senha temporária NÃO será exibida novamente. Copie agora.</span>
+              </div>
+            )}
             <div>
               <Label>Email do gestor</Label>
               <div className="flex gap-2 mt-1">
@@ -141,21 +160,33 @@ export default function CompanyManualCreate() {
                 </Button>
               </div>
             </div>
-            <div>
-              <Label>Senha temporária</Label>
-              <div className="flex gap-2 mt-1">
-                <Input readOnly value={result.temp_password} className="font-mono text-lg" />
-                <Button variant="outline" size="icon" onClick={() => copy(result.temp_password, "pwd")}>
-                  {copied === "pwd" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
+            {isWelcome ? (
+              <div>
+                <Label>Link de primeiro acesso (válido 48h)</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input readOnly value={result.welcome_link ?? ""} className="font-mono text-xs" />
+                  <Button variant="outline" size="icon" onClick={() => copy(result.welcome_link ?? "", "link")}>
+                    {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <Label>Senha temporária</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input readOnly value={result.temp_password ?? ""} className="font-mono text-lg" />
+                  <Button variant="outline" size="icon" onClick={() => copy(result.temp_password ?? "", "pwd")}>
+                    {copied === "pwd" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            )}
             <Button className="w-full" onClick={() => copy(wa, "all")}>
               {copied === "all" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
               Copiar mensagem pronta para WhatsApp
             </Button>
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setResult(null); setForm({ name:"", cnpj:"", phone:"", city:"", state:"", mgrName:"", mgrEmail:"", mgrPhone:"", couponCode:"", isExempt:false }); setCouponPreview(null); }}>
+              <Button variant="outline" className="flex-1" onClick={() => { setResult(null); setForm({ name:"", cnpj:"", phone:"", city:"", state:"", mgrName:"", mgrEmail:"", mgrPhone:"", couponCode:"", isExempt:false, useTempPassword:false }); setCouponPreview(null); }}>
                 Criar outra
               </Button>
               <Button className="flex-1" onClick={() => nav("/super-admin")}>Ver empresas</Button>
@@ -173,7 +204,7 @@ export default function CompanyManualCreate() {
         <h1 className="text-2xl font-display font-bold">Criar empresa manualmente</h1>
       </div>
       <p className="text-sm text-muted-foreground">
-        Cria empresa + gestor com senha temporária. Email já vem confirmado (bypass).
+        Cria empresa + gestor. Por padrão envia email de boas-vindas com link de primeiro acesso (48h).
       </p>
 
       <Card>
@@ -240,6 +271,10 @@ export default function CompanyManualCreate() {
           <div className="flex items-center gap-2">
             <Checkbox id="exempt" checked={form.isExempt} onCheckedChange={(v) => set("isExempt", !!v)} />
             <Label htmlFor="exempt" className="cursor-pointer">Marcar como isento de trial (acesso vitalício)</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="temp" checked={form.useTempPassword} onCheckedChange={(v) => set("useTempPassword", !!v)} />
+            <Label htmlFor="temp" className="cursor-pointer">Gerar senha temporária em vez de enviar email (fallback)</Label>
           </div>
         </CardContent>
       </Card>
