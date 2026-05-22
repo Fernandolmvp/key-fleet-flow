@@ -9,6 +9,7 @@ import Agendar from "./pages/Agendar";
 import AgendarCalendario from "./pages/AgendarCalendario";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
+import PrimeiroAcesso from "./pages/auth/PrimeiroAcesso";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/app/Dashboard";
 import Vehicles from "./pages/app/Vehicles";
@@ -96,6 +97,7 @@ const App = () => (
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/primeiro-acesso" element={<PrimeiroAcesso />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
             <Route path="/motorista" element={<MotoristaShell />} />
             <Route element={<RequireAuth />}>
