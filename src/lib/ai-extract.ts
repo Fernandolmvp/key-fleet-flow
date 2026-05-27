@@ -26,12 +26,39 @@ export async function extractDocument(opts: {
   companyId?: string;
 }): Promise<{ data: Record<string, any>; archivedUrl: string | null }> {
   const { type, file, bucket, companyId } = opts;
-  const base64 = await fileToBase64(file);
 
-  // 1) Extrair via edge function
-  const { data: result, error } = await supabase.functions.invoke("extract-document", {
-    body: { type, fileBase64: base64, mimeType: file.type || "application/octet-stream" },
-  });
+  // Roda IA e arquivamento EM PARALELO para não travar o spinner.
+  const aiPromise = (async () => {
+    const base64 = await fileToBase64(file);
+    return supabase.functions.invoke("extract-document", {
+      body: { type, fileBase64: base64, mimeType: file.type || "application/octet-stream" },
+    });
+  })();
+
+  const archivePromise: Promise<string | null> = (async () => {
+    if (!bucket || !companyId) return null;
+    try {
+      const path = `${companyId}/${type}/${crypto.randomUUID()}-${file.name}`;
+      // Timeout duro de 45s para não deixar o botão travado em "lendo".
+      const upload = supabase.storage.from(bucket).upload(path, file, {
+        contentType: file.type || undefined,
+        upsert: false,
+      });
+      const timeout = new Promise<{ error: Error }>((resolve) =>
+        setTimeout(() => resolve({ error: new Error("upload timeout") }), 45_000)
+      );
+      const { error: upErr } = (await Promise.race([upload, timeout])) as any;
+      if (upErr) return null;
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+      return pub.publicUrl ?? null;
+    } catch (e) {
+      console.warn("archive failed", e);
+      return null;
+    }
+  })();
+
+  const [{ data: result, error }, archivedUrl] = await Promise.all([aiPromise, archivePromise]);
+
   if (error) {
     // Tenta extrair a mensagem real do corpo da resposta (FunctionsHttpError esconde 4xx/5xx)
     let msg = error.message || "Falha ao processar documento";
@@ -49,24 +76,6 @@ export async function extractDocument(opts: {
   }
   if (result?.error) throw new Error(result.error);
   if (!result?.data) throw new Error("Sem dados extraídos");
-
-  // 2) Arquivar arquivo (opcional)
-  let archivedUrl: string | null = null;
-  if (bucket && companyId) {
-    try {
-      const path = `${companyId}/${type}/${crypto.randomUUID()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
-        contentType: file.type || undefined,
-        upsert: false,
-      });
-      if (!upErr) {
-        const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
-        archivedUrl = pub.publicUrl;
-      }
-    } catch (e) {
-      console.warn("archive failed", e);
-    }
-  }
 
   return { data: result.data as Record<string, any>, archivedUrl };
 }
