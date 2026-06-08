@@ -55,25 +55,29 @@ export default function PrimeiroAcesso() {
     }
     if (pwd !== pwd2) return toast.error("As senhas não coincidem.");
     setSubmitting(true);
-    const { data, error } = await supabase.functions.invoke("set-first-access-password", {
-      body: { token, password: pwd },
-    });
-    if (error || (data as any)?.error) {
+    try {
+      const { data, error } = await supabase.functions.invoke("set-first-access-password", {
+        body: { token, password: pwd },
+      });
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error || error?.message || "Erro ao definir senha");
+        return;
+      }
+      const email = (data as any).email || info?.email;
+      const { error: signErr } = await supabase.auth.signInWithPassword({ email, password: pwd });
+      if (signErr) {
+        toast.success("Senha definida! Faça login.");
+        nav("/login");
+        return;
+      }
+      toast.success("Bem-vindo à FrotaOps!");
+      nav("/app");
+    } catch (e) {
+      console.error("[primeiro-acesso]", e);
+      toast.error("Não foi possível concluir seu primeiro acesso. Tente novamente em alguns instantes.");
+    } finally {
       setSubmitting(false);
-      toast.error((data as any)?.error || error?.message || "Erro ao definir senha");
-      return;
     }
-    // Login automático
-    const email = (data as any).email || info?.email;
-    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password: pwd });
-    setSubmitting(false);
-    if (signErr) {
-      toast.success("Senha definida! Faça login.");
-      nav("/login");
-      return;
-    }
-    toast.success("Bem-vindo à FrotaOps!");
-    nav("/app");
   }
 
   return (
