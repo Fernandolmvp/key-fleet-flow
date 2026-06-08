@@ -3017,6 +3017,7 @@ export type Database = {
           id: string
           included_at: string
           inclusion_type: string
+          individual_premium: number | null
           notes: string | null
           policy_id: string
           removed_at: string | null
@@ -3031,6 +3032,7 @@ export type Database = {
           id?: string
           included_at?: string
           inclusion_type?: string
+          individual_premium?: number | null
           notes?: string | null
           policy_id: string
           removed_at?: string | null
@@ -3045,6 +3047,7 @@ export type Database = {
           id?: string
           included_at?: string
           inclusion_type?: string
+          individual_premium?: number | null
           notes?: string | null
           policy_id?: string
           removed_at?: string | null
@@ -3821,6 +3824,93 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_insurance_costs: {
+        Row: {
+          company_id: string
+          created_at: string
+          days_in_month_covered: number
+          id: string
+          individual_premium: number
+          insurance_policy_id: string
+          insurance_policy_vehicle_id: string
+          monthly_cost: number
+          policy_end_date: string
+          policy_start_date: string
+          reference_month: number
+          reference_year: number
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          days_in_month_covered: number
+          id?: string
+          individual_premium: number
+          insurance_policy_id: string
+          insurance_policy_vehicle_id: string
+          monthly_cost: number
+          policy_end_date: string
+          policy_start_date: string
+          reference_month: number
+          reference_year: number
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          days_in_month_covered?: number
+          id?: string
+          individual_premium?: number
+          insurance_policy_id?: string
+          insurance_policy_vehicle_id?: string
+          monthly_cost?: number
+          policy_end_date?: string
+          policy_start_date?: string
+          reference_month?: number
+          reference_year?: number
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_insurance_costs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_insurance_costs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "monthly_insurance_costs_insurance_policy_id_fkey"
+            columns: ["insurance_policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_insurance_costs_insurance_policy_vehicle_id_fkey"
+            columns: ["insurance_policy_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policy_vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_insurance_costs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -6789,6 +6879,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      recalculate_insurance_monthly_costs: {
+        Args: { p_policy_id?: string }
+        Returns: undefined
       }
       record_stripe_payment: {
         Args: {
