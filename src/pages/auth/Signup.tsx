@@ -79,107 +79,102 @@ export default function Signup() {
     const parsed = schema.safeParse(form);
     if (!parsed.success) return toast.error(parsed.error.errors[0].message);
     setBusy(true);
-    let { data: auth, error } = await supabase.auth.signUp({
-      email: form.email, password: form.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/app`,
-        data: { full_name: form.fullName },
-      },
-    });
-    if (error) {
-      const msg = String(error.message || "");
-      const alreadyExists = /already|registered|exists/i.test(msg) || (error as any).status === 422;
-      if (!alreadyExists) {
-        setBusy(false);
-        return toast.error(msg || "Falha ao criar conta");
-      }
-      // Recuperação: usuário já existe (possível cadastro travado anteriormente).
-      const { data: signIn, error: sErr } = await supabase.auth.signInWithPassword({
-        email: form.email, password: form.password,
-      });
-      if (sErr || !signIn.user) {
-        setBusy(false);
-        toast.error(
-          "Já existe uma conta com este email. Se for sua, faça login ou recupere a senha.",
-          { duration: 8000 }
-        );
-        nav("/login");
-        return;
-      }
-      // Já tem empresa? Manda direto pro app.
-      const { data: existingMem } = await supabase
-        .from("company_members").select("company_id").eq("user_id", signIn.user.id).limit(1);
-      if (existingMem && existingMem.length > 0) {
-        setBusy(false);
-        toast.success("Você já tinha conta — conectamos você ao sistema.");
-        await refreshCompanies();
-        nav("/app");
-        return;
-      }
-      // Órfão: continua o bootstrap abaixo com a sessão recém-criada.
-      auth = { user: signIn.user, session: signIn.session } as any;
-    }
-    if (!auth.user) { setBusy(false); return toast.error("Falha ao criar usuário"); }
-
-    // Garantir sessão (caso confirmação de e-mail esteja ativa, faz signIn imediato)
-    if (!auth.session) {
-      const { error: sErr } = await supabase.auth.signInWithPassword({
-        email: form.email, password: form.password,
-      });
-      if (sErr) {
-        setBusy(false);
-        return toast.error("Conta criada. Verifique seu e-mail para confirmar e depois faça login.");
-      }
-    }
-
-    // Bootstrap empresa + membership + role + profile + subscription placeholder (RPC SECURITY DEFINER)
-    const { data: companyIdRet, error: rpcErr } = await supabase.rpc("bootstrap_company_v2" as any, {
-      _company_name: form.companyName,
-      _full_name: form.fullName,
-      _cnpj: onlyDigits(form.cnpj),
-      _phone: onlyDigits(form.phone),
-      _contact_name: form.contactName,
-      _email: form.email,
-      _trial_plan_slug: planSlug,
-    });
-    if (rpcErr) {
-      setBusy(false);
-      const m = String(rpcErr.message || "");
-      if (/duplicate|unique|cnpj/i.test(m)) {
-        return toast.error("Já existe uma empresa com este CNPJ. Se for sua, peça acesso ao administrador.");
-      }
-      return toast.error("Sua conta foi criada, mas falhou ao cadastrar a empresa. Faça login para continuar.", { duration: 8000 });
-    }
-
-    await refreshCompanies();
-
-    // Resgata cupom se informado
-    if (couponCode.trim() && companyIdRet) {
-      try {
-        const { data: r } = await supabase.rpc("redeem_coupon" as any, {
-          p_code: couponCode.trim(),
-          p_company_id: companyIdRet as any,
-        });
-        const res: any = r;
-        if (res?.success) toast.success(res?.message ?? "Cupom aplicado");
-        else if (res?.message) toast.warning(`Cupom: ${res.message}`);
-      } catch (_) { /* silencioso */ }
-    }
-
-    // Dispara email de boas-vindas (best-effort, não bloqueia o fluxo)
     try {
-      const ends = new Date(Date.now() + 21 * 86400000).toLocaleDateString("pt-BR");
-      await supabase.functions.invoke("send-partner-email", {
-        body: {
-          to: form.email,
-          subject: "Bem-vindo ao FrotaOps — 21 dias grátis liberados",
-          html: `<p>Olá ${form.fullName},</p><p>Sua conta no <strong>FrotaOps</strong> foi criada com <strong>21 dias grátis</strong> de todos os módulos liberados. Aproveite até <strong>${ends}</strong>.</p><p><a href="${window.location.origin}/app">Acessar a plataforma</a></p><p>Após o período de teste, basta ativar sua assinatura para continuar sem interrupção.</p>`,
+      let { data: auth, error } = await supabase.auth.signUp({
+        email: form.email, password: form.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/app`,
+          data: { full_name: form.fullName },
         },
       });
-    } catch (_) { /* silencioso */ }
-    setBusy(false);
-    toast.success("Conta criada! Você tem 21 dias grátis para testar tudo.");
-    nav("/app");
+      if (error) {
+        const msg = String(error.message || "");
+        const alreadyExists = /already|registered|exists/i.test(msg) || (error as any).status === 422;
+        if (!alreadyExists) {
+          return toast.error(msg || "Falha ao criar conta");
+        }
+        const { data: signIn, error: sErr } = await supabase.auth.signInWithPassword({
+          email: form.email, password: form.password,
+        });
+        if (sErr || !signIn.user) {
+          toast.error(
+            "Já existe uma conta com este email. Se for sua, faça login ou recupere a senha.",
+            { duration: 8000 }
+          );
+          nav("/login");
+          return;
+        }
+        const { data: existingMem } = await supabase
+          .from("company_members").select("company_id").eq("user_id", signIn.user.id).limit(1);
+        if (existingMem && existingMem.length > 0) {
+          toast.success("Você já tinha conta — conectamos você ao sistema.");
+          await refreshCompanies();
+          nav("/app");
+          return;
+        }
+        auth = { user: signIn.user, session: signIn.session } as any;
+      }
+      if (!auth.user) return toast.error("Falha ao criar usuário");
+
+      if (!auth.session) {
+        const { error: sErr } = await supabase.auth.signInWithPassword({
+          email: form.email, password: form.password,
+        });
+        if (sErr) {
+          return toast.error("Conta criada. Verifique seu e-mail para confirmar e depois faça login.");
+        }
+      }
+
+      const { data: companyIdRet, error: rpcErr } = await supabase.rpc("bootstrap_company_v2" as any, {
+        _company_name: form.companyName,
+        _full_name: form.fullName,
+        _cnpj: onlyDigits(form.cnpj),
+        _phone: onlyDigits(form.phone),
+        _contact_name: form.contactName,
+        _email: form.email,
+        _trial_plan_slug: planSlug,
+      });
+      if (rpcErr) {
+        const m = String(rpcErr.message || "");
+        if (/duplicate|unique|cnpj/i.test(m)) {
+          return toast.error("Já existe uma empresa com este CNPJ. Se for sua, peça acesso ao administrador.");
+        }
+        return toast.error("Sua conta foi criada, mas falhou ao cadastrar a empresa. Faça login para continuar.", { duration: 8000 });
+      }
+
+      await refreshCompanies();
+
+      if (couponCode.trim() && companyIdRet) {
+        try {
+          const { data: r } = await supabase.rpc("redeem_coupon" as any, {
+            p_code: couponCode.trim(),
+            p_company_id: companyIdRet as any,
+          });
+          const res: any = r;
+          if (res?.success) toast.success(res?.message ?? "Cupom aplicado");
+          else if (res?.message) toast.warning(`Cupom: ${res.message}`);
+        } catch (_) { /* silencioso */ }
+      }
+
+      try {
+        const ends = new Date(Date.now() + 21 * 86400000).toLocaleDateString("pt-BR");
+        await supabase.functions.invoke("send-partner-email", {
+          body: {
+            to: form.email,
+            subject: "Bem-vindo ao FrotaOps — 21 dias grátis liberados",
+            html: `<p>Olá ${form.fullName},</p><p>Sua conta no <strong>FrotaOps</strong> foi criada com <strong>21 dias grátis</strong> de todos os módulos liberados. Aproveite até <strong>${ends}</strong>.</p><p><a href="${window.location.origin}/app">Acessar a plataforma</a></p><p>Após o período de teste, basta ativar sua assinatura para continuar sem interrupção.</p>`,
+          },
+        });
+      } catch (_) { /* silencioso */ }
+
+      toast.success("Conta criada! Você tem 21 dias grátis para testar tudo.");
+      nav("/app");
+    } catch (e) {
+      console.error("[signup]", e);
+      toast.error("Não foi possível concluir o cadastro. Tente novamente em alguns instantes.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
