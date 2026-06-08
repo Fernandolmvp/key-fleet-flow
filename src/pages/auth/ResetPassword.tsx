@@ -34,15 +34,18 @@ export default function ResetPassword() {
     if (!/^\d{6}$/.test(pwd)) return toast.error("A senha deve ter exatamente 6 dígitos numéricos");
     if (pwd !== confirm) return toast.error("As senhas não conferem");
     setBusy(true);
-    const { error } = await supabase.auth.updateUser({ password: pwd });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setDone(true);
-    toast.success("Senha redefinida!");
-    setTimeout(async () => {
-      await supabase.auth.signOut();
-      nav("/login");
-    }, 1500);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pwd });
+      if (error) return toast.error("Não foi possível redefinir a senha. Solicite um novo link e tente novamente.");
+      setDone(true);
+      toast.success("Senha redefinida!");
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        nav("/login");
+      }, 1500);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

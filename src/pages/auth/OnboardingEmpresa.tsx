@@ -74,42 +74,47 @@ export default function OnboardingEmpresa() {
     const parsed = schema.safeParse(form);
     if (!parsed.success) return toast.error(parsed.error.errors[0].message);
     setBusy(true);
-    const fullName = user?.user_metadata?.full_name || form.contactName;
-    const email = user?.email || null;
-    const { data: companyIdRet, error: rpcErr } = await supabase.rpc("bootstrap_company_v2" as any, {
-      _company_name: form.companyName,
-      _full_name: fullName,
-      _cnpj: onlyDigits(form.cnpj),
-      _phone: onlyDigits(form.phone),
-      _contact_name: form.contactName,
-      _email: email,
-      _trial_plan_slug: planSlug,
-    });
-    if (rpcErr) {
-      setBusy(false);
-      const msg = String(rpcErr.message || "");
-      if (/duplicate|unique|cnpj/i.test(msg)) {
-        return toast.error("Já existe uma empresa com este CNPJ. Verifique ou fale com o suporte.");
+    try {
+      const fullName = user?.user_metadata?.full_name || form.contactName;
+      const email = user?.email || null;
+      const { data: companyIdRet, error: rpcErr } = await supabase.rpc("bootstrap_company_v2" as any, {
+        _company_name: form.companyName,
+        _full_name: fullName,
+        _cnpj: onlyDigits(form.cnpj),
+        _phone: onlyDigits(form.phone),
+        _contact_name: form.contactName,
+        _email: email,
+        _trial_plan_slug: planSlug,
+      });
+      if (rpcErr) {
+        const msg = String(rpcErr.message || "");
+        if (/duplicate|unique|cnpj/i.test(msg)) {
+          return toast.error("Já existe uma empresa com este CNPJ. Verifique ou fale com o suporte.");
+        }
+        return toast.error(msg || "Falha ao criar empresa");
       }
-      return toast.error(msg || "Falha ao criar empresa");
-    }
 
-    if (couponCode.trim() && companyIdRet) {
-      try {
-        const { data: r } = await supabase.rpc("redeem_coupon" as any, {
-          p_code: couponCode.trim(),
-          p_company_id: companyIdRet as any,
-        });
-        const res: any = r;
-        if (res?.success) toast.success(res?.message ?? "Cupom aplicado");
-        else if (res?.message) toast.warning(`Cupom: ${res.message}`);
-      } catch (_) { /* silencioso */ }
-    }
+      if (couponCode.trim() && companyIdRet) {
+        try {
+          const { data: r } = await supabase.rpc("redeem_coupon" as any, {
+            p_code: couponCode.trim(),
+            p_company_id: companyIdRet as any,
+          });
+          const res: any = r;
+          if (res?.success) toast.success(res?.message ?? "Cupom aplicado");
+          else if (res?.message) toast.warning(`Cupom: ${res.message}`);
+        } catch (_) { /* silencioso */ }
+      }
 
-    await refreshCompanies();
-    setBusy(false);
-    toast.success("Empresa criada! Você tem 21 dias grátis pra testar tudo.");
-    nav("/app");
+      await refreshCompanies();
+      toast.success("Empresa criada! Você tem 21 dias grátis pra testar tudo.");
+      nav("/app");
+    } catch (e) {
+      console.error("[onboarding-empresa]", e);
+      toast.error("Não foi possível concluir o cadastro da empresa. Tente novamente em alguns instantes.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

@@ -82,15 +82,18 @@ export default function DriverFirstAccess() {
     const iso = brToIso(birth);
     if (!iso) return toast.error("Data de nascimento inválida (use DD/MM/AAAA)");
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: { action: "verify-identity", cpf: cpfDigits, birth_date: iso },
-    });
-    setBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
-    setDriver({ id: data.driver_id, full_name: data.full_name, existing_email: data.existing_email });
-    setEmail(data.existing_email || "");
-    setPhone(maskPhone(data.existing_phone || ""));
-    setStep("contact");
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-onboarding", {
+        body: { action: "verify-identity", cpf: cpfDigits, birth_date: iso },
+      });
+      if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
+      setDriver({ id: data.driver_id, full_name: data.full_name, existing_email: data.existing_email });
+      setEmail(data.existing_email || "");
+      setPhone(maskPhone(data.existing_phone || ""));
+      setStep("contact");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const sendOtp = async (e: React.FormEvent) => {
@@ -103,20 +106,23 @@ export default function DriverFirstAccess() {
     }
     if (password !== password2) return toast.error("As senhas não conferem");
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: {
-        action: "send-otp",
-        driver_id: driver.id,
-        email: email.trim().toLowerCase(),
-        phone: phone.replace(/\D/g, ""),
-      },
-    });
-    setBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha ao enviar email");
-    setExpiresAt(data.expires_at);
-    setDevCode(data.dev_code || null);
-    setStep("otp");
-    toast.success("Código enviado por email");
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-onboarding", {
+        body: {
+          action: "send-otp",
+          driver_id: driver.id,
+          email: email.trim().toLowerCase(),
+          phone: phone.replace(/\D/g, ""),
+        },
+      });
+      if (error || data?.error) return toast.error(data?.error || error?.message || "Falha ao enviar email");
+      setExpiresAt(data.expires_at);
+      setDevCode(data.dev_code || null);
+      setStep("otp");
+      toast.success("Código enviado por email");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const confirmOtp = async (e: React.FormEvent) => {
@@ -124,44 +130,49 @@ export default function DriverFirstAccess() {
     if (!driver) return;
     if (code.replace(/\D/g, "").length !== 6) return toast.error("Código deve ter 6 dígitos");
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: {
-        action: "confirm-otp",
-        driver_id: driver.id,
-        code: code.trim(),
-        email: email.trim().toLowerCase(),
-        password,
-        phone: phone.replace(/\D/g, ""),
-      },
-    });
-    if (error || data?.error) {
-      setBusy(false);
-      return toast.error(data?.error || error?.message || "Código inválido");
-    }
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-onboarding", {
+        body: {
+          action: "confirm-otp",
+          driver_id: driver.id,
+          code: code.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          phone: phone.replace(/\D/g, ""),
+        },
+      });
+      if (error || data?.error) {
+        return toast.error(data?.error || error?.message || "Código inválido");
+      }
 
-    const loggedIn = await signInAfterActivation();
-    setBusy(false);
-    if (!loggedIn) {
-      return toast.error("Seu acesso foi ativado, mas a entrada automática falhou. Tente entrar novamente em alguns segundos.");
+      const loggedIn = await signInAfterActivation();
+      if (!loggedIn) {
+        return toast.error("Seu acesso foi ativado, mas a entrada automática falhou. Tente entrar novamente em alguns segundos.");
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
   const resend = async () => {
     if (!driver) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("driver-onboarding", {
-      body: {
-        action: "send-otp",
-        driver_id: driver.id,
-        email: email.trim().toLowerCase(),
-        phone: phone.replace(/\D/g, ""),
-      },
-    });
-    setBusy(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
-    setExpiresAt(data.expires_at);
-    setDevCode(data.dev_code || null);
-    toast.success("Novo código enviado");
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-onboarding", {
+        body: {
+          action: "send-otp",
+          driver_id: driver.id,
+          email: email.trim().toLowerCase(),
+          phone: phone.replace(/\D/g, ""),
+        },
+      });
+      if (error || data?.error) return toast.error(data?.error || error?.message || "Falha");
+      setExpiresAt(data.expires_at);
+      setDevCode(data.dev_code || null);
+      toast.success("Novo código enviado");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
