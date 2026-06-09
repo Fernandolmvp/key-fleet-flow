@@ -101,7 +101,7 @@ const nav: NavEntry[] = [
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
   { to: "/app/configuracoes", label: "Configurações da Empresa", icon: Settings, module: "settings" },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle, soon: true },
-  { to: "/app/reports", label: "Relatórios", icon: BarChart3, soon: true, module: "reports" },
+  { to: "/app/reports", label: "Relatórios", icon: BarChart3, module: "reports" },
 ];
 
 function isGroup(e: NavEntry): e is NavGroup {

@@ -45,6 +45,8 @@ import Viagens from "./pages/app/Viagens";
 import ManutencaoSolicitacoes from "./pages/app/ManutencaoSolicitacoes";
 import WorkOrders from "./pages/app/WorkOrders";
 import VehicleHistory from "./pages/app/VehicleHistory";
+import Reports from "./pages/app/Reports";
+import LicensingReport from "./pages/app/reports/LicensingReport";
 import SuperAdminShell from "./pages/admin/SuperAdminShell";
 import CompaniesPanel from "./pages/admin/CompaniesPanel";
 import ProvidersPage from "./pages/admin/ai/ProvidersPage";
@@ -167,6 +169,8 @@ const App = () => (
                   <Route path="manutencao/solicitacoes" element={<ManutencaoSolicitacoes />} />
                   <Route path="manutencao/os" element={<WorkOrders />} />
                   <Route path="vehicles/:id/historico" element={<VehicleHistory />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="reports/licenciamento" element={<LicensingReport />} />
                 </Route>
               </Route>
             </Route>
