@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { BarChart3, FileText, ChevronRight } from "lucide-react";
+import { BarChart3, FileText, ChevronRight, Sparkles } from "lucide-react";
 
 const REPORTS = [
   {
@@ -8,6 +8,13 @@ const REPORTS = [
     title: "Licenciamento de Veículos",
     description: "Ano de licenciamento, placa, chassi e RENAVAM da frota.",
     icon: FileText,
+    available: true,
+  },
+  {
+    to: "/app/reports/veiculos-em-apolice-sem-cadastro",
+    title: "Veículos em apólice sem cadastro",
+    description: "Placas presentes nas apólices que ainda não constam na frota cadastrada.",
+    icon: Sparkles,
     available: true,
   },
 ];
