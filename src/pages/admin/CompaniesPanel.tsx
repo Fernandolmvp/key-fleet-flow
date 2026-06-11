@@ -267,9 +267,12 @@ export default function CompaniesPanel() {
                         <td className="px-4 py-3">
                           {(() => {
                             const eff = isTrialExpired(i) ? "trial_expirado" : i.subscription_status;
+                            const label = eff === "trial"
+                              ? `Trial (${trialDaysLeft(i)} dia${trialDaysLeft(i) === 1 ? "" : "s"})`
+                              : (statusLabel[eff] ?? eff);
                             return (
                               <Badge className={`border ${statusTone[eff] ?? ""}`}>
-                                {statusLabel[eff] ?? eff}
+                                {label}
                               </Badge>
                             );
                           })()}
@@ -326,9 +329,12 @@ export default function CompaniesPanel() {
                             <td className="px-4 py-2.5">
                               {(() => {
                                 const eff = isTrialExpired(ch) ? "trial_expirado" : ch.subscription_status;
+                                const label = eff === "trial"
+                                  ? `Trial (${trialDaysLeft(ch)}d)`
+                                  : (statusLabel[eff] ?? eff);
                                 return (
                                   <Badge className={`border ${statusTone[eff] ?? ""}`}>
-                                    {statusLabel[eff] ?? eff}
+                                    {label}
                                   </Badge>
                                 );
                               })()}
