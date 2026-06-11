@@ -19,6 +19,8 @@ import { useTabPermissions } from "@/lib/permissions";
 import CepInput from "@/components/forms/CepInput";
 import AddressNumberFields from "@/components/forms/AddressNumberFields";
 import { isAddressMissingNumber } from "@/lib/address";
+import { formatCpf, isValidCpf, onlyDigits } from "@/lib/document";
+import { translateDbError } from "@/lib/db-error";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -186,9 +188,14 @@ export default function Drivers() {
   const save = async () => {
     if (!currentCompanyId) return;
     if (!form.full_name.trim()) return toast.error("Nome obrigatório");
+    const cpfDigits = onlyDigits(form.cpf);
+    if (cpfDigits && !isValidCpf(cpfDigits)) {
+      return toast.error("CPF inválido — confira os dígitos verificadores");
+    }
     setBusy(true);
     const payload: any = {
       ...form, company_id: currentCompanyId,
+      cpf: cpfDigits || null,
       cnh_expires_at: form.cnh_expires_at || null,
       medical_exam_expires_at: form.medical_exam_expires_at || null,
       birth_date: form.birth_date || null,
@@ -206,7 +213,7 @@ export default function Drivers() {
       ? supabase.from("drivers").update(payload).eq("id", editing.id)
       : supabase.from("drivers").insert(payload).select("id").single();
     const { data: saved, error } = await op as any;
-    if (error) { setBusy(false); return toast.error(error.message); }
+    if (error) { setBusy(false); return toast.error(translateDbError(error)); }
 
     // Arquivar CNH na tabela de documentos (se enviada via IA neste fluxo)
     const driverId = editing ? editing.id : saved?.id;
