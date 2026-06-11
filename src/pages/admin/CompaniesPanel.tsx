@@ -51,7 +51,7 @@ const statusTone: Record<string, string> = {
 const statusLabel: Record<string, string> = {
   ativa: "Ativa", aguardando_pagamento: "Aguardando", atrasada: "Atrasada",
   suspensa: "Suspensa", cancelada: "Cancelada",
-  trial: "Trial", trial_expirado: "Trial expirado",
+  trial: "Trial", trial_expirado: "Trial expirado", expirada: "Trial expirado",
 };
 
 const fmtBRL = (v: number | null | undefined) =>
@@ -107,11 +107,16 @@ export default function CompaniesPanel() {
   useEffect(() => { load(); }, []);
 
   const isTrialExpired = (i: Usage) =>
-    i.subscription_status === "trial" &&
+    (i.subscription_status === "trial" || i.subscription_status === "expirada") &&
     !!i.current_period_end &&
     new Date(i.current_period_end) < new Date();
   const isTrialActive = (i: Usage) =>
     i.subscription_status === "trial" && !isTrialExpired(i);
+  const trialDaysLeft = (i: Usage) => {
+    if (!i.current_period_end) return 0;
+    const ms = new Date(i.current_period_end).getTime() - Date.now();
+    return Math.max(0, Math.ceil(ms / 86400000));
+  };
 
   const byTab = items.filter((i) => {
     if (tab === "todas") return true;
@@ -150,7 +155,14 @@ export default function CompaniesPanel() {
     .reduce((s, i) => s + (i.monthly_amount ?? 0), 0);
   const totalCompanies = items.length;
   const activeCount = items.filter((i) => i.subscription_status === "ativa").length;
-  const overdueCount = items.filter((i) => ["atrasada","suspensa"].includes(i.subscription_status)).length;
+  // Mesmo critério da tabela: vencimento passado e não cancelada/exempt
+  const overdueCount = items.filter((i) => {
+    if (["atrasada","suspensa"].includes(i.subscription_status)) return true;
+    if (i.subscription_status === "cancelada") return false;
+    return !!i.current_period_end &&
+      new Date(i.current_period_end) < new Date() &&
+      i.subscription_status !== "ativa";
+  }).length;
   const totalVehicles = items.reduce((s, i) => s + (i.vehicles_used ?? 0), 0);
 
   const counts = {
@@ -255,9 +267,12 @@ export default function CompaniesPanel() {
                         <td className="px-4 py-3">
                           {(() => {
                             const eff = isTrialExpired(i) ? "trial_expirado" : i.subscription_status;
+                            const label = eff === "trial"
+                              ? `Trial (${trialDaysLeft(i)} dia${trialDaysLeft(i) === 1 ? "" : "s"})`
+                              : (statusLabel[eff] ?? eff);
                             return (
                               <Badge className={`border ${statusTone[eff] ?? ""}`}>
-                                {statusLabel[eff] ?? eff}
+                                {label}
                               </Badge>
                             );
                           })()}
@@ -314,9 +329,12 @@ export default function CompaniesPanel() {
                             <td className="px-4 py-2.5">
                               {(() => {
                                 const eff = isTrialExpired(ch) ? "trial_expirado" : ch.subscription_status;
+                                const label = eff === "trial"
+                                  ? `Trial (${trialDaysLeft(ch)}d)`
+                                  : (statusLabel[eff] ?? eff);
                                 return (
                                   <Badge className={`border ${statusTone[eff] ?? ""}`}>
-                                    {statusLabel[eff] ?? eff}
+                                    {label}
                                   </Badge>
                                 );
                               })()}

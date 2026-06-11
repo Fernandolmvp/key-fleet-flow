@@ -6,7 +6,7 @@ import { TrialExpiredGate } from "@/components/TrialExpiredGate";
 
 export default function RequireActiveSubscription() {
   const { loading: authLoading } = useAuth();
-  const { loading, isActive, isExempt } = useTrialStatus();
+  const { loading, isActive, isExempt, isBlocked } = useTrialStatus();
 
   if (authLoading || loading) {
     return (
@@ -15,6 +15,8 @@ export default function RequireActiveSubscription() {
       </div>
     );
   }
+  // Fonte única: is_company_blocked. Só bloqueia quando is_blocked=true e empresa não é isenta.
+  if (isBlocked && !isExempt) return <TrialExpiredGate />;
   if (!isActive && !isExempt) return <TrialExpiredGate />;
   return <Outlet />;
 }

@@ -7,6 +7,7 @@ export type TrialStatus = {
   isActive: boolean;
   isExempt: boolean;
   isExpired: boolean;
+  isBlocked: boolean;
   daysRemaining: number | null;
   trialEndsAt: string | null;
   subscriptionStatus: string | null;
@@ -22,6 +23,7 @@ export function useTrialStatus(): TrialStatus {
     isActive: true,
     isExempt: false,
     isExpired: false,
+    isBlocked: false,
     daysRemaining: null,
     trialEndsAt: null,
     subscriptionStatus: null,
@@ -30,7 +32,7 @@ export function useTrialStatus(): TrialStatus {
   const fetchNow = useCallback(async () => {
     if (!user || isSuperAdmin || isDriverOnly) {
       setState({
-        loading: false, isActive: true, isExempt: true, isExpired: false,
+        loading: false, isActive: true, isExempt: true, isExpired: false, isBlocked: false,
         daysRemaining: null, trialEndsAt: null, subscriptionStatus: null,
       });
       return;
@@ -42,14 +44,17 @@ export function useTrialStatus(): TrialStatus {
     }
     const row: any = Array.isArray(data) ? data[0] : data;
     const isExempt = !!row?.is_exempt;
-    const isActive = !!row?.is_active;
+    const isBlocked = !!row?.is_blocked;
+    // Fonte da verdade: is_blocked. is_active = NOT blocked.
+    const isActive = isExempt || !isBlocked;
     const subStatus = row?.subscription_status ?? null;
     const days = row?.trial_days_remaining ?? null;
     setState({
       loading: false,
       isActive,
       isExempt,
-      isExpired: !isActive && !isExempt,
+      isBlocked,
+      isExpired: isBlocked,
       daysRemaining: days,
       trialEndsAt: row?.trial_ends_at ?? null,
       subscriptionStatus: subStatus,

@@ -95,7 +95,7 @@ export function TrialExpiredGate() {
             Precisa de ajuda?{" "}
             <a className="text-primary underline" href="mailto:contato@frotaops.com.br">Falar com o suporte</a>
           </div>
-          {trialEndsAt && (
+          {trialEndsAt && new Date(trialEndsAt).getTime() < Date.now() && (
             <div className="text-xs text-muted-foreground">
               Trial encerrado em {new Date(trialEndsAt).toLocaleDateString("pt-BR")}
             </div>
