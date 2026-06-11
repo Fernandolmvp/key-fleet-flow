@@ -561,7 +561,26 @@ export default function Drivers() {
               </div>
             </div>
                 <div className="space-y-2 sm:col-span-2"><Label>Nome completo *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
-                <div className="space-y-2"><Label>CPF</Label><Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} /></div>
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  {(() => {
+                    const digits = onlyDigits(form.cpf);
+                    const invalid = digits.length > 0 && (digits.length < 11 || !isValidCpf(digits));
+                    return (
+                      <>
+                        <Input
+                          value={formatCpf(form.cpf || "")}
+                          onChange={(e) => setForm({ ...form, cpf: onlyDigits(e.target.value).slice(0, 11) })}
+                          placeholder="000.000.000-00"
+                          className={invalid && digits.length === 11 ? "border-destructive focus-visible:ring-destructive" : undefined}
+                        />
+                        {invalid && digits.length === 11 && (
+                          <p className="text-xs text-destructive">CPF inválido</p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
                 <div className="space-y-2"><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
                 <div className="space-y-2">
