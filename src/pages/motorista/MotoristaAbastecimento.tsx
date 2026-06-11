@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { FUELS, PAYMENTS, fmtMoney } from "@/lib/fuel";
 import { toast } from "sonner";
 import MotoristaBottomNav from "@/components/motorista/MotoristaBottomNav";
+import { translateDbError } from "@/lib/db-error";
 
 export default function MotoristaAbastecimento() {
   const { user, currentCompanyId } = useAuth();
@@ -50,6 +51,9 @@ export default function MotoristaAbastecimento() {
     try {
       const km = parseInt(form.km, 10);
       if (!km || km < (vehicle.current_km ?? 0)) throw new Error("KM precisa ser maior que o último registrado");
+      if (!(liters > 0)) throw new Error("Litros precisa ser maior que zero");
+      if (!(total > 0)) throw new Error("Valor total precisa ser maior que zero");
+      if (!(pricePerLiter > 0)) throw new Error("Valor por litro precisa ser maior que zero");
       let receiptUrl: string | null = null;
       if (photo) {
         const path = `${currentCompanyId}/${vehicle.id}/${Date.now()}-${photo.name.replace(/\s+/g,'_')}`;
@@ -70,7 +74,7 @@ export default function MotoristaAbastecimento() {
       if (error) throw error;
       toast.success("Abastecimento registrado");
       nav("/motorista");
-    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+    } catch (e: any) { toast.error(translateDbError(e)); } finally { setBusy(false); }
   }
 
   if (loading) return <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -95,11 +99,11 @@ export default function MotoristaAbastecimento() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Litros *</Label>
-            <Input type="number" step="0.01" required value={form.liters}
+            <Input type="number" step="0.01" min="0.01" required value={form.liters}
               onChange={e => setForm(f => ({ ...f, liters: e.target.value }))} className="h-12 text-lg" />
           </div>
           <div><Label>Total R$ *</Label>
-            <Input type="number" step="0.01" required value={form.total}
+            <Input type="number" step="0.01" min="0.01" required value={form.total}
               onChange={e => setForm(f => ({ ...f, total: e.target.value }))} className="h-12 text-lg" />
           </div>
         </div>
