@@ -433,6 +433,15 @@ function EditSubscriptionDialog({ sub, plans, onClose, onSaved }:
 
   const selectedPlan = plans.find((p) => p.id === planId);
 
+  // Auto-preenche mensalidade ao trocar de plano (a menos que seja custom/Enterprise)
+  const onPlanChange = (newPlanId: string) => {
+    setPlanId(newPlanId);
+    const p = plans.find((pl) => pl.id === newPlanId);
+    if (p && !p.is_custom && p.monthly_price != null) {
+      setAmount(String(p.monthly_price));
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     const patch: any = {
@@ -468,7 +477,7 @@ function EditSubscriptionDialog({ sub, plans, onClose, onSaved }:
         <div className="space-y-4">
           <div>
             <label className="text-xs text-muted-foreground">Plano</label>
-            <Select value={planId} onValueChange={setPlanId}>
+            <Select value={planId} onValueChange={onPlanChange}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {plans.map((p) => (
