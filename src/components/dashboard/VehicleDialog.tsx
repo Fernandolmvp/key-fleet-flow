@@ -15,6 +15,9 @@ import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle, BarChart3 } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 import VehicleFipePanel from "./VehicleFipePanel";
+import { isValidPlate, normalizePlate } from "@/lib/plate";
+import { translateDbError } from "@/lib/db-error";
+import { isValidDocument, onlyDigits } from "@/lib/document";
 
 const STATUSES = [
   { value: "ativo", label: "Ativo" },
@@ -386,6 +389,24 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
   const save = async () => {
     if (!currentCompanyId) return toast.error("Selecione uma empresa");
     if (!form.plate.trim() || !form.brand.trim() || !form.model.trim()) return toast.error("Placa, marca e modelo são obrigatórios");
+    const normPlate = normalizePlate(form.plate);
+    if (!isValidPlate(normPlate)) {
+      return toast.error("Placa inválida — use o formato AAA9999 (antigo) ou AAA9A99 (Mercosul)");
+    }
+    const nowYear = new Date().getFullYear();
+    const minYear = 1950;
+    const maxYear = nowYear + 1;
+    const yf = form.year_manufacture ? Number(form.year_manufacture) : null;
+    const ym = form.year_model ? Number(form.year_model) : null;
+    if (yf != null && (yf < minYear || yf > maxYear)) {
+      return toast.error(`Ano de fabricação deve estar entre ${minYear} e ${maxYear}`);
+    }
+    if (ym != null && (ym < minYear || ym > maxYear)) {
+      return toast.error(`Ano modelo deve estar entre ${minYear} e ${maxYear}`);
+    }
+    if (form.owner_doc && !isValidDocument(form.owner_doc)) {
+      return toast.error("CPF/CNPJ do proprietário inválido");
+    }
     setBusy(true);
 
     // Auto-flag: se preencheu data de venda mas o status não foi alterado, marca como vendido.
@@ -481,7 +502,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
       ? supabase.from("vehicles").update(payload).eq("id", vehicle.id)
       : supabase.from("vehicles").insert(payload).select("id").single();
     const { data: saved, error } = await (op as any);
-    if (error) { setBusy(false); return toast.error(error.message); }
+    if (error) { setBusy(false); return toast.error(translateDbError(error)); }
 
     // Vincula CRLV anexado pela IA na tabela `documents`
     const vehicleId = isEdit ? vehicle.id : saved?.id;
@@ -658,13 +679,32 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
 
           <TabsContent value="dados" className="space-y-4 mt-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label>Placa *</Label><Input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} className="font-mono uppercase" /></div>
+          <div className="space-y-2"><Label>Placa *</Label>
+            <Input
+              value={form.plate}
+              onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7) })}
+              className={`font-mono uppercase ${form.plate && !isValidPlate(form.plate) ? "border-destructive focus-visible:ring-destructive" : ""}`}
+              maxLength={7}
+              placeholder="AAA9A99"
+            />
+            {form.plate && !isValidPlate(form.plate) && (
+              <p className="text-xs text-destructive">Placa inválida (AAA9999 ou AAA9A99)</p>
+            )}
+          </div>
           <div className="space-y-2"><Label>RENAVAM</Label><Input value={form.renavam} onChange={(e) => setForm({ ...form, renavam: e.target.value })} /></div>
           <div className="space-y-2 sm:col-span-2"><Label>Chassi</Label><Input value={form.chassis} onChange={(e) => setForm({ ...form, chassis: e.target.value })} /></div>
           <div className="space-y-2"><Label>Marca *</Label><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
           <div className="space-y-2"><Label>Modelo *</Label><Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Ano fabricação</Label><Input type="number" value={form.year_manufacture} onChange={(e) => setForm({ ...form, year_manufacture: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Ano modelo</Label><Input type="number" value={form.year_model} onChange={(e) => setForm({ ...form, year_model: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Ano fabricação</Label>
+            <Input type="number" min={1950} max={new Date().getFullYear() + 1}
+              value={form.year_manufacture}
+              onChange={(e) => setForm({ ...form, year_manufacture: e.target.value })} />
+          </div>
+          <div className="space-y-2"><Label>Ano modelo</Label>
+            <Input type="number" min={1950} max={new Date().getFullYear() + 1}
+              value={form.year_model}
+              onChange={(e) => setForm({ ...form, year_model: e.target.value })} />
+          </div>
           <div className="space-y-2"><Label>Cor</Label><Input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></div>
           <div className="space-y-2"><Label>Tipo</Label><Input value={form.vehicle_type} onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} placeholder="Sedan, utilitário, caminhão..." /></div>
           <div className="space-y-2">
