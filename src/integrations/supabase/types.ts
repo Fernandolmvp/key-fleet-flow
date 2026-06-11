@@ -6752,6 +6752,7 @@ export type Database = {
           company_id: string
           has_company: boolean
           is_active: boolean
+          is_blocked: boolean
           is_exempt: boolean
           subscription_status: string
           trial_days_remaining: number
@@ -6816,6 +6817,7 @@ export type Database = {
         Returns: boolean
       }
       is_ai_policy: { Args: { _policy_id: string }; Returns: boolean }
+      is_company_blocked: { Args: { p_company_id: string }; Returns: boolean }
       is_company_member: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
