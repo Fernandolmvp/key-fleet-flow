@@ -20,6 +20,20 @@ export const normChassis = (c?: string | null) =>
 export const normRenavam = (r?: string | null) =>
   String(r || "").replace(/[^0-9]/g, "");
 
+/**
+ * Valida placa brasileira no formato antigo (LLL9999) ou Mercosul (LLL9L99).
+ * Normaliza para A-Z0-9 maiúsculas antes de validar.
+ */
+export function isValidPlate(p?: string | null): boolean {
+  const s = String(p ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (s.length !== 7) return false;
+  // Mercosul: 3 letras + 1 dígito + 1 letra + 2 dígitos
+  if (/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(s)) return true;
+  // Antigo: 3 letras + 4 dígitos
+  if (/^[A-Z]{3}[0-9]{4}$/.test(s)) return true;
+  return false;
+}
+
 /** Match entre veículo e dados extraídos da apólice (placa/chassi/renavam). */
 export function matchPlateOrVin(
   a: { plate?: string | null; chassis?: string | null; renavam?: string | null },

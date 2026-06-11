@@ -290,7 +290,14 @@ export default function CompaniesPanel() {
                         <td className={`px-4 py-3 text-xs ${overdue ? "text-destructive font-medium" : ""}`}>
                           {fmtDate(i.current_period_end)}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs">{fmtBRL(i.monthly_amount)}</td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {(() => {
+                            const plan = plans.find((p) => p.id === i.plan_id);
+                            if (plan?.is_custom) return <span className="text-muted-foreground italic">sob consulta</span>;
+                            const v = i.monthly_amount ?? plan?.monthly_price ?? null;
+                            return fmtBRL(v);
+                          })()}
+                        </td>
                         <td className="px-4 py-3 text-xs">{fmtDate(i.last_payment_at)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex gap-1">
@@ -426,6 +433,15 @@ function EditSubscriptionDialog({ sub, plans, onClose, onSaved }:
 
   const selectedPlan = plans.find((p) => p.id === planId);
 
+  // Auto-preenche mensalidade ao trocar de plano (a menos que seja custom/Enterprise)
+  const onPlanChange = (newPlanId: string) => {
+    setPlanId(newPlanId);
+    const p = plans.find((pl) => pl.id === newPlanId);
+    if (p && !p.is_custom && p.monthly_price != null) {
+      setAmount(String(p.monthly_price));
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     const patch: any = {
@@ -461,7 +477,7 @@ function EditSubscriptionDialog({ sub, plans, onClose, onSaved }:
         <div className="space-y-4">
           <div>
             <label className="text-xs text-muted-foreground">Plano</label>
-            <Select value={planId} onValueChange={setPlanId}>
+            <Select value={planId} onValueChange={onPlanChange}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {plans.map((p) => (

@@ -80,6 +80,17 @@ export const DEFAULT_MONTHLY_TEMPLATE = {
 };
 
 export function monthRefLabel(d: string | Date): string {
+  // Importante: strings "YYYY-MM-DD" são interpretadas como UTC pelo
+  // construtor de Date, o que joga a data para o dia anterior em fuso BRT
+  // (UTC-3) e fazia o rótulo mostrar o mês errado (ex.: "maio" em junho).
+  // Parseamos manualmente quando vier no formato esperado.
+  if (typeof d === "string") {
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+      const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return dt.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    }
+  }
   const dt = typeof d === "string" ? new Date(d) : d;
   return dt.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }

@@ -438,7 +438,7 @@ export default function Vehicles() {
                               : <Truck className="h-4 w-4 text-muted-foreground" />}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-mono font-bold text-primary text-sm">{v.plate}</div>
+                            <div className="font-mono font-bold text-foreground text-sm">{v.plate}</div>
                             <div className="text-xs text-muted-foreground truncate">{v.brand} {v.model} {v.year_model ?? ""}</div>
                           </div>
                         </div>
