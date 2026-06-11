@@ -16,6 +16,9 @@ const CONSTRAINT_MAP: Record<string, string> = {
   fuel_records_price_per_liter_check: "O valor por litro precisa ser maior que zero.",
   fuel_records_total_value_check: "O valor total precisa ser maior que zero.",
   fuel_records_km_at_fueling_check: "O KM informado precisa ser maior que zero.",
+  drivers_company_id_cpf_key: "Já existe um motorista com este CPF nesta empresa.",
+  vehicles_company_id_plate_key: "Já existe um veículo com esta placa nesta empresa.",
+  vehicles_plate_company_unique: "Já existe um veículo com esta placa nesta empresa.",
 };
 
 const REGEX_PATTERNS: Array<{ re: RegExp; msg: (m: RegExpMatchArray) => string }> = [
