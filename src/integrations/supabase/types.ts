@@ -2840,6 +2840,7 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           phone: string | null
+          possible_duplicate_of: string | null
           state: string | null
           susep: string | null
           updated_at: string
@@ -2863,6 +2864,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          possible_duplicate_of?: string | null
           state?: string | null
           susep?: string | null
           updated_at?: string
@@ -2886,6 +2888,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          possible_duplicate_of?: string | null
           state?: string | null
           susep?: string | null
           updated_at?: string
@@ -2904,6 +2907,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "company_usage"
             referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "insurance_brokers_possible_duplicate_of_fkey"
+            columns: ["possible_duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "insurance_brokers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6724,6 +6734,14 @@ export type Database = {
             Returns: Json
           }
       dashboard_get_summary: { Args: { p_company_id: string }; Returns: Json }
+      dedupe_insurance_brokers: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
+      dedupe_insurance_policies: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -6869,6 +6887,8 @@ export type Database = {
         }
         Returns: number
       }
+      norm_broker_name: { Args: { p: string }; Returns: string }
+      norm_digits: { Args: { p: string }; Returns: string }
       normalize_plate: { Args: { p: string }; Returns: string }
       preview_coupon: {
         Args: { p_cnpj?: string; p_code: string }
@@ -6923,6 +6943,14 @@ export type Database = {
         Returns: undefined
       }
       update_fines_auto_status: { Args: never; Returns: undefined }
+      upsert_insurance_broker: {
+        Args: { p_company_id: string; p_data: Json }
+        Returns: string
+      }
+      upsert_insurance_policy: {
+        Args: { p_company_id: string; p_data: Json }
+        Returns: string
+      }
       validate_vehicle_km: {
         Args: {
           _new_km: number
