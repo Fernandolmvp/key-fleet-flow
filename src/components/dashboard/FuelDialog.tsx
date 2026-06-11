@@ -12,6 +12,7 @@ import { Loader2, Upload, X, Camera, Gauge, ShieldCheck, ShieldAlert } from "luc
 import { FUELS, PAYMENTS } from "@/lib/fuel";
 import { extractDocument } from "@/lib/ai-extract";
 import { getMaxVehicleKm, friendlyKmError } from "@/lib/km-validation";
+import { translateDbError } from "@/lib/db-error";
 import KmOverrideField from "@/components/dashboard/KmOverrideField";
 
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
@@ -155,6 +156,9 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
     if (!form.vehicle_id) return toast.error("Selecione um veículo");
     if (plateCheck && !plateCheck.ok) return toast.error("Placa não autorizada — abastecimento bloqueado");
     if (!form.liters || !form.price_per_liter || !form.km_at_fueling) return toast.error("Litros, valor/L e KM são obrigatórios");
+    if (Number(form.liters) <= 0) return toast.error("A quantidade de litros precisa ser maior que zero");
+    if (Number(form.price_per_liter) <= 0) return toast.error("O valor por litro precisa ser maior que zero");
+    if (Number(form.total_value) <= 0) return toast.error("O valor total precisa ser maior que zero");
     const kmNum = Number(form.km_at_fueling);
     if (maxKm > 0 && kmNum < maxKm && !kmOverrideReason.trim()) {
       return toast.error(`KM (${kmNum.toLocaleString("pt-BR")}) é menor que o último registrado (${maxKm.toLocaleString("pt-BR")}). ${isManager ? "Preencha a justificativa de gestor." : "Peça a um gestor para corrigir."}`);
@@ -186,7 +190,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       : supabase.from("fuel_records").insert(payload);
     const { error } = await op;
     setBusy(false);
-    if (error) return toast.error(friendlyKmError(error.message) ?? error.message);
+    if (error) return toast.error(friendlyKmError(error.message) ?? translateDbError(error));
     toast.success(record ? "Abastecimento atualizado" : "Abastecimento registrado");
     onOpenChange(false); onSaved();
   };
@@ -309,13 +313,17 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
               reason={kmOverrideReason} onReasonChange={setKmOverrideReason} context="abastecimento" />
           </div>
           <div className="space-y-2"><Label>Litros *</Label>
-            <Input type="number" step="0.01" value={form.liters} onChange={(e) => setForm({ ...form, liters: e.target.value })} />
+            <Input type="number" step="0.01" min="0.01" value={form.liters} onChange={(e) => setForm({ ...form, liters: e.target.value })}
+              className={form.liters !== "" && Number(form.liters) <= 0 ? "border-destructive focus-visible:ring-destructive" : ""} />
+            {form.liters !== "" && Number(form.liters) <= 0 && <p className="text-xs text-destructive">Litros precisa ser maior que zero</p>}
           </div>
           <div className="space-y-2"><Label>Valor / litro (R$) *</Label>
-            <Input type="number" step="0.001" value={form.price_per_liter} onChange={(e) => setForm({ ...form, price_per_liter: e.target.value })} />
+            <Input type="number" step="0.001" min="0.001" value={form.price_per_liter} onChange={(e) => setForm({ ...form, price_per_liter: e.target.value })}
+              className={form.price_per_liter !== "" && Number(form.price_per_liter) <= 0 ? "border-destructive focus-visible:ring-destructive" : ""} />
+            {form.price_per_liter !== "" && Number(form.price_per_liter) <= 0 && <p className="text-xs text-destructive">Valor por litro precisa ser maior que zero</p>}
           </div>
           <div className="space-y-2"><Label>Valor total (R$)</Label>
-            <Input type="number" step="0.01" value={form.total_value} onChange={(e) => setForm({ ...form, total_value: e.target.value })} className="font-mono" />
+            <Input type="number" step="0.01" min="0.01" value={form.total_value} onChange={(e) => setForm({ ...form, total_value: e.target.value })} className="font-mono" />
           </div>
           <div className="space-y-2 flex items-end gap-3 pb-2">
             <Switch checked={form.full_tank} onCheckedChange={(v) => setForm({ ...form, full_tank: v })} id="full" />
