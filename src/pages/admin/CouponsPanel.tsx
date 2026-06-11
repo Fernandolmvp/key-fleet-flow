@@ -237,6 +237,9 @@ function CouponDialog({ open, onOpenChange, editing, onSaved }: {
   }, [editing, open]);
 
   const submit = async () => {
+    if (form.max_uses === "" || Number(form.max_uses) < 1) {
+      return toast.error("Máximo de usos é obrigatório (mínimo 1) — evita risco se o código vazar");
+    }
     setBusy(true);
     const payload: any = {
       code: (form.code || randomCode()).toUpperCase(),
@@ -322,8 +325,10 @@ function CouponDialog({ open, onOpenChange, editing, onSaved }: {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Máximo de usos (vazio = ∞)</Label>
-              <Input type="number" min={1} value={form.max_uses} onChange={(e) => setForm({ ...form, max_uses: e.target.value })} />
+            <div className="space-y-2"><Label>Máximo de usos *</Label>
+              <Input type="number" min={1} required placeholder="Ex.: 1, 10, 100"
+                value={form.max_uses} onChange={(e) => setForm({ ...form, max_uses: e.target.value })} />
+              <p className="text-[11px] text-muted-foreground">Obrigatório por segurança — defina um limite mesmo para uso interno.</p>
             </div>
             <div className="space-y-2"><Label>Restringir ao CNPJ</Label>
               <Input value={form.restrict_to_cnpj} onChange={(e) => setForm({ ...form, restrict_to_cnpj: e.target.value })} placeholder="opcional" />
