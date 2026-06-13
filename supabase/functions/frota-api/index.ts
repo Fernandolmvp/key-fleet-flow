@@ -341,6 +341,8 @@ Deno.serve(async (req) => {
     let response: Response;
     if (path === "/veiculos") {
       response = await handleVeiculos(req, url, ctx);
+    } else if (path === "/me") {
+      response = await handleMe(req, ctx);
     } else if (path === "/manutencoes") {
       response = await handleManutencoes(req, url, ctx);
     } else if (path === "/manutencoes/aprovar") {
