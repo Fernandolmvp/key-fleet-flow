@@ -17,6 +17,13 @@ const REPORTS = [
     icon: Sparkles,
     available: true,
   },
+  {
+    to: "/app/reports/veiculos-completo",
+    title: "Veículos — Dados Completos",
+    description: "Placa, chassi, RENAVAM, ano/modelo, cor, corretor, seguradora e apólice.",
+    icon: FileText,
+    available: true,
+  },
 ];
 
 export default function Reports() {
