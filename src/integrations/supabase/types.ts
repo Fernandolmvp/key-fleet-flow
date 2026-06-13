@@ -339,6 +339,104 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          ativa: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      api_request_logs: {
+        Row: {
+          api_key_id: string | null
+          company_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          key_name: string | null
+          method: string
+          path: string
+          status: number
+        }
+        Insert: {
+          api_key_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          key_name?: string | null
+          method: string
+          path: string
+          status: number
+        }
+        Update: {
+          api_key_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          key_name?: string | null
+          method?: string
+          path?: string
+          status?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
