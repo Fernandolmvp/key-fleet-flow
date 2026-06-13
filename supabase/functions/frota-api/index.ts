@@ -113,6 +113,27 @@ function normalizeVehicleStatus(value: unknown): string {
   return VEHICLE_STATUS_VALUES.has(raw) ? raw : "ativo";
 }
 
+const MAINTENANCE_TYPE_VALUES = new Set(["preventiva", "corretiva", "pneus", "sinistro"]);
+const MAINTENANCE_STATUS_VALUES = new Set(["agendada", "em_andamento", "concluida", "cancelada"]);
+const MAINTENANCE_REQUEST_STATUSES = new Set([
+  "pendente_aprovacao",
+  "em_analise",
+  "agendada",
+  "rejeitada",
+  "concluida",
+]);
+
+function normalizeMaintenanceType(value: unknown): string | null {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  return MAINTENANCE_TYPE_VALUES.has(raw) ? raw : null;
+}
+function normalizeMaintenanceStatus(value: unknown): string {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "concluida";
+  return MAINTENANCE_STATUS_VALUES.has(raw) ? raw : "concluida";
+}
+
 // ============== HANDLERS ==============
 
 async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Response> {
@@ -166,6 +187,136 @@ async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Res
   return methodNotAllowed("GET, POST ou PATCH");
 }
 
+// -------- Manutenções --------
+
+async function handleManutencoes(req: Request, url: URL, ctx: AuthCtx): Promise<Response> {
+  if (req.method === "GET") {
+    const vehicleId = url.searchParams.get("vehicle_id");
+    const status = url.searchParams.get("status");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const limit = Math.min(Number(url.searchParams.get("limit") ?? 100) || 100, 500);
+    let q = ctx.admin
+      .from("maintenance_records")
+      .select(
+        "id, vehicle_id, driver_id, type, status, category, service_at, km_at_service, next_service_km, next_service_at, workshop_name, workshop_cnpj, labor_value, parts_value, total_value, description, notes",
+      )
+      .eq("company_id", ctx.companyId)
+      .order("service_at", { ascending: false })
+      .limit(limit);
+    if (vehicleId) q = q.eq("vehicle_id", vehicleId);
+    if (status) q = q.eq("status", normalizeMaintenanceStatus(status));
+    if (from) q = q.gte("service_at", from);
+    if (to) q = q.lte("service_at", to);
+    const { data, error } = await q;
+    if (error) return fail(error.message, 500);
+    return ok(data ?? []);
+  }
+  if (req.method === "POST") {
+    const body = await readJson(req);
+    if (!body || typeof body !== "object") return fail("Corpo JSON inválido.", 400);
+    if (!body.vehicle_id) return fail("Campo obrigatório: vehicle_id.", 400);
+    const type = normalizeMaintenanceType(body.type ?? body.tipo);
+    if (!type) {
+      return fail("Campo 'type' obrigatório. Valores aceitos: preventiva, corretiva, pneus, sinistro.", 400);
+    }
+    // Garante que o veículo pertence à empresa da chave
+    const { data: veh, error: vErr } = await ctx.admin
+      .from("vehicles")
+      .select("id")
+      .eq("id", body.vehicle_id)
+      .eq("company_id", ctx.companyId)
+      .maybeSingle();
+    if (vErr) return fail(vErr.message, 500);
+    if (!veh) return fail("Veículo não encontrado nesta empresa.", 404);
+
+    const labor = Number(body.labor_value ?? 0) || 0;
+    const parts = Number(body.parts_value ?? 0) || 0;
+    const total = body.total_value != null ? Number(body.total_value) || 0 : labor + parts;
+
+    const payload: Record<string, unknown> = {
+      company_id: ctx.companyId,
+      vehicle_id: body.vehicle_id,
+      driver_id: body.driver_id ?? null,
+      cost_center_id: body.cost_center_id ?? null,
+      type,
+      status: normalizeMaintenanceStatus(body.status ?? "concluida"),
+      category: body.category ?? null,
+      service_at: body.service_at ?? new Date().toISOString(),
+      km_at_service: body.km_at_service ?? null,
+      next_service_km: body.next_service_km ?? null,
+      next_service_at: body.next_service_at ?? null,
+      workshop_name: body.workshop_name ?? null,
+      workshop_cnpj: body.workshop_cnpj ?? null,
+      city: body.city ?? null,
+      state: body.state ?? null,
+      parts: Array.isArray(body.parts) ? body.parts : [],
+      labor_value: labor,
+      parts_value: parts,
+      total_value: total,
+      attachments: Array.isArray(body.attachments) ? body.attachments : [],
+      description: body.description ?? null,
+      notes: body.notes ?? null,
+    };
+    const { data, error } = await ctx.admin
+      .from("maintenance_records")
+      .insert(payload)
+      .select("*")
+      .maybeSingle();
+    if (error) return fail(error.message, 400);
+    return ok(data, 201);
+  }
+  return methodNotAllowed("GET ou POST");
+}
+
+async function handleManutencoesAprovar(req: Request, _url: URL, ctx: AuthCtx): Promise<Response> {
+  if (req.method !== "POST") return methodNotAllowed("POST");
+  const body = await readJson(req);
+  if (!body?.id) return fail("Campo obrigatório: id (id da solicitação de manutenção).", 400);
+  const decisao = String(body.decisao ?? body.decision ?? "aprovar").toLowerCase();
+  const isReject = decisao === "rejeitar" || decisao === "reject" || decisao === "rejeitada";
+  const newStatus = isReject ? "rejeitada" : "agendada";
+  if (isReject && !body.rejection_reason) {
+    return fail("Para rejeitar, informe 'rejection_reason'.", 400);
+  }
+
+  // Verifica que a solicitação pertence à empresa
+  const { data: reqRow, error: reqErr } = await ctx.admin
+    .from("maintenance_requests")
+    .select("id, status, company_id")
+    .eq("id", body.id)
+    .eq("company_id", ctx.companyId)
+    .maybeSingle();
+  if (reqErr) return fail(reqErr.message, 500);
+  if (!reqRow) return fail("Solicitação não encontrada nesta empresa.", 404);
+  if (!MAINTENANCE_REQUEST_STATUSES.has(reqRow.status as string)) {
+    return fail("Status atual inválido: " + reqRow.status, 400);
+  }
+
+  const update: Record<string, unknown> = {
+    status: newStatus,
+    reviewed_at: new Date().toISOString(),
+  };
+  if (isReject) {
+    update.rejection_reason = body.rejection_reason;
+  } else {
+    if (body.scheduled_date) update.scheduled_date = body.scheduled_date;
+    if (body.scheduled_workshop_id) update.scheduled_workshop_id = body.scheduled_workshop_id;
+    if (body.estimated_cost != null) update.estimated_cost = Number(body.estimated_cost) || 0;
+    if (body.gestor_notes) update.gestor_notes = body.gestor_notes;
+  }
+
+  const { data, error } = await ctx.admin
+    .from("maintenance_requests")
+    .update(update)
+    .eq("id", body.id)
+    .eq("company_id", ctx.companyId)
+    .select("*")
+    .maybeSingle();
+  if (error) return fail(error.message, 400);
+  return ok(data);
+}
+
 // ============== ROUTER ==============
 
 Deno.serve(async (req) => {
@@ -190,6 +341,10 @@ Deno.serve(async (req) => {
     let response: Response;
     if (path === "/veiculos") {
       response = await handleVeiculos(req, url, ctx);
+    } else if (path === "/manutencoes") {
+      response = await handleManutencoes(req, url, ctx);
+    } else if (path === "/manutencoes/aprovar") {
+      response = await handleManutencoesAprovar(req, url, ctx);
     } else {
       response = fail("Rota não encontrada: " + path, 404);
     }
