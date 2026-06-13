@@ -95,6 +95,24 @@ async function readJson(req: Request): Promise<any> {
   }
 }
 
+const VEHICLE_STATUS_VALUES = new Set([
+  "ativo",
+  "manutencao",
+  "vendido",
+  "parado",
+  "sinistrado",
+  "inativo",
+  "transferido",
+  "roubado_furtado",
+  "leiloado",
+]);
+
+function normalizeVehicleStatus(value: unknown): string {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw || raw === "active") return "ativo";
+  return VEHICLE_STATUS_VALUES.has(raw) ? raw : "ativo";
+}
+
 // ============== HANDLERS ==============
 
 async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Response> {
@@ -119,7 +137,7 @@ async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Res
       year_model: body.year_model ?? body.ano ?? null,
       year_manufacture: body.year_manufacture ?? null,
       current_km: body.current_km ?? body.km ?? 0,
-      status: body.status ?? "ativo",
+      status: normalizeVehicleStatus(body.status),
       fuel_type: body.fuel_type ?? null,
     };
     const { data, error } = await ctx.admin.from("vehicles").insert(payload).select("*").maybeSingle();
@@ -131,6 +149,9 @@ async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Res
     if (!body?.id) return fail("Campo obrigatório: id.", 400);
     const { id, ...rest } = body;
     delete (rest as any).company_id;
+    if ("status" in rest) {
+      (rest as Record<string, unknown>).status = normalizeVehicleStatus((rest as Record<string, unknown>).status);
+    }
     const { data, error } = await ctx.admin
       .from("vehicles")
       .update(rest)
