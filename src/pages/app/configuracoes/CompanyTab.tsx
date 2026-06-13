@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import CepInput from "@/components/forms/CepInput";
 import AddressNumberFields from "@/components/forms/AddressNumberFields";
 import { isAddressMissingNumber } from "@/lib/address";
+import ApiKeyPanel from "./ApiKeyPanel";
 
 export default function CompanyTab({ companyId }: { companyId: string }) {
   const { refreshCompanies } = useAuth();
@@ -91,6 +92,8 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
   if (loading) return <div className="grid place-items-center py-12"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
 
   return (
+    <div className="space-y-6">
+    <ApiKeyPanel companyId={companyId} />
     <div className="surface-card rounded-xl p-6 max-w-2xl space-y-4">
       <h3 className="font-display font-semibold">Dados da empresa</h3>
       <div className="space-y-2">
@@ -196,6 +199,7 @@ export default function CompanyTab({ companyId }: { companyId: string }) {
           Salvar
         </Button>
       </div>
+    </div>
     </div>
   );
 }
