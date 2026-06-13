@@ -136,6 +136,43 @@ function normalizeMaintenanceStatus(value: unknown): string {
 
 // ============== HANDLERS ==============
 
+async function handleMe(req: Request, ctx: AuthCtx): Promise<Response> {
+  if (req.method !== "GET") return methodNotAllowed("GET");
+  const { data, error } = await ctx.admin
+    .from("companies")
+    .select("id, name, cnpj, email, phone, city, state, status")
+    .eq("id", ctx.companyId)
+    .maybeSingle();
+  if (error) return fail(error.message, 500);
+  if (!data) return fail("Empresa não encontrada.", 404);
+
+  let plano: string | null = null;
+  try {
+    const { data: sub } = await ctx.admin
+      .from("subscriptions")
+      .select("plan_id, status, plans(name)")
+      .eq("company_id", ctx.companyId)
+      .in("status", ["active", "trialing", "ativa"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    plano = (sub as any)?.plans?.name ?? null;
+  } catch { /* noop */ }
+
+  return ok({
+    company_id: data.id,
+    nome: (data as any).name,
+    cnpj: (data as any).cnpj,
+    email: (data as any).email,
+    telefone: (data as any).phone,
+    cidade: (data as any).city,
+    uf: (data as any).state,
+    status: (data as any).status,
+    plano,
+    chave: { nome: ctx.keyName, prefix: null },
+  });
+}
+
 async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Response> {
   if (req.method === "GET") {
     const { data, error } = await ctx.admin
@@ -341,6 +378,8 @@ Deno.serve(async (req) => {
     let response: Response;
     if (path === "/veiculos") {
       response = await handleVeiculos(req, url, ctx);
+    } else if (path === "/me") {
+      response = await handleMe(req, ctx);
     } else if (path === "/manutencoes") {
       response = await handleManutencoes(req, url, ctx);
     } else if (path === "/manutencoes/aprovar") {
