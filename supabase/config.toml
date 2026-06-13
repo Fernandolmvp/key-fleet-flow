@@ -53,3 +53,5 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.set-first-access-password]
     verify_jwt = false
+  [functions.frota-api]
+    verify_jwt = false
