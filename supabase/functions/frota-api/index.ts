@@ -101,7 +101,7 @@ async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Res
   if (req.method === "GET") {
     const { data, error } = await ctx.admin
       .from("vehicles")
-      .select("id, plate, brand, model, model_year, manufacture_year, current_km, status, fuel_type")
+      .select("id, plate, brand, model, year_model, year_manufacture, current_km, status, fuel_type")
       .eq("company_id", ctx.companyId)
       .order("plate", { ascending: true });
     if (error) return fail(error.message, 500);
@@ -116,8 +116,8 @@ async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Res
       plate: String(body.plate).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7),
       brand: body.brand ?? null,
       model: body.model,
-      model_year: body.model_year ?? body.ano ?? null,
-      manufacture_year: body.manufacture_year ?? null,
+      year_model: body.year_model ?? body.ano ?? null,
+      year_manufacture: body.year_manufacture ?? null,
       current_km: body.current_km ?? body.km ?? 0,
       status: body.status ?? "active",
       fuel_type: body.fuel_type ?? null,
