@@ -119,7 +119,7 @@ async function handleVeiculos(req: Request, url: URL, ctx: AuthCtx): Promise<Res
       year_model: body.year_model ?? body.ano ?? null,
       year_manufacture: body.year_manufacture ?? null,
       current_km: body.current_km ?? body.km ?? 0,
-      status: body.status ?? "active",
+      status: body.status ?? "ativo",
       fuel_type: body.fuel_type ?? null,
     };
     const { data, error } = await ctx.admin.from("vehicles").insert(payload).select("*").maybeSingle();
