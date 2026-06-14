@@ -139,12 +139,12 @@ export async function loadAgendaEvents(
     supabase
       .from("maintenance_records")
       .select(
-        "id,vehicle_id,type,category,description,next_service_at,workshop_id,workshop_name,status,total_value",
+        "id,vehicle_id,type,category,description,service_at,km_at_service,next_service_at,workshop_id,workshop_name,status,total_value",
       )
       .eq("company_id", companyId)
-      .gte("next_service_at", fromISO)
-      .lte("next_service_at", toISO)
-      .not("next_service_at", "is", null),
+      .or(
+        `and(service_at.gte.${fromISO},service_at.lte.${toISO}),and(next_service_at.gte.${fromISO},next_service_at.lte.${toISO})`,
+      ),
     supabase
       .from("vehicle_expenses")
       .select(
@@ -258,24 +258,56 @@ export async function loadAgendaEvents(
     const w = wsh(r.workshop_id);
     const type: AgendaEventType =
       r.type === "preventiva" ? "preventiva" : r.type === "pneus" ? "pneu" : "corretiva";
-    events.push({
-      id: `rec-${r.id}`,
-      source: "record",
-      type,
-      date: r.next_service_at,
-      time: null,
-      vehicle_id: r.vehicle_id,
-      vehicle_plate: v.plate,
-      vehicle_model: v.model,
-      description: r.description || r.category || "Próxima manutenção",
-      workshop_id: r.workshop_id,
-      local_name: w?.trade_name || w?.name || r.workshop_name || null,
-      local_address: fmtAddress(w),
-      status: r.status,
-      status_done: r.status === "concluida",
-      estimated_value: r.total_value ?? null,
-      url: `/app/maintenance`,
-    });
+    const typeLabel = TYPE_META[type].label;
+    const inRange = (d: string | null | undefined) =>
+      !!d && d >= fromISO && d <= toISO;
+    const baseDesc = r.description || r.category || "Manutenção";
+    const local_name = w?.trade_name || w?.name || r.workshop_name || null;
+    const local_address = fmtAddress(w);
+
+    const sameDate = r.service_at && r.next_service_at && r.service_at === r.next_service_at;
+
+    if (inRange(r.service_at)) {
+      events.push({
+        id: `rec-done-${r.id}`,
+        source: "record",
+        type,
+        date: r.service_at,
+        time: null,
+        vehicle_id: r.vehicle_id,
+        vehicle_plate: v.plate,
+        vehicle_model: v.model,
+        description: `${typeLabel} — ${baseDesc}`,
+        workshop_id: r.workshop_id,
+        local_name,
+        local_address,
+        status: r.status || "concluida",
+        status_done: true,
+        estimated_value: r.total_value ?? null,
+        url: `/app/maintenance`,
+      });
+    }
+
+    if (!sameDate && inRange(r.next_service_at)) {
+      events.push({
+        id: `rec-next-${r.id}`,
+        source: "record",
+        type,
+        date: r.next_service_at,
+        time: null,
+        vehicle_id: r.vehicle_id,
+        vehicle_plate: v.plate,
+        vehicle_model: v.model,
+        description: baseDesc,
+        workshop_id: r.workshop_id,
+        local_name,
+        local_address,
+        status: r.status,
+        status_done: false,
+        estimated_value: r.total_value ?? null,
+        url: `/app/maintenance`,
+      });
+    }
   });
 
   (exps ?? []).forEach((e: any) => {
