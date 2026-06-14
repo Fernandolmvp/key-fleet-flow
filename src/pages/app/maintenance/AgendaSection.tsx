@@ -37,6 +37,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Mode = "month" | "week" | "list";
 
+export interface UrgentPendency {
+  vehicle_id: string;
+  plate: string;
+  nextKm: number;
+  remaining: number;
+  overdue: boolean;
+}
+
+interface AgendaSectionProps {
+  urgentPendencies?: UrgentPendency[];
+  onSchedule?: (p: UrgentPendency) => void;
+  onQuickRegister?: (p: UrgentPendency) => void;
+}
+
 const TYPE_ICON: Record<AgendaEventType, any> = {
   preventiva: Wrench,
   corretiva: Wrench,
@@ -67,10 +81,11 @@ const sameDay = (a: Date, b: Date) =>
 const fmtBRL = (v?: number | null) =>
   v == null ? "—" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-export default function AgendaSection() {
+export default function AgendaSection({ urgentPendencies = [], onSchedule, onQuickRegister }: AgendaSectionProps = {}) {
   const { currentCompanyId } = useAuth();
   const nav = useNavigate();
   const [mode, setMode] = useState<Mode>("month");
+  const [listFocus, setListFocus] = useState<"range" | "today">("range");
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => {
@@ -109,6 +124,9 @@ export default function AgendaSection() {
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    if (listFocus === "today") {
+      return { from: fmtDate(today), to: fmtDate(today) };
+    }
     let s = today;
     let e = today;
     if (listRange === "7") e = addDays(today, 7);
@@ -123,7 +141,7 @@ export default function AgendaSection() {
       e = endOfMonth(nm);
     }
     return { from: fmtDate(s), to: fmtDate(e) };
-  }, [mode, cursor, listRange]);
+  }, [mode, cursor, listRange, listFocus]);
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -231,6 +249,46 @@ export default function AgendaSection() {
 
   return (
     <div className="space-y-4">
+      {/* URGENT PENDENCIES — top of agenda */}
+      {urgentPendencies.length > 0 && (
+        <div className="surface-card rounded-xl p-4 border border-warning/40 bg-warning/5">
+          <h3 className="font-display font-semibold text-sm flex items-center gap-2 text-warning">
+            <AlertTriangle className="h-4 w-4" /> Validar urgente — sem data ({urgentPendencies.length})
+          </h3>
+          <p className="text-[11px] text-muted-foreground mt-1">Veículos vencidos ou prestes a vencer a preventiva, sem agendamento aberto. Agende ou registre agora.</p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+            {urgentPendencies.map((p) => (
+              <div
+                key={p.vehicle_id}
+                className={`rounded-lg p-3 border flex items-center justify-between gap-2 ${
+                  p.overdue
+                    ? "bg-destructive/10 border-destructive/40"
+                    : "bg-warning/10 border-warning/40"
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="font-mono text-primary font-semibold">{p.plate}</div>
+                  <div className={`text-[11px] ${p.overdue ? "text-destructive" : "text-warning"}`}>
+                    {p.overdue
+                      ? `${Math.abs(p.remaining).toLocaleString("pt-BR")} km vencidos`
+                      : `Faltam ${p.remaining.toLocaleString("pt-BR")} km`}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Alvo ~{p.nextKm.toLocaleString("pt-BR")} km</div>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => onSchedule?.(p)}>
+                    <CalendarDays className="h-3 w-3 mr-1" /> Agendar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onQuickRegister?.(p)}>
+                    <Wrench className="h-3 w-3 mr-1" /> Registrar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filters bar */}
       <div className="surface-card rounded-xl p-4">
         {isMobile ? (
@@ -300,8 +358,22 @@ export default function AgendaSection() {
       {mode === "list" && (
         <div className="space-y-3">
           <div className="surface-card rounded-xl p-3 flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-md border border-border bg-card overflow-hidden">
+              <button
+                onClick={() => setListFocus("today")}
+                className={`px-3 py-1 text-xs ${listFocus === "today" ? "bg-primary text-primary-foreground" : "hover:bg-muted/40"}`}
+              >
+                Hoje / Dia
+              </button>
+              <button
+                onClick={() => setListFocus("range")}
+                className={`px-3 py-1 text-xs ${listFocus === "range" ? "bg-primary text-primary-foreground" : "hover:bg-muted/40"}`}
+              >
+                Período
+              </button>
+            </div>
             <span className="text-xs text-muted-foreground">Período:</span>
-            <Select value={listRange} onValueChange={(v: any) => setListRange(v)}>
+            <Select value={listRange} onValueChange={(v: any) => setListRange(v)} disabled={listFocus === "today"}>
               <SelectTrigger className="h-8 w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="7">Próximos 7 dias</SelectItem>
@@ -312,7 +384,15 @@ export default function AgendaSection() {
               </SelectContent>
             </Select>
           </div>
-          <ListView events={filtered} onOpen={openEvent} loading={loading} />
+          <ListView
+            events={
+              listFocus === "today"
+                ? [...filtered].sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"))
+                : filtered
+            }
+            onOpen={openEvent}
+            loading={loading}
+          />
         </div>
       )}
 
