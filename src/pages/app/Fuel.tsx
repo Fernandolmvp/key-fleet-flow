@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export default function Fuel() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["fuel_records"]);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este abastecimento? Esta ação será registrada no histórico de auditoria.")) return;
