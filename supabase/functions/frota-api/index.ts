@@ -989,15 +989,45 @@ async function handleChecklists(req: Request, url: URL, ctx: AuthCtx): Promise<R
 }
 
 // -------- Cadastros read-only: postos, oficinas, fornecedores --------
-async function handleReadOnlyList(
-  req: Request, ctx: AuthCtx, table: string, scope: string, columns: string, orderBy = "created_at",
+async function handleCadastro(
+  req: Request,
+  ctx: AuthCtx,
+  table: string,
+  resource: string,
+  columns: string,
+  allowedFields: string[],
+  requiredFields: string[],
+  defaults: Record<string, unknown> = {},
+  orderBy = "created_at",
 ): Promise<Response> {
-  if (req.method !== "GET") return methodNotAllowed("GET");
-  const guard = requireScope(ctx, scope); if (guard) return guard;
-  const { data, error } = await ctx.admin.from(table)
-    .select(columns).eq("company_id", ctx.companyId).order(orderBy, { ascending: false });
-  if (error) return fail(error.message, 500);
-  return ok(data ?? []);
+  if (req.method === "GET") {
+    const guard = requireScope(ctx, `${resource}:read`); if (guard) return guard;
+    const { data, error } = await ctx.admin.from(table)
+      .select(columns).eq("company_id", ctx.companyId).order(orderBy, { ascending: false });
+    if (error) return fail(error.message, 500);
+    return ok(data ?? []);
+  }
+  if (req.method === "POST") {
+    const guard = requireScope(ctx, `${resource}:write`); if (guard) return guard;
+    const body = await readJson(req);
+    const missing = requiredFields.filter((f) => !body?.[f] || String(body[f]).trim() === "");
+    if (missing.length) return fail(`Campos obrigatórios: ${missing.join(", ")}.`, 400);
+    const payload: Record<string, unknown> = { ...defaults, company_id: ctx.companyId };
+    for (const f of allowedFields) {
+      if (body[f] !== undefined) payload[f] = body[f];
+    }
+    if (typeof payload.cnpj === "string") {
+      const digits = (payload.cnpj as string).replace(/\D/g, "");
+      if (digits && digits.length !== 14) return fail("cnpj inválido (use 14 dígitos).", 400);
+      payload.cnpj = digits || null;
+    }
+    if (typeof payload.name === "string") payload.name = (payload.name as string).trim();
+    const { data, error } = await ctx.admin.from(table).insert(payload).select("*").maybeSingle();
+    if (error) return fail(error.message, 400);
+    await logWrite(ctx, resource, "create", (data as any)?.id ?? null, payload);
+    return ok(data, 201);
+  }
+  return methodNotAllowed("GET ou POST");
 }
 
 // -------- Ordens de serviço --------
@@ -1096,16 +1126,31 @@ Deno.serve(async (req) => {
     else if (path === "/multas") response = await handleMultas(req, url, ctx);
     else if (path === "/checklists") response = await handleChecklists(req, url, ctx);
     else if (path === "/postos") {
-      response = await handleReadOnlyList(req, ctx, "fuel_stations", "postos:read",
-        "id, name, cnpj, brand, city, state, active, preferred, rating");
+      response = await handleCadastro(
+        req, ctx, "fuel_stations", "postos",
+        "id, name, cnpj, brand, city, state, active, preferred, rating",
+        ["name", "cnpj", "brand", "city", "state", "active", "preferred"],
+        ["name"],
+        { active: true, preferred: false },
+      );
     }
     else if (path === "/oficinas") {
-      response = await handleReadOnlyList(req, ctx, "workshops", "oficinas:read",
-        "id, status, document_type, workshop_type, invoice_type");
+      response = await handleCadastro(
+        req, ctx, "workshops", "oficinas",
+        "id, name, cnpj, status, document_type, workshop_type, invoice_type, city, state",
+        ["name", "cnpj", "workshop_type", "document_type", "invoice_type", "city", "state", "status"],
+        ["name"],
+        { status: "ativo" },
+      );
     }
     else if (path === "/fornecedores") {
-      response = await handleReadOnlyList(req, ctx, "suppliers", "fornecedores:read",
-        "id, status, supplier_category, document_type, invoice_type");
+      response = await handleCadastro(
+        req, ctx, "suppliers", "fornecedores",
+        "id, name, cnpj, status, supplier_category, document_type, invoice_type, city, state",
+        ["name", "cnpj", "supplier_category", "document_type", "invoice_type", "city", "state", "status"],
+        ["name"],
+        { status: "ativo" },
+      );
     }
     else if (path === "/ordens") response = await handleOrdens(req, url, ctx);
     else response = fail("Rota não encontrada: " + path, 404);
