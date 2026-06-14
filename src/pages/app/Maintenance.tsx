@@ -17,6 +17,7 @@ import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { Label } from "@/components/ui/label";
 import { useTabPermissions } from "@/lib/permissions";
 import AgendaSection from "./maintenance/AgendaSection";
+import CorretivoSection from "./maintenance/CorretivoSection";
 
 interface MRec {
   id: string; vehicle_id: string; type: string; status: string; category: string | null;
@@ -47,9 +48,10 @@ export default function Maintenance() {
   const [intervalKm, setIntervalKm] = useState<number>(DEFAULT_INTERVAL_KM);
   const [scheduleDlg, setScheduleDlg] = useState<{ open: boolean; vehicleId: string | null; plate?: string; targetKm?: number | null }>({ open: false, vehicleId: null });
   const [quickMaintFromUrgent, setQuickMaintFromUrgent] = useState<string | null>(null);
+  const [quickCorretivaVehicle, setQuickCorretivaVehicle] = useState<string | null>(null);
   const [tab, setTab] = useState<string>("agenda");
   const { canViewTab, isVisible, fallback } = useTabPermissions(
-    "maintenance", ["agenda", "records", "schedules", "calendar", "costs"], tab,
+    "maintenance", ["agenda", "calendar", "corretivo", "costs", "records"], tab,
   );
   useEffect(() => {
     if (!isVisible && fallback) setTab(fallback);
@@ -240,10 +242,10 @@ export default function Maintenance() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           {canViewTab("agenda") && <TabsTrigger value="agenda">Agenda</TabsTrigger>}
-          {canViewTab("records") && <TabsTrigger value="records">Histórico</TabsTrigger>}
-          {canViewTab("schedules") && <TabsTrigger value="schedules">Agendamentos {overdue + upcoming > 0 && <Badge className="ml-2 bg-warning/30 text-warning">{overdue + upcoming}</Badge>}</TabsTrigger>}
-          {canViewTab("calendar") && <TabsTrigger value="calendar">Calendário Preventivo</TabsTrigger>}
+          {canViewTab("calendar") && <TabsTrigger value="calendar">Preventivo</TabsTrigger>}
+          {canViewTab("corretivo") && <TabsTrigger value="corretivo">Corretivo</TabsTrigger>}
           {canViewTab("costs") && <TabsTrigger value="costs">Custos por veículo</TabsTrigger>}
+          {canViewTab("records") && <TabsTrigger value="records">Histórico</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="agenda" className="mt-4">
@@ -321,43 +323,11 @@ export default function Maintenance() {
           )}
         </TabsContent>
 
-        <TabsContent value="schedules" className="mt-4">
-          {enrichedSchedules.length === 0 ? (
-            <div className="surface-card rounded-xl p-12 text-center">
-              <CalendarClock className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <h3 className="font-display font-semibold">Nenhum agendamento</h3>
-              <p className="text-sm text-muted-foreground mt-1">Ao registrar uma manutenção, defina a próxima troca por KM ou data para criar um alerta automático.</p>
-            </div>
-          ) : (
-            <div className="surface-card rounded-xl overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Veículo</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Alvo KM</TableHead>
-                    <TableHead>Alvo data</TableHead>
-                    <TableHead>Restante</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {enrichedSchedules.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-mono text-primary">{vehicles[s.vehicle_id]?.plate ?? "—"}</TableCell>
-                      <TableCell><Badge className={`capitalize border ${TYPE_TONE[s.type] ?? ""}`}>{s.type}</Badge></TableCell>
-                      <TableCell className="text-sm">{s.category}</TableCell>
-                      <TableCell className="font-mono text-xs">{s.target_km?.toLocaleString("pt-BR") ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{s.target_date ? new Date(s.target_date).toLocaleDateString("pt-BR") : "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{(s as any).progress ?? "—"}</TableCell>
-                      <TableCell><Badge className={`capitalize border ${SCHEDULE_STATUS_TONE[s.status] ?? ""}`}>{s.status}</Badge></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+        <TabsContent value="corretivo" className="mt-4">
+          <CorretivoSection
+            reloadKey={records.length}
+            onNewCorretiva={() => { setEditing(null); setQuickCorretivaVehicle(""); setOpen(true); }}
+          />
         </TabsContent>
 
         <TabsContent value="costs" className="mt-4">
@@ -513,8 +483,15 @@ export default function Maintenance() {
 
       <MaintenanceDialog
         open={open}
-        onOpenChange={(b) => { setOpen(b); if (!b) setQuickMaintFromUrgent(null); }}
-        record={editing ?? (quickMaintFromUrgent ? { vehicle_id: quickMaintFromUrgent, type: "preventiva" } as any : null)}
+        onOpenChange={(b) => { setOpen(b); if (!b) { setQuickMaintFromUrgent(null); setQuickCorretivaVehicle(null); } }}
+        record={
+          editing
+            ?? (quickMaintFromUrgent
+                ? ({ vehicle_id: quickMaintFromUrgent, type: "preventiva" } as any)
+                : (quickCorretivaVehicle !== null
+                    ? ({ vehicle_id: quickCorretivaVehicle, type: "corretiva" } as any)
+                    : null))
+        }
         onSaved={load}
       />
       <SchedulePreventiveDialog
