@@ -1018,6 +1018,7 @@ export type Database = {
           id: string
           is_exempt_from_trial: boolean
           logo_url: string | null
+          maintenance_default_interval_km: number | null
           name: string
           neighborhood: string | null
           onboarding_dismissed_at: string | null
@@ -1045,6 +1046,7 @@ export type Database = {
           id?: string
           is_exempt_from_trial?: boolean
           logo_url?: string | null
+          maintenance_default_interval_km?: number | null
           name: string
           neighborhood?: string | null
           onboarding_dismissed_at?: string | null
@@ -1072,6 +1074,7 @@ export type Database = {
           id?: string
           is_exempt_from_trial?: boolean
           logo_url?: string | null
+          maintenance_default_interval_km?: number | null
           name?: string
           neighborhood?: string | null
           onboarding_dismissed_at?: string | null
@@ -3657,6 +3660,8 @@ export type Database = {
           id: string
           interval_days: number | null
           interval_km: number | null
+          scheduled_time: string | null
+          scheduled_workshop_id: string | null
           status: Database["public"]["Enums"]["schedule_status"]
           target_date: string | null
           target_km: number | null
@@ -3674,6 +3679,8 @@ export type Database = {
           id?: string
           interval_days?: number | null
           interval_km?: number | null
+          scheduled_time?: string | null
+          scheduled_workshop_id?: string | null
           status?: Database["public"]["Enums"]["schedule_status"]
           target_date?: string | null
           target_km?: number | null
@@ -3691,6 +3698,8 @@ export type Database = {
           id?: string
           interval_days?: number | null
           interval_km?: number | null
+          scheduled_time?: string | null
+          scheduled_workshop_id?: string | null
           status?: Database["public"]["Enums"]["schedule_status"]
           target_date?: string | null
           target_km?: number | null
@@ -3704,6 +3713,13 @@ export type Database = {
             columns: ["completed_record_id"]
             isOneToOne: false
             referencedRelation: "maintenance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_schedules_scheduled_workshop_id_fkey"
+            columns: ["scheduled_workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
           {
