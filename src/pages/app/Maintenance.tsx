@@ -420,8 +420,8 @@ export default function Maintenance() {
               </h3>
               <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                 {toDoNow.map((c) => (
-                  <div key={c.id} className="surface-card rounded-lg p-3 flex items-center justify-between">
-                    <div>
+                  <div key={c.id} className="surface-card rounded-lg p-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <div className="font-mono text-primary font-semibold">{c.plate}</div>
                       <div className="text-xs text-muted-foreground">
                         {c.remaining < 0
@@ -429,7 +429,12 @@ export default function Maintenance() {
                           : `Faltam ${c.remaining.toLocaleString("pt-BR")} km`}
                       </div>
                     </div>
-                    <Badge className={`border ${c.tone}`}>{c.label}</Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge className={`border ${c.tone}`}>{c.label}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => setScheduleDlg({ open: true, vehicleId: c.id, plate: c.plate, targetKm: c.nextKm })}>
+                        <CalendarClock className="h-3 w-3 mr-1" /> Agendar
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -453,6 +458,7 @@ export default function Maintenance() {
                     <TableHead className="text-right">Próxima em (KM)</TableHead>
                     <TableHead className="text-right">Restante</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -485,7 +491,17 @@ export default function Maintenance() {
                       <TableCell className="text-right font-mono text-xs font-semibold">
                         {c.remaining.toLocaleString("pt-BR")} km
                       </TableCell>
-                      <TableCell><Badge className={`border ${c.tone}`}>{c.label}</Badge></TableCell>
+                      <TableCell>
+                        <Badge className={`border ${c.tone}`}>{c.label}</Badge>
+                        {hasOpenPreventive.has(c.id) && (
+                          <div className="text-[10px] text-success mt-1">Agendado</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => setScheduleDlg({ open: true, vehicleId: c.id, plate: c.plate, targetKm: c.nextKm })}>
+                          <CalendarClock className="h-3 w-3 mr-1" /> Agendar
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -495,7 +511,20 @@ export default function Maintenance() {
         </TabsContent>
       </Tabs>
 
-      <MaintenanceDialog open={open} onOpenChange={setOpen} record={editing} onSaved={load} />
+      <MaintenanceDialog
+        open={open}
+        onOpenChange={(b) => { setOpen(b); if (!b) setQuickMaintFromUrgent(null); }}
+        record={editing ?? (quickMaintFromUrgent ? { vehicle_id: quickMaintFromUrgent, type: "preventiva" } as any : null)}
+        onSaved={load}
+      />
+      <SchedulePreventiveDialog
+        open={scheduleDlg.open}
+        onOpenChange={(b) => setScheduleDlg((s) => ({ ...s, open: b }))}
+        vehicleId={scheduleDlg.vehicleId}
+        vehiclePlate={scheduleDlg.plate}
+        targetKm={scheduleDlg.targetKm ?? null}
+        onSaved={load}
+      />
       <ChecklistDialog
         open={checklistOpen}
         onOpenChange={setChecklistOpen}
