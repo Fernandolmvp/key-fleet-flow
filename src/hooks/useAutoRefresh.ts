@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
  *   not, the focus + polling fallback still keeps the UI fresh).
  */
 export function useAutoRefresh(
-  reload: () => void | Promise<void>,
+  reload: () => unknown | Promise<unknown>,
   tables: string[] = [],
   opts: { intervalMs?: number; enabled?: boolean } = {}
 ) {
