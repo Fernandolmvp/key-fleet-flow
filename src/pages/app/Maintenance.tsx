@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import KpiCard from "@/components/dashboard/KpiCard";
 import MaintenanceDialog from "@/components/dashboard/MaintenanceDialog";
 import ChecklistDialog from "@/components/dashboard/ChecklistDialog";
+import SchedulePreventiveDialog from "@/components/dashboard/SchedulePreventiveDialog";
 import { STATUS_TONE, TYPE_TONE, SCHEDULE_STATUS_TONE, fmtBRL } from "@/lib/maintenance";
 import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,8 @@ export default function Maintenance() {
   const [loading, setLoading] = useState(true);
   const intervalKey = `maint_interval_km:${currentCompanyId ?? "_"}`;
   const [intervalKm, setIntervalKm] = useState<number>(DEFAULT_INTERVAL_KM);
+  const [scheduleDlg, setScheduleDlg] = useState<{ open: boolean; vehicleId: string | null; plate?: string; targetKm?: number | null }>({ open: false, vehicleId: null });
+  const [quickMaintFromUrgent, setQuickMaintFromUrgent] = useState<string | null>(null);
   const [tab, setTab] = useState<string>("agenda");
   const { canViewTab, isVisible, fallback } = useTabPermissions(
     "maintenance", ["agenda", "records", "schedules", "calendar", "costs"], tab,
@@ -54,13 +57,24 @@ export default function Maintenance() {
 
   useEffect(() => {
     if (!currentCompanyId) return;
-    const saved = localStorage.getItem(intervalKey);
-    setIntervalKm(saved ? Number(saved) || DEFAULT_INTERVAL_KM : DEFAULT_INTERVAL_KM);
+    (async () => {
+      const { data } = await supabase.from("companies").select("maintenance_default_interval_km").eq("id", currentCompanyId).maybeSingle();
+      const dbVal = (data as any)?.maintenance_default_interval_km as number | null | undefined;
+      if (dbVal && dbVal > 0) {
+        setIntervalKm(Number(dbVal));
+        return;
+      }
+      const saved = localStorage.getItem(intervalKey);
+      setIntervalKm(saved ? Number(saved) || DEFAULT_INTERVAL_KM : DEFAULT_INTERVAL_KM);
+    })();
   }, [currentCompanyId]);
 
   const saveInterval = (n: number) => {
     setIntervalKm(n);
     localStorage.setItem(intervalKey, String(n));
+    if (currentCompanyId && n > 0) {
+      supabase.from("companies").update({ maintenance_default_interval_km: n }).eq("id", currentCompanyId);
+    }
   };
 
   const load = async () => {
@@ -76,7 +90,25 @@ export default function Maintenance() {
     (v ?? []).forEach((x: any) => { map[x.id] = { plate: x.plate, current_km: x.current_km }; });
     setVehicles(map);
     setRecords(((r ?? []) as MRec[]).filter((x) => map[x.vehicle_id]));
-    setSchedules(((s ?? []) as Sched[]).filter((x) => map[x.vehicle_id]));
+    const sList = ((s ?? []) as Sched[]).filter((x) => map[x.vehicle_id]);
+    setSchedules(sList);
+    // Reconcile: close open preventive schedules when a completed preventive record fulfills them
+    try {
+      const prevRecs = ((r ?? []) as MRec[]).filter((x) => x.type === "preventiva" && x.status === "concluida");
+      const toClose: string[] = [];
+      sList.filter((sc) => sc.type === "preventiva").forEach((sc) => {
+        const match = prevRecs.find((rec) => {
+          if (rec.vehicle_id !== sc.vehicle_id) return false;
+          if (sc.target_km != null && rec.km_at_service != null && rec.km_at_service >= sc.target_km) return true;
+          if (sc.target_date && rec.service_at && new Date(rec.service_at) >= new Date(sc.target_date)) return true;
+          return false;
+        });
+        if (match) toClose.push(sc.id);
+      });
+      if (toClose.length) {
+        await supabase.from("maintenance_schedules").update({ status: "concluida" } as any).in("id", toClose);
+      }
+    } catch {/* noop */}
     const fuelMap: Record<string, { km: number; at: string }> = {};
     (f ?? []).forEach((row: any) => {
       if (!fuelMap[row.vehicle_id]) fuelMap[row.vehicle_id] = { km: row.km_at_fueling, at: row.fueled_at };
@@ -164,7 +196,27 @@ export default function Maintenance() {
     () => calendar.filter((c) => c.plate.toLowerCase().includes(calQ.toLowerCase())),
     [calendar, calQ],
   );
-  const toDoNow = filteredCalendar.filter((c) => c.label === "Fazer agora" || c.label === "Vencida");
+  // Vehicles with an open preventive schedule already
+  const hasOpenPreventive = useMemo(() => {
+    const set = new Set<string>();
+    schedules.forEach((s) => { if (s.type === "preventiva" && s.status !== "concluida") set.add(s.vehicle_id); });
+    return set;
+  }, [schedules]);
+  const toDoNow = filteredCalendar.filter((c) => (c.label === "Fazer agora" || c.label === "Vencida") && !hasOpenPreventive.has(c.id));
+
+  // Urgent pendencies for the Agenda tab (unscheduled near/over due preventives)
+  const urgentPendencies = useMemo(() => {
+    return calendar
+      .filter((c) => (c.label === "Fazer agora" || c.label === "Vencida") && !hasOpenPreventive.has(c.id))
+      .map((c) => ({
+        vehicle_id: c.id,
+        plate: c.plate,
+        nextKm: c.nextKm,
+        remaining: c.remaining,
+        overdue: c.remaining < 0,
+      }))
+      .sort((a, b) => a.remaining - b.remaining);
+  }, [calendar, hasOpenPreventive]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -181,8 +233,8 @@ export default function Maintenance() {
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard label="Gasto total" value={fmtBRL(totalSpent)} icon={DollarSign} tone="primary" />
         <KpiCard label="Últimos 30 dias" value={fmtBRL(last30)} icon={Activity} tone="success" />
-        <KpiCard label="Fazer preventivo" value={String(toDoNow.length)} icon={BellRing} tone="warning" hint={`a ≤ ${ALERT_THRESHOLD_KM.toLocaleString("pt-BR")} km`} />
-        <KpiCard label="Vencidas" value={String(calendar.filter((c)=>c.label==="Vencida").length)} icon={AlertTriangle} tone="destructive" />
+        <KpiCard label="Validar urgente" value={String(urgentPendencies.length)} icon={BellRing} tone="warning" hint="sem agendamento aberto" />
+        <KpiCard label="Vencidas" value={String(calendar.filter((c)=>c.label==="Vencida" && !hasOpenPreventive.has(c.id)).length)} icon={AlertTriangle} tone="destructive" />
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -195,7 +247,11 @@ export default function Maintenance() {
         </TabsList>
 
         <TabsContent value="agenda" className="mt-4">
-          <AgendaSection />
+          <AgendaSection
+            urgentPendencies={urgentPendencies}
+            onSchedule={(p) => setScheduleDlg({ open: true, vehicleId: p.vehicle_id, plate: p.plate, targetKm: p.nextKm })}
+            onQuickRegister={(p) => { setEditing(null); setQuickMaintFromUrgent(p.vehicle_id); setOpen(true); }}
+          />
         </TabsContent>
 
         <TabsContent value="records" className="space-y-4 mt-4">
