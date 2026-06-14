@@ -418,7 +418,7 @@ export default function AgendaSection({ urgentPendencies = [], onSchedule, onQui
                 <div className="flex items-start gap-2">
                   <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div>
-                    <div className="font-mono">{new Date(selected.date + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</div>
+                    <div className="font-mono">{new Date(String(selected.date).slice(0,10) + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</div>
                     {selected.time && <div className="text-xs text-muted-foreground">{selected.time}</div>}
                   </div>
                 </div>
@@ -680,7 +680,7 @@ function ListView({
             return (
               <TableRow key={e.id} className={e.status_done ? "opacity-70" : ""}>
                 <TableCell className="font-mono text-xs">
-                  {new Date(e.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                  {new Date(String(e.date).slice(0,10) + "T00:00:00").toLocaleDateString("pt-BR")}
                   {e.time && <div className="text-[10px] text-muted-foreground">{e.time}</div>}
                 </TableCell>
                 <TableCell>
