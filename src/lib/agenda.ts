@@ -268,8 +268,9 @@ export async function loadAgendaEvents(
     const sameDate = r.service_at && r.next_service_at && r.service_at === r.next_service_at;
 
     if (inRange(r.service_at)) {
+      const done = ["concluida", "finalizada"].includes(String(r.status ?? "").toLowerCase());
       events.push({
-        id: `rec-done-${r.id}`,
+        id: `rec-do-${r.id}`,
         source: "record",
         type,
         date: r.service_at,
@@ -281,8 +282,8 @@ export async function loadAgendaEvents(
         workshop_id: r.workshop_id,
         local_name,
         local_address,
-        status: r.status || "concluida",
-        status_done: true,
+        status: r.status || "agendada",
+        status_done: done,
         estimated_value: r.total_value ?? null,
         url: `/app/maintenance`,
       });
