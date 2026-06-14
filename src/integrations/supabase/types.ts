@@ -350,6 +350,7 @@ export type Database = {
           key_prefix: string
           last_used_at: string | null
           nome: string
+          scopes: string[]
           updated_at: string
         }
         Insert: {
@@ -362,6 +363,7 @@ export type Database = {
           key_prefix: string
           last_used_at?: string | null
           nome: string
+          scopes?: string[]
           updated_at?: string
         }
         Update: {
@@ -374,6 +376,7 @@ export type Database = {
           key_prefix?: string
           last_used_at?: string | null
           nome?: string
+          scopes?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -436,6 +439,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      api_write_audit: {
+        Row: {
+          action: string
+          api_key_id: string | null
+          company_id: string
+          created_at: string
+          entity_id: string | null
+          id: string
+          key_name: string | null
+          payload: Json | null
+          resource: string
+        }
+        Insert: {
+          action: string
+          api_key_id?: string | null
+          company_id: string
+          created_at?: string
+          entity_id?: string | null
+          id?: string
+          key_name?: string | null
+          payload?: Json | null
+          resource: string
+        }
+        Update: {
+          action?: string
+          api_key_id?: string | null
+          company_id?: string
+          created_at?: string
+          entity_id?: string | null
+          id?: string
+          key_name?: string | null
+          payload?: Json | null
+          resource?: string
+        }
+        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -1442,6 +1481,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           doc_type: Database["public"]["Enums"]["document_type"]
           document_number: string | null
           entity_id: string
@@ -1465,6 +1505,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           doc_type: Database["public"]["Enums"]["document_type"]
           document_number?: string | null
           entity_id: string
@@ -1488,6 +1529,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           doc_type?: Database["public"]["Enums"]["document_type"]
           document_number?: string | null
           entity_id?: string
