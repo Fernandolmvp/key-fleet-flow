@@ -21,6 +21,7 @@ import AddressNumberFields from "@/components/forms/AddressNumberFields";
 import { isAddressMissingNumber } from "@/lib/address";
 import { formatCpf, isValidCpf, onlyDigits } from "@/lib/document";
 import { translateDbError } from "@/lib/db-error";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -127,6 +128,7 @@ export default function Drivers() {
     setVehicles(((vs ?? []) as any[]).filter((v) => !["vendido", "inativo"].includes(String(v.status ?? "").toLowerCase())));
   };
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["drivers", "documents"]);
 
   const openNew = () => { setEditing(null); setForm(blank()); setArchivedDoc(null); setOpen(true); };
   const openEdit = (d: Driver) => { setEditing(d); setForm({ ...blank(), ...d }); setArchivedDoc(null); setOpen(true); };
