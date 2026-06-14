@@ -131,7 +131,7 @@ export async function loadAgendaEvents(
       .not("scheduled_date", "is", null),
     supabase
       .from("maintenance_schedules")
-      .select("id,vehicle_id,type,category,description,target_date,status")
+      .select("id,vehicle_id,type,category,description,target_date,status,scheduled_time,scheduled_workshop_id,target_km")
       .eq("company_id", companyId)
       .gte("target_date", fromISO)
       .lte("target_date", toISO)
@@ -230,6 +230,7 @@ export async function loadAgendaEvents(
 
   (scheds ?? []).forEach((s: any) => {
     const v = veh(s.vehicle_id);
+    const w = wsh(s.scheduled_workshop_id);
     const type: AgendaEventType =
       s.type === "preventiva" ? "preventiva" : s.type === "pneus" ? "pneu" : "corretiva";
     events.push({
@@ -237,13 +238,14 @@ export async function loadAgendaEvents(
       source: "schedule",
       type,
       date: s.target_date,
-      time: null,
+      time: s.scheduled_time ? String(s.scheduled_time).slice(0, 5) : null,
       vehicle_id: s.vehicle_id,
       vehicle_plate: v.plate,
       vehicle_model: v.model,
       description: s.description || s.category || "Manutenção planejada",
-      local_name: null,
-      local_address: null,
+      workshop_id: s.scheduled_workshop_id ?? null,
+      local_name: w?.trade_name || w?.name || null,
+      local_address: fmtAddress(w),
       status: s.status,
       status_done: s.status === "concluida",
       estimated_value: null,
