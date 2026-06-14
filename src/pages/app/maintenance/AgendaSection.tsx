@@ -25,6 +25,7 @@ import {
   FileBadge,
   Clock,
   X,
+  Check,
 } from "lucide-react";
 import {
   ALL_AGENDA_TYPES,
