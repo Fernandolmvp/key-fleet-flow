@@ -527,9 +527,9 @@ function MonthView({
                     <button
                       key={e.id}
                       onClick={() => onOpen(e)}
-                      className={`w-full text-left px-1.5 py-0.5 rounded border text-[10px] flex items-center gap-1 truncate ${TYPE_META[e.type].chipClass}`}
+                      className={`w-full text-left px-1.5 py-0.5 rounded border text-[10px] flex items-center gap-1 truncate ${TYPE_META[e.type].chipClass} ${e.status_done ? "opacity-60 border-dashed line-through decoration-1" : ""}`}
                     >
-                      <Icon className="h-2.5 w-2.5 shrink-0" />
+                      {e.status_done ? <Check className="h-2.5 w-2.5 shrink-0" /> : <Icon className="h-2.5 w-2.5 shrink-0" />}
                       <span className="font-mono truncate">{e.vehicle_plate}</span>
                     </button>
                   );
@@ -611,11 +611,13 @@ function WeekView({
                     <button
                       key={e.id}
                       onClick={() => onOpen(e)}
-                      className={`w-full text-left p-2 rounded border text-xs ${TYPE_META[e.type].chipClass}`}
+                      className={`w-full text-left p-2 rounded border text-xs ${TYPE_META[e.type].chipClass} ${e.status_done ? "opacity-60 border-dashed" : ""}`}
                     >
                       {e.time && <div className="font-mono text-[10px] opacity-80">{e.time}</div>}
                       <div className="flex items-center gap-1 font-semibold">
-                        <Icon className="h-3 w-3" /> {e.vehicle_plate}
+                        {e.status_done ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
+                        {e.vehicle_plate}
+                        {e.status_done && <span className="ml-auto text-[9px] font-normal opacity-80">realizada</span>}
                       </div>
                       <div className="text-[10px] opacity-80 truncate">{e.vehicle_model}</div>
                       {e.local_name && <div className="text-[10px] opacity-70 truncate">{e.local_name}</div>}
@@ -676,7 +678,7 @@ function ListView({
           {slice.map((e) => {
             const Icon = TYPE_ICON[e.type];
             return (
-              <TableRow key={e.id}>
+              <TableRow key={e.id} className={e.status_done ? "opacity-70" : ""}>
                 <TableCell className="font-mono text-xs">
                   {new Date(e.date + "T00:00:00").toLocaleDateString("pt-BR")}
                   {e.time && <div className="text-[10px] text-muted-foreground">{e.time}</div>}
@@ -686,8 +688,9 @@ function ListView({
                   <div className="text-[10px] text-muted-foreground">{e.vehicle_model}</div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={`border ${TYPE_META[e.type].chipClass}`}>
-                    <Icon className="h-3 w-3 mr-1" /> {TYPE_META[e.type].label}
+                  <Badge className={`border ${TYPE_META[e.type].chipClass} ${e.status_done ? "border-dashed" : ""}`}>
+                    {e.status_done ? <Check className="h-3 w-3 mr-1" /> : <Icon className="h-3 w-3 mr-1" />}
+                    {TYPE_META[e.type].label}{e.status_done ? " (realizada)" : ""}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm max-w-xs truncate">{e.description}</TableCell>
