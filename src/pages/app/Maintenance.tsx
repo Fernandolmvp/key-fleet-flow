@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,7 @@ export default function Maintenance() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["maintenance_records", "maintenance_schedules", "maintenance_work_orders", "maintenance_requests"]);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este registro?")) return;

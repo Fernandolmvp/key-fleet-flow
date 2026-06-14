@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,7 @@ export default function Vehicles() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["vehicles", "documents", "drivers"]);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este veículo?")) return;

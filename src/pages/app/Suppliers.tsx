@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export default function Suppliers() {
     setItems(data ?? []);
   };
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["suppliers"]);
 
   const openNew = () => { setEditing(null); setForm(blank()); setOpen(true); };
   const openEdit = (s: any) => {
