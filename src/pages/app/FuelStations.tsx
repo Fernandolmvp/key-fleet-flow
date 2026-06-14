@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export default function FuelStations() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["fuel_stations"]);
 
   const openNew = () => { setEditing(null); setForm(blank()); setOpen(true); };
   const openEdit = (s: Station) => {
