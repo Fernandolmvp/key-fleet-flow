@@ -23,7 +23,36 @@ function pick(obj: any, paths: string[]): string | null {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const payload = await req.json().catch(() => ({}))
+    const rawBody = await req.text()
+
+    // Verify Cal.com HMAC signature when secret is configured
+    const secret = Deno.env.get('CAL_WEBHOOK_SECRET')
+    if (secret) {
+      const sigHeader = req.headers.get('x-cal-signature-256') || ''
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign'],
+      )
+      const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
+      const expected = Array.from(new Uint8Array(sigBuf))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+      if (sigHeader.toLowerCase() !== expected.toLowerCase()) {
+        console.warn('cal-webhook: invalid signature')
+        return new Response(JSON.stringify({ error: 'invalid signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } else {
+      console.warn('cal-webhook: CAL_WEBHOOK_SECRET not set — signature verification skipped')
+    }
+
+    let payload: any = {}
+    try { payload = JSON.parse(rawBody) } catch { payload = {} }
     // Cal.com format: { triggerEvent, payload: { ... } }
     const data = payload?.payload ?? payload
     const attendee = Array.isArray(data?.attendees) ? data.attendees[0] : data?.attendees

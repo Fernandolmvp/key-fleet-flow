@@ -295,11 +295,12 @@ Deno.serve(async (req) => {
 
       console.log(`[OTP EMAIL] ${email} | código: ${code}`);
 
+      const isDev = Deno.env.get("ENVIRONMENT") === "development";
       return json({
         ok: true,
         expires_at: expiresAt,
         masked_email: maskEmail(email),
-        dev_code: code,
+        ...(isDev ? { dev_code: code } : {}),
       });
     }
 
