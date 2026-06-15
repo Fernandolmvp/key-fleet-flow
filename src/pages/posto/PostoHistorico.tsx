@@ -15,6 +15,14 @@ type Row = {
 };
 
 function fmt(n: number) { return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(n); }
+function escHtml(s: unknown): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 export default function PostoHistorico() {
   const { authedFetch, station } = usePostoAuth();
@@ -73,24 +81,24 @@ export default function PostoHistorico() {
 
   const exportPdf = () => {
     const html = `
-      <html><head><meta charset="utf-8"><title>Histórico ${station?.name ?? ""}</title>
+      <html><head><meta charset="utf-8"><title>Histórico ${escHtml(station?.name)}</title>
       <style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{margin:0 0 4px}h2{font-size:14px;color:#555;margin:0 0 16px}
       table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ddd;padding:6px;text-align:left}
       th{background:#f3f4f6}tfoot td{font-weight:bold;background:#f9fafb}</style></head>
       <body>
       <h1>Histórico de abastecimentos</h1>
-      <h2>${station?.name ?? ""} ${station?.cnpj ? "· CNPJ " + station.cnpj : ""}</h2>
+      <h2>${escHtml(station?.name)} ${station?.cnpj ? "· CNPJ " + escHtml(station.cnpj) : ""}</h2>
       <table>
         <thead><tr><th>Data</th><th>Placa</th><th>Motorista</th><th>Empresa</th><th>Litros</th><th>R$/L</th><th>Total</th><th>Cupom</th></tr></thead>
         <tbody>${rows.map((r) => `<tr>
-          <td>${new Date(r.fueled_at).toLocaleString("pt-BR")}</td>
-          <td>${r.vehicle?.plate ?? ""}</td>
-          <td>${r.driver?.full_name ?? ""}</td>
-          <td>${r.company?.name ?? ""}</td>
+          <td>${escHtml(new Date(r.fueled_at).toLocaleString("pt-BR"))}</td>
+          <td>${escHtml(r.vehicle?.plate)}</td>
+          <td>${escHtml(r.driver?.full_name)}</td>
+          <td>${escHtml(r.company?.name)}</td>
           <td>${fmt(Number(r.liters))}</td>
           <td>R$ ${fmt(Number(r.price_per_liter))}</td>
           <td>R$ ${fmt(Number(r.total_value))}</td>
-          <td>${r.notes ?? ""}</td>
+          <td>${escHtml(r.notes)}</td>
         </tr>`).join("")}</tbody>
         <tfoot><tr><td colspan="4">Total — ${totals.qtd} abastecimentos</td>
           <td>${fmt(totals.liters)}</td><td></td><td>R$ ${fmt(totals.value)}</td><td></td></tr></tfoot>
