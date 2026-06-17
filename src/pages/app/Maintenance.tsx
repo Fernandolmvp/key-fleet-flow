@@ -18,7 +18,7 @@ import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { Label } from "@/components/ui/label";
 import { useTabPermissions } from "@/lib/permissions";
 import AgendaSection from "./maintenance/AgendaSection";
-import CorretivoSection from "./maintenance/CorretivoSection";
+import SituacaoSection from "./maintenance/SituacaoSection";
 
 interface MRec {
   id: string; vehicle_id: string; type: string; status: string; category: string | null;
@@ -50,9 +50,9 @@ export default function Maintenance() {
   const [scheduleDlg, setScheduleDlg] = useState<{ open: boolean; vehicleId: string | null; plate?: string; targetKm?: number | null }>({ open: false, vehicleId: null });
   const [quickMaintFromUrgent, setQuickMaintFromUrgent] = useState<string | null>(null);
   const [quickCorretivaVehicle, setQuickCorretivaVehicle] = useState<string | null>(null);
-  const [tab, setTab] = useState<string>("agenda");
+  const [tab, setTab] = useState<string>("situacao");
   const { canViewTab, isVisible, fallback } = useTabPermissions(
-    "maintenance", ["agenda", "calendar", "corretivo", "costs", "records"], tab,
+    "maintenance", ["situacao", "agenda", "historico", "preventivo"], tab,
   );
   useEffect(() => {
     if (!isVisible && fallback) setTab(fallback);
@@ -243,12 +243,15 @@ export default function Maintenance() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          {canViewTab("situacao") && <TabsTrigger value="situacao">Situação da frota</TabsTrigger>}
           {canViewTab("agenda") && <TabsTrigger value="agenda">Agenda</TabsTrigger>}
-          {canViewTab("calendar") && <TabsTrigger value="calendar">Preventivo</TabsTrigger>}
-          {canViewTab("corretivo") && <TabsTrigger value="corretivo">Corretivo</TabsTrigger>}
-          {canViewTab("costs") && <TabsTrigger value="costs">Custos por veículo</TabsTrigger>}
-          {canViewTab("records") && <TabsTrigger value="records">Histórico</TabsTrigger>}
+          {canViewTab("historico") && <TabsTrigger value="historico">Histórico &amp; Custos</TabsTrigger>}
+          {canViewTab("preventivo") && <TabsTrigger value="preventivo">Preventivo</TabsTrigger>}
         </TabsList>
+
+        <TabsContent value="situacao" className="mt-4">
+          <SituacaoSection />
+        </TabsContent>
 
         <TabsContent value="agenda" className="mt-4">
           <AgendaSection
@@ -258,7 +261,7 @@ export default function Maintenance() {
           />
         </TabsContent>
 
-        <TabsContent value="records" className="space-y-4 mt-4">
+        <TabsContent value="historico" className="space-y-4 mt-4">
           <div className="surface-card rounded-xl p-4">
             <div className="relative max-w-sm">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -323,19 +326,8 @@ export default function Maintenance() {
               </Table>
             </div>
           )}
-        </TabsContent>
 
-        <TabsContent value="corretivo" className="mt-4">
-          <CorretivoSection
-            reloadKey={records.length}
-            onNewCorretiva={() => { setEditing(null); setQuickCorretivaVehicle(""); setOpen(true); }}
-          />
-        </TabsContent>
-
-        <TabsContent value="costs" className="mt-4">
-          {byVehicle.length === 0 ? (
-            <div className="surface-card rounded-xl p-12 text-center text-muted-foreground">Sem dados</div>
-          ) : (
+          {byVehicle.length > 0 && (
             <div className="surface-card rounded-xl p-6 space-y-3">
               <h3 className="font-display font-semibold">Top 5 veículos com maior custo</h3>
               {byVehicle.map((v, i) => {
@@ -357,7 +349,7 @@ export default function Maintenance() {
           )}
         </TabsContent>
 
-        <TabsContent value="calendar" className="mt-4 space-y-4">
+        <TabsContent value="preventivo" className="mt-4 space-y-4">
           <div className="surface-card rounded-xl p-4 flex flex-wrap items-end gap-4">
             <div className="flex items-center gap-2">
               <Settings2 className="h-4 w-4 text-primary" />
