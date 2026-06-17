@@ -7062,6 +7062,10 @@ export type Database = {
         Args: { p_policy_id?: string }
         Returns: undefined
       }
+      recompute_vehicle_maintenance_status: {
+        Args: { _vehicle_id: string }
+        Returns: undefined
+      }
       record_stripe_payment: {
         Args: {
           _amount: number
