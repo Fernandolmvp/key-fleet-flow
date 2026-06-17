@@ -18,7 +18,6 @@ import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { Label } from "@/components/ui/label";
 import { useTabPermissions } from "@/lib/permissions";
 import AgendaSection from "./maintenance/AgendaSection";
-import CorretivoSection from "./maintenance/CorretivoSection";
 import SituacaoSection from "./maintenance/SituacaoSection";
 
 interface MRec {
