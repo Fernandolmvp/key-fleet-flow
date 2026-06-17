@@ -74,11 +74,10 @@ export const MODULE_TABS: Partial<Record<PermModule, { value: string; label: str
     { value: "historico", label: "Histórico" },
   ],
   maintenance: [
+    { value: "situacao", label: "Situação da frota" },
     { value: "agenda", label: "Agenda" },
-    { value: "records", label: "Histórico" },
-    { value: "schedules", label: "Agendamentos" },
-    { value: "calendar", label: "Calendário Preventivo" },
-    { value: "costs", label: "Custos por veículo" },
+    { value: "historico", label: "Histórico & Custos" },
+    { value: "preventivo", label: "Calendário Preventivo" },
   ],
   tires: [
     { value: "list", label: "Pneus" },
