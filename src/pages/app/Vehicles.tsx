@@ -12,8 +12,8 @@ import VehicleBulkImportDialog from "@/components/dashboard/VehicleBulkImportDia
 import { Badge } from "@/components/ui/badge";
 import { useTabPermissions } from "@/lib/permissions";
 import {
-  loadDetranCalendar, computeLicensingStatus, licensingBadgeText,
-  licensingTooltip, licensingBadgeClass, type DetranCalendar, type LicensingResult,
+  useDetranCalendar, computeLicensingStatus, licensingBadgeText,
+  licensingTooltip, licensingBadgeClass, type LicensingResult,
 } from "@/lib/licensing";
 
 interface Vehicle {
@@ -75,9 +75,7 @@ export default function Vehicles() {
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("vehicles:view") as "grid" | "list") || "grid");
   const [tab, setTab] = useState<string>(() => localStorage.getItem("vehicles:tab") || "ativos");
-  const [calendar, setCalendar] = useState<DetranCalendar>(() => new Map());
-
-  useEffect(() => { loadDetranCalendar().then(setCalendar); }, []);
+  const calendar = useDetranCalendar();
 
   useEffect(() => { localStorage.setItem("vehicles:view", view); }, [view]);
   useEffect(() => { localStorage.setItem("vehicles:tab", tab); }, [tab]);
