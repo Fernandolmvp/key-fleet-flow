@@ -55,3 +55,9 @@ project_id = "qvhgivhlgumcxaneizzb"
     verify_jwt = false
   [functions.frota-api]
     verify_jwt = false
+  [functions.admin-create-test-user]
+    verify_jwt = false
+  [functions.admin-delete-test-user]
+    verify_jwt = false
+  [functions.admin-list-test-users]
+    verify_jwt = false

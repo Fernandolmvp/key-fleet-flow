@@ -14,11 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Search, DollarSign, Users, Truck, AlertTriangle,
-  CheckCircle2, Pencil, Receipt, Loader2, Layers, ChevronDown, ChevronRight
+  CheckCircle2, Pencil, Receipt, Loader2, Layers, ChevronDown, ChevronRight, KeyRound
 } from "lucide-react";
 import { toast } from "sonner";
 import CompanyMembersDialog from "./CompanyMembersDialog";
 import GroupInfoDialog from "./GroupInfoDialog";
+import TestAccessDialog from "./TestAccessDialog";
 
 type Plan = {
   id: string; slug: string; name: string;
@@ -69,6 +70,7 @@ export default function CompaniesPanel() {
   const [paying, setPaying] = useState<Usage | null>(null);
   const [membersOf, setMembersOf] = useState<Usage | null>(null);
   const [groupInfo, setGroupInfo] = useState<string | null>(null);
+  const [testAccessOf, setTestAccessOf] = useState<Usage | null>(null);
   const [companyMeta, setCompanyMeta] = useState<Record<string, { group_id: string | null; is_primary: boolean }>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -309,6 +311,9 @@ export default function CompaniesPanel() {
                             <Button size="sm" variant="ghost" onClick={() => setMembersOf(i)} title="Membros e perfis">
                               <Users className="h-3.5 w-3.5" />
                             </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setTestAccessOf(i)} title="Criar acesso de teste">
+                              <KeyRound className="h-3.5 w-3.5 text-primary" />
+                            </Button>
                             <Button size="sm" variant="ghost" onClick={() => setPaying(i)} title="Registrar pagamento">
                               <Receipt className="h-3.5 w-3.5" />
                             </Button>
@@ -389,6 +394,11 @@ export default function CompaniesPanel() {
           companyId={membersOf?.company_id ?? null}
           companyName={membersOf?.company_name ?? ""}
           onClose={() => setMembersOf(null)}
+        />
+        <TestAccessDialog
+          companyId={testAccessOf?.company_id ?? null}
+          companyName={testAccessOf?.company_name ?? ""}
+          onClose={() => setTestAccessOf(null)}
         />
         <GroupInfoDialog groupId={groupInfo} onClose={() => setGroupInfo(null)} />
     </div>
