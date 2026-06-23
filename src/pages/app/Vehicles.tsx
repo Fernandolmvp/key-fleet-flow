@@ -345,7 +345,7 @@ export default function Vehicles() {
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="outline" title={licensingTooltip(lic)} className={`gap-1 ${licensingBadgeClass(lic)}`}>
                       {lic.status === "licenciado" ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                      {licensingBadgeText(lic)}
+                      {licensingBadgeText(lic, v.licensing_year ?? null)}
                     </Badge>
                     <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
                       {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
@@ -482,7 +482,7 @@ export default function Vehicles() {
                             <Badge variant="outline" title={licensingTooltip(lic)}
                               className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${licensingBadgeClass(lic)}`}>
                               {lic.status === "licenciado" ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                              {licensingBadgeText(lic)}
+                              {licensingBadgeText(lic, v.licensing_year ?? null, true)}
                             </Badge>
                             {(() => {
                               const st = insuranceStatus(v as any);
