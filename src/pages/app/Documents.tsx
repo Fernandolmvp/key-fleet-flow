@@ -16,6 +16,9 @@ import {
   evaluateLicensing, LICENSING_LABEL, LICENSING_COLOR, plateLastDigit,
   LICENSING_MONTH_BY_PLATE_END, MONTH_LABEL_PT,
 } from "@/lib/documents";
+import {
+  loadDetranCalendar, computeLicensingStatus, type DetranCalendar,
+} from "@/lib/licensing";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useTabPermissions } from "@/lib/permissions";
@@ -36,7 +39,7 @@ type DocRow = {
   ai_extracted: any;
 };
 
-type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null; licensing_year: number | null; licensing_uf: string | null };
 type Driver = { id: string; full_name: string; cpf: string | null; cnh_number: string | null; cnh_expires_at: string | null; medical_exam_expires_at: string | null };
 
 export default function Documents() {
