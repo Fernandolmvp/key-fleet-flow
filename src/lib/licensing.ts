@@ -149,11 +149,22 @@ export function computeLicensingStatus(opts: {
   return { status, vencimento, mesAno, diasRestantes: diff, uf };
 }
 
-export function licensingBadgeText(r: LicensingResult): string {
+export function licensingBadgeText(
+  r: LicensingResult,
+  licensingYear?: number | null,
+  compact = false,
+): string {
   if (r.status === "sem") return "Sem exercício";
-  if (r.status === "licenciado") return "Licenciado";
-  if (r.status === "vencendo") return `Vence ${r.mesAno}`;
-  return `Vencido ${r.mesAno}`;
+  const yr = licensingYear ?? null;
+  const exerc = yr ? (compact ? ` · ${yr}` : ` · Exerc. ${yr}`) : "";
+  const shortMesAno = (() => {
+    if (!r.mesAno) return "";
+    const [mm, yyyy] = r.mesAno.split("/");
+    return `${mm}/${yyyy.slice(-2)}`;
+  })();
+  if (r.status === "licenciado") return `${compact ? "Lic." : "Licenciado"}${exerc}`;
+  if (r.status === "vencendo") return `Vence ${compact ? shortMesAno : r.mesAno}${exerc}`;
+  return `Vencido ${compact ? shortMesAno : r.mesAno}${exerc}`;
 }
 
 export function licensingTooltip(r: LicensingResult): string {
