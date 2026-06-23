@@ -1,7 +1,7 @@
 // Cria um usuário de teste em qualquer empresa (somente super admin).
 // O usuário é marcado em user_metadata.is_test_user=true para que possa ser
 // listado/removido pelo painel super-admin.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,22 +26,28 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
 
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const token = authHeader.slice(7);
+    let callerId: string | null = null;
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const { data: userData, error: cErr } = await userClient.auth.getUser(authHeader.slice(7));
-    if (cErr || !userData?.user?.id) {
-      console.error("getUser failed", cErr);
-      return json({ error: "Token inválido" }, 401);
+    const { data: userData } = await userClient.auth.getUser(token);
+    if (userData?.user?.id) {
+      callerId = userData.user.id;
+    } else {
+      const { data: claimsData, error: clErr } = await (admin.auth as any).getClaims(token);
+      if (clErr || !claimsData?.claims?.sub) {
+        console.error("auth failed", clErr);
+        return json({ error: "Token inválido" }, 401);
+      }
+      callerId = String(claimsData.claims.sub);
     }
-    const callerId = userData.user.id;
-
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     const { data: sa } = await admin.from("super_admins").select("user_id").eq("user_id", callerId).maybeSingle();
     if (!sa) return json({ error: "Apenas Super Admin" }, 403);
