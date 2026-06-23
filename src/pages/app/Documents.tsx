@@ -16,6 +16,9 @@ import {
   evaluateLicensing, LICENSING_LABEL, LICENSING_COLOR, plateLastDigit,
   LICENSING_MONTH_BY_PLATE_END, MONTH_LABEL_PT,
 } from "@/lib/documents";
+import {
+  loadDetranCalendar, computeLicensingStatus, type DetranCalendar,
+} from "@/lib/licensing";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useTabPermissions } from "@/lib/permissions";
@@ -36,7 +39,7 @@ type DocRow = {
   ai_extracted: any;
 };
 
-type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null; licensing_year: number | null; licensing_uf: string | null };
 type Driver = { id: string; full_name: string; cpf: string | null; cnh_number: string | null; cnh_expires_at: string | null; medical_exam_expires_at: string | null };
 
 export default function Documents() {
@@ -50,6 +53,9 @@ export default function Documents() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DocFormDoc | null>(null);
   const [prefill, setPrefill] = useState<Partial<DocFormDoc> | null>(null);
+  const [calendar, setCalendar] = useState<DetranCalendar>(() => new Map());
+
+  useEffect(() => { loadDetranCalendar().then(setCalendar); }, []);
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
@@ -95,7 +101,7 @@ export default function Documents() {
     setLoading(true);
     const [d, v, dr] = await Promise.all([
       supabase.from("documents").select("*").eq("company_id", currentCompanyId).order("expires_at", { ascending: true, nullsFirst: false }),
-      supabase.from("vehicles").select("id,plate,brand,model,year_model").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,year_model,licensing_year,licensing_uf").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("drivers").select("id,full_name,cpf,cnh_number,cnh_expires_at,medical_exam_expires_at").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
     ]);
     if (d.error) toast.error(d.error.message);
@@ -183,6 +189,7 @@ export default function Documents() {
             docs={docs.filter((x) => x.entity_type === "vehicle")}
             search={search}
             loading={loading}
+            calendar={calendar}
             onAdd={(vehicleId) => openNewFor({ entity_type: "vehicle", entity_id: vehicleId, doc_type: "crlv" })}
             onEdit={openEdit}
             onDelete={remove}
@@ -218,12 +225,13 @@ export default function Documents() {
 /* ----------------------- Veículos ----------------------- */
 
 function VehiclesTab({
-  vehicles, docs, search, loading, onAdd, onEdit, onDelete,
+  vehicles, docs, search, loading, calendar, onAdd, onEdit, onDelete,
 }: {
   vehicles: Vehicle[];
   docs: DocRow[];
   search: string;
   loading: boolean;
+  calendar: DetranCalendar;
   onAdd: (vehicleId: string) => void;
   onEdit: (d: DocRow) => void;
   onDelete: (id: string) => void;
@@ -297,6 +305,17 @@ function VehiclesTab({
                 const lic = evaluateLicensing({ plate: v.plate, crlvExpiresAt: crlv?.expires_at });
                 const last = plateLastDigit(v.plate);
                 const monthIdx = last ? LICENSING_MONTH_BY_PLATE_END[last] : null;
+                const adjustedDocs = vDocs.map((d) => {
+                  if (d.doc_type !== "crlv" && d.doc_type !== "licenciamento") return d;
+                  if (!v.licensing_year) return d;
+                  const r = computeLicensingStatus({
+                    licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf, calendar,
+                  });
+                  if (!r.vencimento) return d;
+                  const iso = `${r.vencimento.getFullYear()}-${String(r.vencimento.getMonth()+1).padStart(2,"0")}-${String(r.vencimento.getDate()).padStart(2,"0")}`;
+                  const status: DocStatus = r.status === "vencido" ? "vencido" : r.status === "vencendo" ? "vencendo" : "valido";
+                  return { ...d, expires_at: d.expires_at || iso, status };
+                });
 
                 return (
                   <tr key={v.id} className="border-t border-border align-top hover:bg-muted/20">
@@ -320,13 +339,13 @@ function VehiclesTab({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {vDocs.length === 0 ? (
+                      {adjustedDocs.length === 0 ? (
                         <div className="flex items-center gap-2 text-amber-400 text-xs">
                           <FileWarning className="h-4 w-4" /> Nenhum documento anexado.
                         </div>
                       ) : (
                         <div className="space-y-1">
-                          {vDocs.map((d) => (
+                          {adjustedDocs.map((d) => (
                             <DocLine key={d.id} d={d} onEdit={onEdit} onDelete={onDelete} />
                           ))}
                         </div>

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { loadDetranCalendar, computeLicensingStatus } from "@/lib/licensing";
 
 export type AgendaEventType =
   | "preventiva"
@@ -103,10 +104,11 @@ export async function loadAgendaEvents(
     { data: scheds },
     { data: recs },
     { data: exps },
+    calendar,
   ] = await Promise.all([
     supabase
       .from("vehicles")
-      .select("id,plate,brand,model")
+      .select("id,plate,brand,model,licensing_year,licensing_uf")
       .eq("company_id", companyId),
     supabase
       .from("workshops")
@@ -154,6 +156,7 @@ export async function loadAgendaEvents(
       .or(
         `and(due_date.gte.${fromISO},due_date.lte.${toISO}),and(expense_date.gte.${fromISO},expense_date.lte.${toISO})`,
       ),
+    loadDetranCalendar(),
   ]);
 
   const vMap = new Map<string, any>();
@@ -333,6 +336,37 @@ export async function loadAgendaEvents(
       status_done: !!e.paid,
       estimated_value: e.amount ?? null,
       url: `/app/despesas`,
+    });
+  });
+
+  // Eventos de vencimento de licenciamento calculados pelo calendário do Detran
+  (vehs ?? []).forEach((v: any) => {
+    if (!v.licensing_year) return;
+    const lic = computeLicensingStatus({
+      licensing_year: v.licensing_year,
+      plate: v.plate,
+      uf: v.licensing_uf ?? null,
+      calendar,
+    });
+    if (!lic.vencimento) return;
+    const iso = `${lic.vencimento.getFullYear()}-${String(lic.vencimento.getMonth() + 1).padStart(2, "0")}-${String(lic.vencimento.getDate()).padStart(2, "0")}`;
+    if (iso < fromISO || iso > toISO) return;
+    events.push({
+      id: `lic-${v.id}-${lic.vencimento.getFullYear()}`,
+      source: "expense",
+      type: "licenciamento",
+      date: iso,
+      time: null,
+      vehicle_id: v.id,
+      vehicle_plate: v.plate,
+      vehicle_model: [v.brand, v.model].filter(Boolean).join(" "),
+      description: `Vencimento do licenciamento (exerc. ${v.licensing_year})`,
+      local_name: null,
+      local_address: null,
+      status: lic.status === "vencido" ? "vencido" : "agendada",
+      status_done: false,
+      estimated_value: null,
+      url: `/app/vehicles`,
     });
   });
 

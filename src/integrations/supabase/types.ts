@@ -1477,6 +1477,33 @@ export type Database = {
           },
         ]
       }
+      detran_calendar: {
+        Row: {
+          created_at: string
+          estado: string
+          final_placa: number
+          id: string
+          mes_vencimento: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          estado: string
+          final_placa: number
+          id?: string
+          mes_vencimento: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          estado?: string
+          final_placa?: number
+          id?: string
+          mes_vencimento?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           ai_extracted: Json
@@ -6189,6 +6216,7 @@ export type Database = {
           insurance_policy: string | null
           insurance_responsible: string | null
           insurer: string | null
+          licensing_uf: string | null
           licensing_year: number | null
           model: string
           normalized_plate: string | null
@@ -6250,6 +6278,7 @@ export type Database = {
           insurance_policy?: string | null
           insurance_responsible?: string | null
           insurer?: string | null
+          licensing_uf?: string | null
           licensing_year?: number | null
           model: string
           normalized_plate?: string | null
@@ -6311,6 +6340,7 @@ export type Database = {
           insurance_policy?: string | null
           insurance_responsible?: string | null
           insurer?: string | null
+          licensing_uf?: string | null
           licensing_year?: number | null
           model?: string
           normalized_plate?: string | null

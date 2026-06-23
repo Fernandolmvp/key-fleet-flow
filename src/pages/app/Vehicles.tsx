@@ -11,12 +11,17 @@ import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import VehicleBulkImportDialog from "@/components/dashboard/VehicleBulkImportDialog";
 import { Badge } from "@/components/ui/badge";
 import { useTabPermissions } from "@/lib/permissions";
+import {
+  loadDetranCalendar, computeLicensingStatus, licensingBadgeText,
+  licensingTooltip, licensingBadgeClass, type DetranCalendar, type LicensingResult,
+} from "@/lib/licensing";
 
 interface Vehicle {
   id: string; plate: string; brand: string; model: string; year_model: number | null;
   status: string; current_km: number; fuel_type: string | null; photos: string[];
   documents?: string[] | null;
   licensing_year?: number | null;
+  licensing_uf?: string | null;
   insurer?: string | null;
   insurance_policy?: string | null;
   insurance_expires_at?: string | null;
@@ -70,6 +75,9 @@ export default function Vehicles() {
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("vehicles:view") as "grid" | "list") || "grid");
   const [tab, setTab] = useState<string>(() => localStorage.getItem("vehicles:tab") || "ativos");
+  const [calendar, setCalendar] = useState<DetranCalendar>(() => new Map());
+
+  useEffect(() => { loadDetranCalendar().then(setCalendar); }, []);
 
   useEffect(() => { localStorage.setItem("vehicles:view", view); }, [view]);
   useEffect(() => { localStorage.setItem("vehicles:tab", tab); }, [tab]);
@@ -85,7 +93,7 @@ export default function Vehicles() {
     if (!currentCompanyId) return;
     setLoading(true);
     const { data, error } = await supabase.from("vehicles")
-      .select("id,plate,brand,model,year_model,status,current_km,fuel_type,photos,documents,licensing_year,insurer,insurance_policy,insurance_expires_at,owner_name,crlv_city,crlv_issue_date,buyer_name,sale_value,sale_date")
+      .select("id,plate,brand,model,year_model,status,current_km,fuel_type,photos,documents,licensing_year,licensing_uf,insurer,insurance_policy,insurance_expires_at,owner_name,crlv_city,crlv_issue_date,buyer_name,sale_value,sale_date")
       .eq("company_id", currentCompanyId)
       .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
@@ -162,7 +170,12 @@ export default function Vehicles() {
     todos: items.length,
   };
 
-  const currentYear = new Date().getFullYear();
+  const licensingFor = (v: Vehicle): LicensingResult => computeLicensingStatus({
+    licensing_year: v.licensing_year ?? null,
+    plate: v.plate,
+    uf: v.licensing_uf ?? null,
+    calendar,
+  });
   const findCrlv = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "crlv" && d.file_url);
   const findInsurance = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "seguro" && d.file_url);
 
@@ -278,7 +291,7 @@ export default function Vehicles() {
           {filtered.map((v) => {
             const crlv = findCrlv(v.id);
             const insurance = findInsurance(v.id);
-            const licensed = v.licensing_year === currentYear;
+            const lic = licensingFor(v);
             const insured = isInsured(v);
             const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
             const policyLink = findActivePolicy(v.id);
@@ -332,9 +345,9 @@ export default function Vehicles() {
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline" className={`gap-1 ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
-                      {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                      {licensed ? `Licenciado ${currentYear}` : v.licensing_year ? `Exerc. ${v.licensing_year}` : "Sem exercício"}
+                    <Badge variant="outline" title={licensingTooltip(lic)} className={`gap-1 ${licensingBadgeClass(lic)}`}>
+                      {lic.status === "licenciado" ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                      {licensingBadgeText(lic)}
                     </Badge>
                     <Badge variant="outline" className={`gap-1 ${insured ? "border-success/40 text-success bg-success/10" : "border-warning/40 text-warning bg-warning/10"}`}>
                       {insured ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
@@ -424,7 +437,7 @@ export default function Vehicles() {
                 {filtered.map((v) => {
                   const crlv = findCrlv(v.id);
                   const insurance = findInsurance(v.id);
-                  const licensed = v.licensing_year === currentYear;
+                  const lic = licensingFor(v);
                   const insured = isInsured(v);
                   const crlvUrl = crlv?.file_url || (v.documents?.[0] ?? null);
                   const policyLink = findActivePolicy(v.id);
@@ -468,10 +481,10 @@ export default function Vehicles() {
                       ) : (
                         <td className="px-2 py-2">
                           <div className="flex flex-col gap-1">
-                            <Badge variant="outline" title={licensed ? `Licenciado ${currentYear}` : v.licensing_year ? `Exercício ${v.licensing_year}` : "Sem exercício"}
-                              className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${licensed ? "border-success/40 text-success bg-success/10" : "border-destructive/40 text-destructive bg-destructive/10"}`}>
-                              {licensed ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                              {licensed ? `Lic. ${currentYear}` : v.licensing_year ? `${v.licensing_year}` : "Sem"}
+                            <Badge variant="outline" title={licensingTooltip(lic)}
+                              className={`gap-1 text-[10px] px-1.5 py-0 w-fit ${licensingBadgeClass(lic)}`}>
+                              {lic.status === "licenciado" ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                              {licensingBadgeText(lic)}
                             </Badge>
                             {(() => {
                               const st = insuranceStatus(v as any);
