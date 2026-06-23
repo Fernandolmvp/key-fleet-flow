@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type LicensingStatus = "licenciado" | "vencendo" | "vencido" | "sem";
 
@@ -17,9 +19,10 @@ const DEFAULT_UF = "SP";
 
 let cachedCalendar: DetranCalendar | null = null;
 let inflight: Promise<DetranCalendar> | null = null;
+const listeners = new Set<(c: DetranCalendar) => void>();
 
 export async function loadDetranCalendar(force = false): Promise<DetranCalendar> {
-  if (cachedCalendar && !force) return cachedCalendar;
+  if (cachedCalendar && cachedCalendar.size > 0 && !force) return cachedCalendar;
   if (inflight && !force) return inflight;
   inflight = (async () => {
     const { data, error } = await supabase
@@ -33,11 +36,35 @@ export async function loadDetranCalendar(force = false): Promise<DetranCalendar>
         map.get(uf)!.set(Number(row.final_placa), Number(row.mes_vencimento));
       }
     }
-    cachedCalendar = map;
+    // Only cache non-empty result so we retry next call if it failed/was blocked.
+    if (map.size > 0) cachedCalendar = map;
     inflight = null;
+    listeners.forEach((fn) => fn(map));
     return map;
   })();
   return inflight;
+}
+
+/**
+ * Hook React para o calendário do DETRAN.
+ * - Recarrega quando o usuário autentica (userId muda) garantindo que a query
+ *   não seja disparada antes do auth e bloqueada por RLS.
+ * - Compartilha cache entre telas e notifica todas as instâncias quando o
+ *   calendário chega.
+ */
+export function useDetranCalendar(): DetranCalendar {
+  const { user } = useAuth();
+  const [calendar, setCalendar] = useState<DetranCalendar>(
+    () => cachedCalendar ?? new Map()
+  );
+  useEffect(() => {
+    let active = true;
+    const onUpdate = (c: DetranCalendar) => { if (active) setCalendar(c); };
+    listeners.add(onUpdate);
+    loadDetranCalendar().then((c) => { if (active) setCalendar(c); });
+    return () => { active = false; listeners.delete(onUpdate); };
+  }, [user?.id]);
+  return calendar;
 }
 
 export function plateLastDigit(plate?: string | null): number | null {
