@@ -354,12 +354,19 @@ Deno.serve(async (req) => {
     });
 
     if (!result.success) {
-      const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
+      let status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600 ? result.httpStatus : 500;
+      const rawErr = String(result.errorMessage ?? "");
+      const looksLikeMissingKey = /missing|not set|undefined|no api key|invalid api key|unauthor/i.test(rawErr);
+      if (looksLikeMissingKey && (status === 500 || status === 400)) status = 401;
       const userMsg =
+        status === 401 ? "Chave da IA ausente ou inválida no servidor. Fale com o suporte." :
+        status === 403 ? "Acesso à IA negado. Fale com o suporte." :
+        status === 413 ? "Arquivo muito grande para análise. Envie um arquivo menor (até 10 MB)." :
+        status === 415 ? "Formato de arquivo não suportado pela IA. Envie PDF, JPG, PNG ou WEBP." :
         status === 429 ? "Limite de requisições da IA excedido. Tente em alguns instantes." :
         status === 402 ? "Créditos de IA esgotados. Adicione créditos no workspace." :
-        "Falha ao processar documento";
-      console.error("[extract-document] ai-failed", { feature, status, provider: result.providerUsed, error: result.errorMessage });
+        `Falha ao processar documento na IA${rawErr ? `: ${rawErr.slice(0, 200)}` : ""}`;
+      console.error("[extract-document] ai-failed", { feature, status, provider: result.providerUsed, error: rawErr });
       return new Response(JSON.stringify({ error: userMsg }), {
         status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
