@@ -26,17 +26,22 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
 
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: userData, error: cErr } = await userClient.auth.getUser(authHeader.slice(7));
+    if (cErr || !userData?.user?.id) {
+      console.error("getUser failed", cErr);
+      return json({ error: "Token inválido" }, 401);
+    }
+    const callerId = userData.user.id;
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const token = authHeader.slice(7);
-    const { data: claimsData, error: cErr } = await admin.auth.getClaims(token);
-    const callerId = claimsData?.claims?.sub as string | undefined;
-    if (cErr || !callerId) {
-      console.error("getClaims failed", cErr);
-      return json({ error: "Token inválido" }, 401);
-    }
 
     const { data: sa } = await admin.from("super_admins").select("user_id").eq("user_id", callerId).maybeSingle();
     if (!sa) return json({ error: "Apenas Super Admin" }, 403);
