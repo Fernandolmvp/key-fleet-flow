@@ -60,10 +60,13 @@ export async function extractDocument(opts: {
   const [{ data: result, error }, archivedUrl] = await Promise.all([aiPromise, archivePromise]);
 
   if (error) {
-    // Tenta extrair a mensagem real do corpo da resposta (FunctionsHttpError esconde 4xx/5xx)
-    let msg = error.message || "Falha ao processar documento";
+    // Sempre logue o erro cru no console para diagnóstico real.
+    console.error("[extract-document] invoke error", error, (error as any)?.context);
+    let msg = (error as any)?.message || "Falha ao processar documento";
+    let status: number | undefined = (error as any)?.context?.status;
     try {
       const ctx: any = (error as any).context;
+      if (ctx?.status && !status) status = ctx.status;
       if (ctx?.json) {
         const body = await ctx.json();
         if (body?.error) msg = body.error;
@@ -71,11 +74,32 @@ export async function extractDocument(opts: {
         const txt = await ctx.text();
         try { const j = JSON.parse(txt); if (j?.error) msg = j.error; } catch { /* keep msg */ }
       }
-    } catch { /* ignore */ }
-    throw new Error(msg);
+    } catch (parseErr) {
+      console.error("[extract-document] error body parse failed", parseErr);
+    }
+    // Traduções amigáveis por status HTTP conhecido.
+    if (status === 401 || status === 403) {
+      msg = "IA de leitura não configurada ou chave inválida. Fale com o suporte.";
+    } else if (status === 413) {
+      msg = "Arquivo muito grande para análise. Envie um arquivo menor (até 10 MB).";
+    } else if (status === 415) {
+      msg = "Formato de arquivo não suportado. Envie PDF, JPG, PNG ou WEBP.";
+    } else if (status === 504 || /timeout|failed to fetch|networkerror/i.test(msg)) {
+      msg = "A leitura demorou demais. Tente um arquivo menor ou tente novamente em alguns instantes.";
+    }
+    const err = new Error(msg) as Error & { status?: number; raw?: unknown };
+    err.status = status;
+    err.raw = error;
+    throw err;
   }
-  if (result?.error) throw new Error(result.error);
-  if (!result?.data) throw new Error("Sem dados extraídos");
+  if (result?.error) {
+    console.error("[extract-document] result error", result);
+    throw new Error(result.error);
+  }
+  if (!result?.data) {
+    console.error("[extract-document] empty result", result);
+    throw new Error("A IA não retornou dados deste documento. Preencha manualmente.");
+  }
 
   return { data: result.data as Record<string, any>, archivedUrl };
 }
