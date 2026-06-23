@@ -170,7 +170,6 @@ export default function Vehicles() {
     todos: items.length,
   };
 
-  const currentYear = new Date().getFullYear();
   const licensingFor = (v: Vehicle): LicensingResult => computeLicensingStatus({
     licensing_year: v.licensing_year ?? null,
     plate: v.plate,
