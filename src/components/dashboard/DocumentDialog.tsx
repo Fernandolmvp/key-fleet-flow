@@ -89,6 +89,25 @@ export default function DocumentDialog({
       toast.error("Selecione um arquivo primeiro");
       return;
     }
+    // Pré-checagem: tamanho (10 MB) e tipo.
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      toast.error("Arquivo muito grande (máx. 10 MB). Reduza ou tire uma foto menor.");
+      return;
+    }
+    const name = (file.name || "").toLowerCase();
+    const mime = (file.type || "").toLowerCase();
+    const isHeic = /\.(heic|heif)$/.test(name) || /hei[cf]/.test(mime);
+    if (isHeic) {
+      toast.error("Formato HEIC não suportado. No iPhone, ajuste para JPG/PNG ou envie PDF.");
+      return;
+    }
+    const ACCEPTED = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const extOk = /\.(pdf|jpe?g|png|webp)$/.test(name);
+    if (mime && !ACCEPTED.includes(mime) && !extOk) {
+      toast.error("Formato não suportado. Envie PDF, JPG, PNG ou WEBP.");
+      return;
+    }
     setExtracting(true);
     try {
       const { data: raw, archivedUrl } = await extractDocument({
@@ -121,8 +140,17 @@ export default function DocumentDialog({
       setForm(next);
       toast.success("Dados extraídos pela IA");
     } catch (e: any) {
-      console.error("AI extract failed:", e);
-      toast.error(e?.message || "Não foi possível ler o documento. Verifique o arquivo e tente de novo.");
+      // Loga TUDO para diagnóstico real no console do navegador.
+      console.error("AI extract failed:", {
+        message: e?.message,
+        status: e?.status,
+        raw: e?.raw,
+        context: e?.context,
+        stack: e?.stack,
+      });
+      const msg = e?.message
+        || "Não foi possível ler o documento. Verifique o arquivo e tente de novo, ou preencha manualmente.";
+      toast.error(msg);
     } finally {
       setExtracting(false);
     }
