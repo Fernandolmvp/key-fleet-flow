@@ -17,6 +17,13 @@ export type DetranCalendar = Map<string, Map<number, number>>;
 
 const DEFAULT_UF = "SP";
 
+// Fallback embutido do calendário SP (final da placa -> mês de vencimento).
+// Usado como rede de segurança quando o detran_calendar do banco vem vazio
+// no client (ex.: timing de auth/sessão).
+const SP_FALLBACK: Record<number, number> = {
+  1: 7, 2: 7, 3: 8, 4: 8, 5: 8, 6: 9, 7: 10, 8: 10, 9: 11, 0: 12,
+};
+
 let cachedCalendar: DetranCalendar | null = null;
 let inflight: Promise<DetranCalendar> | null = null;
 const listeners = new Set<(c: DetranCalendar) => void>();
@@ -35,6 +42,12 @@ export async function loadDetranCalendar(force = false): Promise<DetranCalendar>
         if (!map.has(uf)) map.set(uf, new Map());
         map.get(uf)!.set(Number(row.final_placa), Number(row.mes_vencimento));
       }
+    }
+    if (error || map.size === 0) {
+      console.warn(
+        "[detran_calendar] retornou vazio, usando fallback SP",
+        error,
+      );
     }
     // Only cache non-empty result so we retry next call if it failed/was blocked.
     if (map.size > 0) cachedCalendar = map;
@@ -108,11 +121,12 @@ export function computeLicensingStatus(opts: {
   if (final === null) {
     return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
   }
-  const ufMap = opts.calendar.get(uf) ?? opts.calendar.get(DEFAULT_UF);
-  if (!ufMap) {
-    return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
+  let ufMap = opts.calendar.get(uf) ?? opts.calendar.get(DEFAULT_UF);
+  let mes: number | undefined = ufMap?.get(final);
+  // Fallback embutido para SP quando o banco não tem a UF ou veio vazio.
+  if (!mes && uf === "SP") {
+    mes = SP_FALLBACK[final];
   }
-  const mes = ufMap.get(final);
   if (!mes) {
     return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
   }
