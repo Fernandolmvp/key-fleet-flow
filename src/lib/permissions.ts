@@ -159,10 +159,13 @@ export function useTabPermissions(
   allTabs: string[],
   currentTab: string,
 ) {
-  const { can } = usePermissions();
-  const visible = allTabs.filter((t) => can(module, "view", t));
-  const isVisible = visible.includes(currentTab);
-  const fallback = visible[0] ?? null;
-  const canViewTab = (t: string) => can(module, "view", t);
+  // Abas internas de uma tela são FILTROS/visões, não funcionalidades
+  // distintas. O controle de acesso é feito no nível do módulo (rota/menu).
+  // Quem pode abrir a tela vê TODAS as abas, sempre — independentemente da
+  // empresa ou de como role_permissions foi semeada.
+  const visible = allTabs;
+  const isVisible = allTabs.includes(currentTab);
+  const fallback = allTabs[0] ?? null;
+  const canViewTab = (_t: string) => true;
   return { visible, isVisible, fallback, canViewTab };
 }
