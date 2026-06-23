@@ -9,6 +9,7 @@ import { Loader2, Sparkles, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { extractDocument } from "@/lib/ai-extract";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import {
   DOC_TYPE_LABELS, VEHICLE_DOC_TYPES, DRIVER_DOC_TYPES, crossValidate,
 } from "@/lib/documents";
@@ -90,26 +91,29 @@ export default function DocumentDialog({
     }
     setExtracting(true);
     try {
-      const { data, archivedUrl } = await extractDocument({
+      const { data: raw, archivedUrl } = await extractDocument({
         type: "document", file, bucket: "documents", companyId,
       });
+      const data: Record<string, any> = raw && typeof raw === "object" ? raw : {};
+      const isStr = (v: any): v is string => typeof v === "string" && v.length > 0;
+      const isIsoDate = (v: any) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
       const next: DocFormDoc = { ...form };
-      if (data.doc_type && (typeOptions as readonly string[]).includes(data.doc_type)) {
-        next.doc_type = data.doc_type;
-      } else if (data.doc_type) {
-        // ajusta entity_type se IA detectou
-        if ((VEHICLE_DOC_TYPES as readonly string[]).includes(data.doc_type)) {
-          next.entity_type = "vehicle"; next.doc_type = data.doc_type;
-        } else if ((DRIVER_DOC_TYPES as readonly string[]).includes(data.doc_type)) {
-          next.entity_type = "driver"; next.doc_type = data.doc_type;
+      const dt = isStr(data.doc_type) ? data.doc_type : null;
+      if (dt && (typeOptions as readonly string[]).includes(dt)) {
+        next.doc_type = dt;
+      } else if (dt) {
+        if ((VEHICLE_DOC_TYPES as readonly string[]).includes(dt)) {
+          next.entity_type = "vehicle"; next.doc_type = dt;
+        } else if ((DRIVER_DOC_TYPES as readonly string[]).includes(dt)) {
+          next.entity_type = "driver"; next.doc_type = dt;
         }
       }
-      if (data.title) next.title = data.title;
-      if (data.document_number) next.document_number = data.document_number;
-      if (data.issuer) next.issuer = data.issuer;
-      if (data.issue_date) next.issue_date = data.issue_date;
-      if (data.expires_at) next.expires_at = data.expires_at;
-      if (data.notes) next.notes = data.notes;
+      if (isStr(data.title)) next.title = data.title;
+      if (isStr(data.document_number)) next.document_number = data.document_number;
+      if (isStr(data.issuer)) next.issuer = data.issuer;
+      if (isIsoDate(data.issue_date)) next.issue_date = data.issue_date;
+      if (isIsoDate(data.expires_at)) next.expires_at = data.expires_at;
+      if (isStr(data.notes)) next.notes = data.notes;
       next.ai_extracted = data;
       next.file_url = archivedUrl || next.file_url;
       next.file_name = file.name;
@@ -117,7 +121,8 @@ export default function DocumentDialog({
       setForm(next);
       toast.success("Dados extraídos pela IA");
     } catch (e: any) {
-      toast.error(e.message || "Falha na extração");
+      console.error("AI extract failed:", e);
+      toast.error(e?.message || "Não foi possível ler o documento. Verifique o arquivo e tente de novo.");
     } finally {
       setExtracting(false);
     }
@@ -222,6 +227,7 @@ export default function DocumentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <ErrorBoundary>
         <DialogHeader>
           <DialogTitle>{form.id ? "Editar documento" : "Novo documento"}</DialogTitle>
         </DialogHeader>
@@ -318,6 +324,7 @@ export default function DocumentDialog({
             {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
           </Button>
         </DialogFooter>
+        </ErrorBoundary>
       </DialogContent>
     </Dialog>
   );
