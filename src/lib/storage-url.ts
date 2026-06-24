@@ -36,9 +36,15 @@ export async function resolveStoredFileUrl(url: string | null | undefined, expir
 
 /** Open a stored file URL in a new tab, signing it first if it's in Supabase Storage. */
 export async function openStoredFile(url: string | null | undefined): Promise<void> {
+  const popup = window.open("about:blank", "_blank");
   const signed = await resolveStoredFileUrl(url);
   if (!signed) {
+    popup?.close();
     toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
+    return;
+  }
+  if (popup) {
+    popup.location.href = signed;
     return;
   }
   window.open(signed, "_blank", "noopener,noreferrer");
