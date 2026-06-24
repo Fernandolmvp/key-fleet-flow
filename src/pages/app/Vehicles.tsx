@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import VehicleBulkImportDialog from "@/components/dashboard/VehicleBulkImportDialog";
+import { openStoredFile } from "@/lib/storage-url";
 import { Badge } from "@/components/ui/badge";
 import { useTabPermissions } from "@/lib/permissions";
 import {
@@ -364,7 +365,7 @@ export default function Vehicles() {
                     <Button
                       size="sm" variant="outline" className="flex-1 min-w-[120px]"
                       disabled={!crlvUrl}
-                      onClick={() => crlvUrl && window.open(crlvUrl, "_blank")}
+                      onClick={() => crlvUrl && openStoredFile(crlvUrl)}
                       title={crlvUrl ? "Abrir CRLV anexado" : "Nenhum CRLV anexado"}
                     >
                       <FileText className="h-3.5 w-3.5 mr-1" /> {crlvUrl ? "Ver CRLV" : "Sem CRLV"}
@@ -372,7 +373,7 @@ export default function Vehicles() {
                     <Button
                       size="sm" variant="outline" className="flex-1 min-w-[120px]"
                       disabled={!insuranceUrl}
-                      onClick={() => insuranceUrl && window.open(insuranceUrl, "_blank")}
+                      onClick={() => insuranceUrl && openStoredFile(insuranceUrl)}
                       title={insuranceUrl ? "Abrir apólice anexada" : "Nenhuma apólice anexada em Documentação"}
                     >
                       <ShieldCheck className="h-3.5 w-3.5 mr-1" /> {insuranceUrl ? "Ver apólice" : "Sem apólice"}
