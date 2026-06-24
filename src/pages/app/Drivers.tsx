@@ -551,9 +551,13 @@ export default function Drivers() {
                 </label>
               </div>
               {archivedDoc && (
-                <a href={archivedDoc.url} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
+                <button
+                  type="button"
+                  onClick={() => openStoredFile(archivedDoc.url)}
+                  className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+                >
                   <FileText className="h-3 w-3" /> CNH arquivada — será vinculada ao salvar
-                </a>
+                </button>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2 space-y-2">
