@@ -20,6 +20,9 @@ type VehicleRow = {
   model: string | null;
   insurer: string | null;
   insurance_policy: string | null;
+  fipe_value: number | null;
+  fipe_reference_month: string | null;
+  fipe_value_updated_at: string | null;
 };
 
 type LinkRow = {
@@ -59,7 +62,7 @@ export default function VehiclesFullReport() {
         supabase
           .from("vehicles")
           .select(
-            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy",
+            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,fipe_value,fipe_reference_month,fipe_value_updated_at",
           )
           .eq("company_id", currentCompanyId)
           .order("plate", { ascending: true }),
@@ -122,6 +125,19 @@ export default function VehiclesFullReport() {
     return `${r.year_manufacture ?? "—"}/${r.year_model ?? "—"}`;
   }
 
+  const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  function fmtFipe(v: number | null) {
+    return v == null ? "—" : brl.format(Number(v));
+  }
+  function fmtUpdatedAt(d: string | null) {
+    if (!d) return "";
+    try {
+      return new Date(d).toLocaleDateString("pt-BR");
+    } catch {
+      return "";
+    }
+  }
+
   function exportCsv() {
     const header = [
       "Placa",
@@ -130,6 +146,8 @@ export default function VehiclesFullReport() {
       "Ano/Modelo",
       "Marca/Modelo",
       "Cor",
+      "Valor FIPE",
+      "Mês Ref. FIPE",
       "Corretor",
       "Seguradora",
       "Apólice",
@@ -144,6 +162,8 @@ export default function VehiclesFullReport() {
           anoModelo(r),
           [r.brand, r.model].filter(Boolean).join(" "),
           r.color ?? "",
+          r.fipe_value != null ? brl.format(Number(r.fipe_value)) : "",
+          r.fipe_reference_month ?? "",
           r.broker_name ?? "",
           r.insurer_name ?? "",
           r.policy_number ?? "",
@@ -216,6 +236,8 @@ export default function VehiclesFullReport() {
                   <th className="text-left px-3 py-2.5">Ano/Mod.</th>
                   <th className="text-left px-3 py-2.5">Marca / Modelo</th>
                   <th className="text-left px-3 py-2.5">Cor</th>
+                  <th className="text-left px-3 py-2.5">Valor FIPE</th>
+                  <th className="text-left px-3 py-2.5">Mês Ref.</th>
                   <th className="text-left px-3 py-2.5">Corretor</th>
                   <th className="text-left px-3 py-2.5">Seguradora</th>
                   <th className="text-left px-3 py-2.5">Apólice</th>
@@ -230,6 +252,13 @@ export default function VehiclesFullReport() {
                     <td className="px-3 py-2.5 font-mono text-xs">{anoModelo(r) || "—"}</td>
                     <td className="px-3 py-2.5">{[r.brand, r.model].filter(Boolean).join(" ") || "—"}</td>
                     <td className="px-3 py-2.5">{r.color || "—"}</td>
+                    <td
+                      className="px-3 py-2.5 font-mono text-xs whitespace-nowrap"
+                      title={r.fipe_value_updated_at ? `Consultado em ${fmtUpdatedAt(r.fipe_value_updated_at)}` : undefined}
+                    >
+                      {fmtFipe(r.fipe_value)}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs whitespace-nowrap">{r.fipe_reference_month || "—"}</td>
                     <td className="px-3 py-2.5">{r.broker_name || "—"}</td>
                     <td className="px-3 py-2.5">{r.insurer_name || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.policy_number || "—"}</td>
