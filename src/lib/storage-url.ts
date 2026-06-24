@@ -1,4 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+function openInNewTab(url: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
 
 /**
  * Parses a Supabase Storage URL (public, sign, or authenticated) and returns
@@ -28,7 +39,7 @@ export async function resolveStoredFileUrl(url: string | null | undefined, expir
   const { data, error } = await supabase.storage.from(parsed.bucket).createSignedUrl(parsed.path, expiresIn);
   if (error || !data?.signedUrl) {
     console.warn("[storage] createSignedUrl failed", parsed.bucket, parsed.path, error?.message);
-    return url;
+    return null;
   }
   return data.signedUrl;
 }
@@ -36,6 +47,9 @@ export async function resolveStoredFileUrl(url: string | null | undefined, expir
 /** Open a stored file URL in a new tab, signing it first if it's in Supabase Storage. */
 export async function openStoredFile(url: string | null | undefined): Promise<void> {
   const signed = await resolveStoredFileUrl(url);
-  if (!signed) return;
-  window.open(signed, "_blank", "noopener,noreferrer");
+  if (!signed) {
+    toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
+    return;
+  }
+  openInNewTab(signed);
 }
