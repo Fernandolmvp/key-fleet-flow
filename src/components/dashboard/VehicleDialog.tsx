@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { openStoredFile } from "@/lib/storage-url";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -664,9 +665,13 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
         </div>
         )}
         {activeTab === "dados" && archivedDoc && (
-          <a href={archivedDoc} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 hover:underline">
+          <button
+            type="button"
+            onClick={() => openStoredFile(archivedDoc)}
+            className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+          >
             <FileText className="h-3 w-3" /> Documento arquivado
-          </a>
+          </button>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
