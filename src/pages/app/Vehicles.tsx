@@ -506,11 +506,11 @@ export default function Vehicles() {
                       <td className="px-2 py-2 text-right">
                         <div className="inline-flex gap-0.5">
                           <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!crlvUrl}
-                            onClick={() => crlvUrl && window.open(crlvUrl, "_blank")} title="Ver CRLV">
+                            onClick={() => crlvUrl && openStoredFile(crlvUrl)} title="Ver CRLV">
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!insuranceUrl}
-                            onClick={() => insuranceUrl && window.open(insuranceUrl, "_blank")} title="Ver apólice">
+                            onClick={() => insuranceUrl && openStoredFile(insuranceUrl)} title="Ver apólice">
                             <ShieldCheck className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(v as any); setOpen(true); }} title="Editar">
