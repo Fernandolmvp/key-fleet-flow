@@ -1,6 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+function openInNewTab(url: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 /**
  * Parses a Supabase Storage URL (public, sign, or authenticated) and returns
  * { bucket, path } when possible. Returns null for non-storage URLs.
@@ -36,16 +46,10 @@ export async function resolveStoredFileUrl(url: string | null | undefined, expir
 
 /** Open a stored file URL in a new tab, signing it first if it's in Supabase Storage. */
 export async function openStoredFile(url: string | null | undefined): Promise<void> {
-  const popup = window.open("about:blank", "_blank");
   const signed = await resolveStoredFileUrl(url);
   if (!signed) {
-    popup?.close();
     toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
     return;
   }
-  if (popup) {
-    popup.location.href = signed;
-    return;
-  }
-  window.open(signed, "_blank", "noopener,noreferrer");
+  openInNewTab(signed);
 }
