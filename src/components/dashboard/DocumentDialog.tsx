@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { extractDocument } from "@/lib/ai-extract";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { openStoredFile } from "@/lib/storage-url";
 import {
   DOC_TYPE_LABELS, VEHICLE_DOC_TYPES, DRIVER_DOC_TYPES, crossValidate,
 } from "@/lib/documents";
@@ -277,9 +278,13 @@ export default function DocumentDialog({
             </Button>
           </div>
           {form.file_url && (
-            <a href={form.file_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
+            <button
+              type="button"
+              onClick={() => openStoredFile(form.file_url)}
+              className="text-xs text-primary underline text-left"
+            >
               Ver arquivo anexado
-            </a>
+            </button>
           )}
         </div>
 

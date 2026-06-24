@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useTabPermissions } from "@/lib/permissions";
+import { openStoredFile } from "@/lib/storage-url";
 
 type DocRow = {
   id: string;
@@ -517,8 +518,8 @@ function DocLine({ d, onEdit, onDelete }: { d: DocRow; onEdit: (d: DocRow) => vo
       )}
       <div className="ml-auto flex items-center gap-1">
         {d.file_url && (
-          <Button asChild variant="ghost" size="icon" className="h-6 w-6">
-            <a href={d.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" /></a>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStoredFile(d.file_url)}>
+            <ExternalLink className="h-3 w-3" />
           </Button>
         )}
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(d)}>
