@@ -788,6 +788,7 @@ export default function Drivers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DriverBulkImportDialog open={bulkOpen} onOpenChange={setBulkOpen} onImported={load} />
     </div>
   );
 }
