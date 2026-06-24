@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import DriverHistoryTab from "@/components/dashboard/DriverHistoryTab";
 import DriverBulkImportDialog from "@/components/dashboard/DriverBulkImportDialog";
+import { openStoredFile } from "@/lib/storage-url";
 import { useTabPermissions } from "@/lib/permissions";
 import CepInput from "@/components/forms/CepInput";
 import AddressNumberFields from "@/components/forms/AddressNumberFields";
@@ -424,7 +425,7 @@ export default function Drivers() {
                   <Button
                     size="sm" variant="outline" className="flex-1"
                     disabled={!cnhDoc?.file_url}
-                    onClick={() => cnhDoc?.file_url && window.open(cnhDoc.file_url, "_blank")}
+                    onClick={() => cnhDoc?.file_url && openStoredFile(cnhDoc.file_url)}
                     title={cnhDoc ? "Abrir CNH arquivada" : "Nenhuma CNH anexada"}
                   >
                     <FileText className="h-3.5 w-3.5 mr-1" /> {cnhDoc ? "Ver CNH" : "Sem CNH"}
@@ -492,7 +493,7 @@ export default function Drivers() {
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
                           <Button size="sm" variant="ghost" disabled={!cnhDoc?.file_url}
-                            onClick={() => cnhDoc?.file_url && window.open(cnhDoc.file_url, "_blank")} title="Ver CNH">
+                            onClick={() => cnhDoc?.file_url && openStoredFile(cnhDoc.file_url)} title="Ver CNH">
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => openEdit(d)} title="Editar">
