@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import DriverHistoryTab from "@/components/dashboard/DriverHistoryTab";
+import DriverBulkImportDialog from "@/components/dashboard/DriverBulkImportDialog";
 import { useTabPermissions } from "@/lib/permissions";
 import CepInput from "@/components/forms/CepInput";
 import AddressNumberFields from "@/components/forms/AddressNumberFields";
@@ -69,6 +70,7 @@ export default function Drivers() {
   const [vehicles, setVehicles] = useState<{ id: string; plate: string; brand: string | null; model: string | null }[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -333,9 +335,14 @@ export default function Drivers() {
           <h1 className="font-display text-3xl font-bold">Motoristas</h1>
           <p className="text-muted-foreground">{items.length} motorista(s) cadastrado(s)</p>
         </div>
-        <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
-          <Plus className="h-4 w-4 mr-2" /> Novo motorista
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
+            <Plus className="h-4 w-4 mr-2" /> Novo motorista
+          </Button>
+          <Button variant="outline" onClick={() => setBulkOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" /> Importar em lote
+          </Button>
+        </div>
       </div>
 
       <div className="surface-card rounded-xl p-4">
@@ -781,6 +788,7 @@ export default function Drivers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DriverBulkImportDialog open={bulkOpen} onOpenChange={setBulkOpen} onImported={load} />
     </div>
   );
 }
