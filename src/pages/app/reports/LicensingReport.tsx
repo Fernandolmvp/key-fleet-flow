@@ -8,6 +8,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Printer, Search, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  computeLicensingStatus,
+  useDetranCalendar,
+  licensingBadgeText,
+  licensingBadgeClass,
+  licensingTooltip,
+  type LicensingStatus,
+} from "@/lib/licensing";
 
 type Row = {
   id: string;
@@ -15,6 +23,7 @@ type Row = {
   chassis: string | null;
   renavam: string | null;
   licensing_year: number | null;
+  licensing_uf: string | null;
   brand: string | null;
   model: string | null;
   status: string | null;
@@ -32,6 +41,8 @@ export default function LicensingReport() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [yearFilter, setYearFilter] = useState<string>("all");
+  const [situacaoFilter, setSituacaoFilter] = useState<"all" | LicensingStatus>("all");
+  const calendar = useDetranCalendar();
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -39,7 +50,7 @@ export default function LicensingReport() {
     (async () => {
       const { data, error } = await supabase
         .from("vehicles")
-        .select("id,plate,chassis,renavam,licensing_year,brand,model,status")
+        .select("id,plate,chassis,renavam,licensing_year,licensing_uf,brand,model,status")
         .eq("company_id", currentCompanyId)
         .order("plate", { ascending: true });
       if (error) toast.error("Falha ao carregar veículos");
@@ -54,12 +65,25 @@ export default function LicensingReport() {
     return Array.from(s).sort((a, b) => b - a);
   }, [rows]);
 
+  const enriched = useMemo(() => {
+    return rows.map((r) => {
+      const lic = computeLicensingStatus({
+        licensing_year: r.licensing_year,
+        plate: r.plate,
+        uf: r.licensing_uf,
+        calendar,
+      });
+      return { ...r, lic };
+    });
+  }, [rows, calendar]);
+
   const filtered = useMemo(() => {
     const term = q.trim().toUpperCase();
-    return rows.filter((r) => {
+    const list = enriched.filter((r) => {
       if (yearFilter !== "all") {
         if (yearFilter === "none" ? r.licensing_year != null : String(r.licensing_year ?? "") !== yearFilter) return false;
       }
+      if (situacaoFilter !== "all" && r.lic.status !== situacaoFilter) return false;
       if (!term) return true;
       return (
         (r.plate || "").toUpperCase().includes(term) ||
@@ -67,15 +91,58 @@ export default function LicensingReport() {
         (r.renavam || "").includes(term)
       );
     });
-  }, [rows, q, yearFilter]);
+    // Ordenação por urgência: vencido (mais antigo primeiro), vencendo (mais próximo),
+    // licenciado, sem.
+    const rank: Record<LicensingStatus, number> = {
+      vencido: 0, vencendo: 1, licenciado: 2, sem: 3,
+    };
+    list.sort((a, b) => {
+      const ra = rank[a.lic.status];
+      const rb = rank[b.lic.status];
+      if (ra !== rb) return ra - rb;
+      const ta = a.lic.vencimento?.getTime() ?? 0;
+      const tb = b.lic.vencimento?.getTime() ?? 0;
+      if (a.lic.status === "vencido") return ta - tb; // mais antigo primeiro
+      if (a.lic.status === "vencendo") return ta - tb; // mais próximo primeiro
+      return (a.plate || "").localeCompare(b.plate || "");
+    });
+    return list;
+  }, [enriched, q, yearFilter, situacaoFilter]);
+
+  const isActive = (s: string | null) => {
+    const v = (s || "").toLowerCase();
+    return v !== "vendido" && v !== "inativo" && v !== "baixado";
+  };
+
+  const counts = useMemo(() => {
+    let venc = 0, vencendo = 0, lic = 0, sem = 0;
+    for (const r of filtered) {
+      const active = isActive(r.status);
+      if (r.lic.status === "vencido" && active) venc++;
+      else if (r.lic.status === "vencendo" && active) vencendo++;
+      else if (r.lic.status === "licenciado") lic++;
+      else if (r.lic.status === "sem") sem++;
+    }
+    return { venc, vencendo, lic, sem };
+  }, [filtered]);
+
+  const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("pt-BR") : "—");
+  const situacaoText = (lic: ReturnType<typeof computeLicensingStatus>) => {
+    if (lic.status === "sem") return "Sem exercício";
+    if (lic.status === "licenciado") return "Licenciado";
+    if (lic.status === "vencendo") return `A vencer ${lic.mesAno}`;
+    return `Vencido ${lic.mesAno}`;
+  };
 
   function exportCsv() {
-    const header = ["Ano Licenciamento", "Placa", "Chassi", "RENAVAM", "Marca/Modelo", "Status"];
+    const header = ["Ano Licenciamento", "Situação", "Vencimento", "Placa", "Chassi", "RENAVAM", "Marca/Modelo", "Status veículo"];
     const lines = [header.join(";")];
     filtered.forEach((r) => {
       lines.push(
         [
           r.licensing_year ?? "",
+          situacaoText(r.lic),
+          fmtDate(r.lic.vencimento),
           r.plate ?? "",
           r.chassis ?? "",
           r.renavam ?? "",
@@ -133,6 +200,18 @@ export default function LicensingReport() {
             ))}
             <option value="none">Sem licenciamento</option>
           </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={situacaoFilter}
+            onChange={(e) => setSituacaoFilter(e.target.value as any)}
+            aria-label="Situação do licenciamento"
+          >
+            <option value="all">Todas as situações</option>
+            <option value="vencido">Vencidos</option>
+            <option value="vencendo">A vencer</option>
+            <option value="licenciado">Licenciados</option>
+            <option value="sem">Sem exercício</option>
+          </select>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1.5" /> Imprimir
           </Button>
@@ -140,8 +219,13 @@ export default function LicensingReport() {
             <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
           </Button>
         </div>
-        <div className="mt-3 text-xs text-muted-foreground">
-          {filtered.length} de {rows.length} veículos
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">{filtered.length} de {rows.length} veículos</span>
+          <span className="text-muted-foreground">·</span>
+          <span className="px-2 py-0.5 rounded-full border border-destructive/40 text-destructive bg-destructive/10 font-medium">{counts.venc} vencidos</span>
+          <span className="px-2 py-0.5 rounded-full border border-warning/40 text-warning bg-warning/10 font-medium">{counts.vencendo} a vencer</span>
+          <span className="px-2 py-0.5 rounded-full border border-success/40 text-success bg-success/10 font-medium">{counts.lic} licenciados</span>
+          <span className="px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/30 font-medium">{counts.sem} sem exercício</span>
         </div>
       </Card>
 
@@ -158,11 +242,13 @@ export default function LicensingReport() {
               <thead className="bg-muted/40 text-xs uppercase font-mono text-muted-foreground">
                 <tr>
                   <th className="text-left px-4 py-2.5">Ano Lic.</th>
+                  <th className="text-left px-4 py-2.5">Situação</th>
+                  <th className="text-left px-4 py-2.5">Vencimento</th>
                   <th className="text-left px-4 py-2.5">Placa</th>
                   <th className="text-left px-4 py-2.5">Chassi</th>
                   <th className="text-left px-4 py-2.5">RENAVAM</th>
                   <th className="text-left px-4 py-2.5">Marca / Modelo</th>
-                  <th className="text-left px-4 py-2.5">Status</th>
+                  <th className="text-left px-4 py-2.5">Status veículo</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,6 +263,15 @@ export default function LicensingReport() {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        title={licensingTooltip(r.lic)}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${licensingBadgeClass(r.lic)}`}
+                      >
+                        {situacaoText(r.lic)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-xs">{fmtDate(r.lic.vencimento)}</td>
                     <td className="px-4 py-2.5 font-mono font-semibold">{r.plate || "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs">{r.chassis || "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs">{r.renavam || "—"}</td>
