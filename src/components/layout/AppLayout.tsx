@@ -172,12 +172,15 @@ export default function AppLayout() {
   }, [currentCompanyId, loc.pathname]);
 
   useEffect(() => {
+    let matched = false;
     for (const e of nav) {
       if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
         setOpenGroup(e.key);
-        return;
+        matched = true;
+        break;
       }
     }
+    if (!matched) setOpenGroup(null);
   }, [loc.pathname]);
 
   if (loading)
