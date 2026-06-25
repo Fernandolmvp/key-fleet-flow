@@ -285,6 +285,8 @@ function VehiclesTab({
         </Card>
       </div>
 
+      <LicensingCalendarReference />
+
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -540,5 +542,70 @@ function DocLine({ d, onEdit, onDelete }: { d: DocRow; onEdit: (d: DocRow) => vo
         </Button>
       </div>
     </div>
+  );
+}
+
+/* ----------------- Tabela de referência: vencimentos SP ----------------- */
+
+function LicensingCalendarReference() {
+  const leve = [
+    { finais: "1 e 2", mes: "Julho" },
+    { finais: "3 e 4", mes: "Agosto" },
+    { finais: "5 e 6", mes: "Setembro" },
+    { finais: "7 e 8", mes: "Outubro" },
+    { finais: "9", mes: "Novembro" },
+    { finais: "0", mes: "Dezembro" },
+  ];
+  const pesado = [
+    { finais: "1 e 2", mes: "Setembro" },
+    { finais: "3, 4 e 5", mes: "Outubro" },
+    { finais: "6, 7 e 8", mes: "Novembro" },
+    { finais: "9 e 0", mes: "Dezembro" },
+  ];
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-sm font-semibold">Calendário de licenciamento — SP</div>
+          <div className="text-xs text-muted-foreground">
+            Classificação automática pelo tipo do veículo (CRLV). Leves = carros, motos, ônibus e reboques. Pesados = caminhões e tratores.
+          </div>
+        </div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground mb-1">Carros, Motos, Ônibus e Reboques</div>
+          <table className="w-full text-sm border border-border rounded">
+            <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+              <tr><th className="text-left px-3 py-1.5">Final da placa</th><th className="text-left px-3 py-1.5">Vencimento</th></tr>
+            </thead>
+            <tbody>
+              {leve.map((r) => (
+                <tr key={r.finais} className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono">{r.finais}</td>
+                  <td className="px-3 py-1.5">Até o último dia de {r.mes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground mb-1">Caminhões e Tratores</div>
+          <table className="w-full text-sm border border-border rounded">
+            <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+              <tr><th className="text-left px-3 py-1.5">Final da placa</th><th className="text-left px-3 py-1.5">Vencimento</th></tr>
+            </thead>
+            <tbody>
+              {pesado.map((r) => (
+                <tr key={r.finais} className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono">{r.finais}</td>
+                  <td className="px-3 py-1.5">Até o último dia de {r.mes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Card>
   );
 }

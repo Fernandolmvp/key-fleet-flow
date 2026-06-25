@@ -157,9 +157,11 @@ export function computeLicensingStatus(opts: {
     return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
   }
 
-  const yearNext = Number(opts.licensing_year) + 1;
-  const vencimento = lastDayOfMonth(yearNext, mes);
-  const mesAno = `${pad2(mes)}/${yearNext}`;
+  // O exercício pago (licensing_year) define o ANO de vencimento:
+  // CRLV exercício 2026 com placa final 2 vence em 31/julho/2026.
+  const yearDue = Number(opts.licensing_year);
+  const vencimento = lastDayOfMonth(yearDue, mes);
+  const mesAno = `${pad2(mes)}/${yearDue}`;
   const diff = Math.round((vencimento.getTime() - today.getTime()) / 86_400_000);
 
   let status: LicensingStatus;
@@ -167,7 +169,7 @@ export function computeLicensingStatus(opts: {
     status = "vencido";
   } else {
     const sameMonth =
-      today.getFullYear() === yearNext && today.getMonth() + 1 === mes;
+      today.getFullYear() === yearDue && today.getMonth() + 1 === mes;
     if (sameMonth || diff <= 30) status = "vencendo";
     else status = "licenciado";
   }
