@@ -62,9 +62,9 @@ Deno.serve(async (req) => {
     const userClient = createClient(SUPABASE_URL, ANON, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: claimsData, error: cErr } = await userClient.auth.getClaims(authHeader.slice(7));
-    if (cErr || !claimsData?.claims?.sub) return json({ error: "Token inválido" }, 401);
-    const userId = claimsData.claims.sub as string;
+    const { data: userData, error: cErr } = await userClient.auth.getUser(authHeader.slice(7));
+    if (cErr || !userData?.user?.id) return json({ error: "Token inválido" }, 401);
+    const userId = userData.user.id;
 
     const body = await req.json();
     const { company_id, partner_type, partner_id, email, name, role, kind } = body as {
