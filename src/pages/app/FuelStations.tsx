@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Pencil, Trash2, Loader2, Fuel, MapPin, Users } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, Fuel, MapPin, Users, LayoutGrid, List } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,8 @@ export default function FuelStations() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<string>(() => localStorage.getItem("stations:tab") || "ativos");
   useEffect(() => { localStorage.setItem("stations:tab", tab); }, [tab]);
+  const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("stations:view") as "grid" | "list") || "grid");
+  useEffect(() => { localStorage.setItem("stations:view", view); }, [view]);
   const [accessFor, setAccessFor] = useState<Station | null>(null);
   const stationAddressRef = useRef<HTMLInputElement>(null);
   const stationNumberRef = useRef<HTMLInputElement>(null);
@@ -155,6 +157,14 @@ export default function FuelStations() {
         <div className="flex items-center gap-3">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome, CNPJ, cidade ou bandeira" value={q} onChange={(e) => setQ(e.target.value)} className="border-0 bg-transparent focus-visible:ring-0" />
+          <div className="ml-auto inline-flex rounded-lg border border-border overflow-hidden">
+            <Button type="button" size="sm" variant={view === "grid" ? "default" : "ghost"} className="rounded-none px-3" onClick={() => setView("grid")} title="Visualização em quadrante">
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="sm" variant={view === "list" ? "default" : "ghost"} className="rounded-none px-3" onClick={() => setView("list")} title="Visualização em lista">
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -163,7 +173,7 @@ export default function FuelStations() {
           <Fuel className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">Nenhum posto cadastrado.</p>
         </div>
-      ) : (
+      ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((s) => (
             <div key={s.id} className="surface-card rounded-xl p-5 space-y-3 hover:border-primary/40 transition-colors">
@@ -198,6 +208,46 @@ export default function FuelStations() {
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="surface-card rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3">Posto</th>
+                  <th className="text-left px-4 py-3">CNPJ</th>
+                  <th className="text-left px-4 py-3">Cidade/UF</th>
+                  <th className="text-left px-4 py-3">Combustíveis</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.id} className="border-t border-border hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{s.name}</div>
+                      {s.brand && <div className="text-xs text-muted-foreground">{s.brand}</div>}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">{s.cnpj || "—"}</td>
+                    <td className="px-4 py-3 text-xs">{[s.city, s.state].filter(Boolean).join(" / ") || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{s.fuel_types?.length ? s.fuel_types.join(", ").replace(/_/g, " ") : "—"}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={s.active ? "default" : "secondary"} className={s.active ? "bg-success/15 text-success border-success/30" : ""}>
+                        {s.active ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" title="Acessos do parceiro" onClick={() => setAccessFor(s)}><Users className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(s)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

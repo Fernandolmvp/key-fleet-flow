@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Pencil, Trash2, Phone, Mail, Briefcase } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Phone, Mail, Briefcase, LayoutGrid, List } from "lucide-react";
 import { toast } from "sonner";
 import CepInput from "@/components/forms/CepInput";
 import AddressNumberFields from "@/components/forms/AddressNumberFields";
@@ -43,6 +43,8 @@ export default function Brokers() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Broker>>(empty);
+  const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("brokers:view") as "grid" | "list") || "grid");
+  useEffect(() => { localStorage.setItem("brokers:view", view); }, [view]);
   const brokerAddressRef = useRef<HTMLInputElement>(null);
   const brokerNumberRef = useRef<HTMLInputElement>(null);
 
@@ -119,11 +121,22 @@ export default function Brokers() {
         <Button onClick={openNew}><Plus className="h-4 w-4" /> Novo corretor</Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="ml-auto inline-flex rounded-lg border border-border overflow-hidden">
+          <Button type="button" size="sm" variant={view === "grid" ? "default" : "ghost"} className="rounded-none px-3" onClick={() => setView("grid")} title="Visualização em quadrante">
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button type="button" size="sm" variant={view === "list" ? "default" : "ghost"} className="rounded-none px-3" onClick={() => setView("list")} title="Visualização em lista">
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
+      {view === "list" ? (
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -171,6 +184,41 @@ export default function Brokers() {
           </table>
         </div>
       </Card>
+      ) : loading ? (
+        <div className="text-center text-muted-foreground py-12">Carregando...</div>
+      ) : filtered.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Briefcase className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          <p className="text-muted-foreground">Nenhum corretor cadastrado.</p>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((b) => (
+            <div key={b.id} className="surface-card rounded-xl p-5 space-y-3 hover:border-primary/40 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-display font-semibold truncate flex items-center gap-1.5">
+                    <Briefcase className="h-4 w-4 text-primary" />{b.name}
+                  </div>
+                  {b.legal_name && <div className="text-xs text-muted-foreground">{b.legal_name}</div>}
+                </div>
+                <Badge variant="outline" className={b.active ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : "bg-muted/30 text-muted-foreground border-border"}>
+                  {b.active ? "Ativo" : "Inativo"}
+                </Badge>
+              </div>
+              {b.document && <div className="font-mono text-xs text-muted-foreground">{b.document}</div>}
+              {b.susep && <div className="text-xs text-muted-foreground">SUSEP {b.susep}</div>}
+              {b.contact_name && <div className="text-xs font-medium">{b.contact_name}</div>}
+              {b.phone && <div className="text-xs flex items-center gap-1 text-muted-foreground"><Phone className="h-3 w-3" />{b.phone}</div>}
+              {b.email && <div className="text-xs flex items-center gap-1 text-muted-foreground"><Mail className="h-3 w-3" />{b.email}</div>}
+              <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(b)}><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(b.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
