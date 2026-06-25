@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Search, Package, Star, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Package, Star, Loader2, LayoutGrid, List } from "lucide-react";
 import { toast } from "sonner";
 import CepInput from "@/components/forms/CepInput";
 import CnpjLookupInput, { type CnpjLookupResult } from "@/components/forms/CnpjLookupInput";
@@ -46,6 +46,8 @@ export default function Suppliers() {
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<any>(blank());
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("suppliers:view") as "grid" | "list") || "grid");
+  useEffect(() => { localStorage.setItem("suppliers:view", view); }, [view]);
 
   const load = async () => {
     if (!currentCompanyId) return;
@@ -174,6 +176,14 @@ export default function Suppliers() {
             {PARTNER_STATUS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <div className="inline-flex rounded-lg border border-border overflow-hidden">
+          <Button type="button" size="sm" variant={view === "grid" ? "default" : "ghost"} className="rounded-none px-3" onClick={() => setView("grid")} title="Visualização em quadrante">
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button type="button" size="sm" variant={view === "list" ? "default" : "ghost"} className="rounded-none px-3" onClick={() => setView("list")} title="Visualização em lista">
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -181,7 +191,7 @@ export default function Suppliers() {
           <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">Nenhum fornecedor cadastrado.</p>
         </div>
-      ) : (
+      ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((s) => {
             const tone = PARTNER_STATUS.find((p) => p.value === s.status)?.tone ?? "";
@@ -214,6 +224,49 @@ export default function Suppliers() {
               </div>
             );
           })}
+        </div>
+      ) : (
+        <div className="surface-card rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="text-left px-4 py-3">Fornecedor</th>
+                  <th className="text-left px-4 py-3">Documento</th>
+                  <th className="text-left px-4 py-3">Cidade/UF</th>
+                  <th className="text-left px-4 py-3">Categorias</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s) => {
+                  const tone = PARTNER_STATUS.find((p) => p.value === s.status)?.tone ?? "";
+                  return (
+                    <tr key={s.id} className="border-t border-border hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <div className="font-medium flex items-center gap-1.5">
+                          {s.name}
+                          {s.preferred && <Star className="h-3.5 w-3.5 text-warning fill-warning" />}
+                        </div>
+                        {s.trade_name && <div className="text-xs text-muted-foreground">{s.trade_name}</div>}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{s.document_number || "—"}</td>
+                      <td className="px-4 py-3 text-xs">{[s.city, s.state].filter(Boolean).join(" / ") || "—"}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {s.supplier_category?.length ? s.supplier_category.slice(0, 3).map((t: string) => labelOf(SUPPLIER_CATEGORIES, t)).join(", ") + (s.supplier_category.length > 3 ? ` +${s.supplier_category.length - 3}` : "") : "—"}
+                      </td>
+                      <td className="px-4 py-3"><Badge className={`border ${tone}`}>{labelOf(PARTNER_STATUS, s.status)}</Badge></td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(s)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
