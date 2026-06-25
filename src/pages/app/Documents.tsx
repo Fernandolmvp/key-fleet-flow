@@ -13,11 +13,11 @@ import {
 import DocumentDialog, { DocFormDoc } from "@/components/dashboard/DocumentDialog";
 import {
   DOC_TYPE_LABELS, STATUS_COLOR, STATUS_LABEL, daysUntil, DocStatus,
-  evaluateLicensing, LICENSING_LABEL, LICENSING_COLOR, plateLastDigit,
-  LICENSING_MONTH_BY_PLATE_END, MONTH_LABEL_PT,
+  plateLastDigit, MONTH_LABEL_PT,
 } from "@/lib/documents";
 import {
   loadDetranCalendar, computeLicensingStatus, type DetranCalendar,
+  licensingBadgeClass, licensingTooltip,
 } from "@/lib/licensing";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -248,15 +248,17 @@ function VehiclesTab({
     let semDoc = 0, atrasados = 0, venceEmBreve = 0, ok = 0;
     vehicles.forEach((v) => {
       const vDocs = docs.filter((d) => d.entity_id === v.id);
-      const crlv = vDocs.find((d) => d.doc_type === "crlv");
-      const lic = evaluateLicensing({ plate: v.plate, crlvExpiresAt: crlv?.expires_at });
+      const lic = computeLicensingStatus({
+        licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf,
+        calendar, vehicle_type: v.vehicle_type,
+      });
       if (vDocs.length === 0) semDoc++;
-      if (lic.status === "atrasado") atrasados++;
-      else if (lic.status === "vence_em_breve") venceEmBreve++;
+      if (lic.status === "vencido") atrasados++;
+      else if (lic.status === "vencendo") venceEmBreve++;
       else if (lic.status === "licenciado") ok++;
     });
     return { semDoc, atrasados, venceEmBreve, ok, total: vehicles.length };
-  }, [vehicles, docs]);
+  }, [vehicles, docs, calendar]);
 
   return (
     <div className="space-y-4">
@@ -303,18 +305,23 @@ function VehiclesTab({
               {filtered.map((v) => {
                 const vDocs = docs.filter((d) => d.entity_id === v.id);
                 const crlv = vDocs.find((d) => d.doc_type === "crlv");
-                const lic = evaluateLicensing({ plate: v.plate, crlvExpiresAt: crlv?.expires_at });
+                const lic = computeLicensingStatus({
+                  licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf,
+                  calendar, vehicle_type: v.vehicle_type,
+                });
                 const last = plateLastDigit(v.plate);
-                const monthIdx = last ? LICENSING_MONTH_BY_PLATE_END[last] : null;
+                const monthIdx = lic.vencimento ? lic.vencimento.getMonth() + 1 : null;
+                const licYear = lic.vencimento ? lic.vencimento.getFullYear() : null;
+                const licLabel =
+                  lic.status === "licenciado" ? "Licenciado"
+                  : lic.status === "vencendo" ? "Vence em breve"
+                  : lic.status === "vencido" ? "Vencido"
+                  : "Sem exercício";
                 const adjustedDocs = vDocs.map((d) => {
                   if (d.doc_type !== "crlv" && d.doc_type !== "licenciamento") return d;
-                  if (!v.licensing_year) return d;
-                  const r = computeLicensingStatus({
-                    licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf, calendar, vehicle_type: v.vehicle_type,
-                  });
-                  if (!r.vencimento) return d;
-                  const iso = `${r.vencimento.getFullYear()}-${String(r.vencimento.getMonth()+1).padStart(2,"0")}-${String(r.vencimento.getDate()).padStart(2,"0")}`;
-                  const status: DocStatus = r.status === "vencido" ? "vencido" : r.status === "vencendo" ? "vencendo" : "valido";
+                  if (!lic.vencimento) return d;
+                  const iso = `${lic.vencimento.getFullYear()}-${String(lic.vencimento.getMonth()+1).padStart(2,"0")}-${String(lic.vencimento.getDate()).padStart(2,"0")}`;
+                  const status: DocStatus = lic.status === "vencido" ? "vencido" : lic.status === "vencendo" ? "vencendo" : "valido";
                   return { ...d, expires_at: d.expires_at || iso, status };
                 });
 
@@ -326,12 +333,15 @@ function VehiclesTab({
                     </td>
                     <td className="px-4 py-3 font-mono">{last || "—"}</td>
                     <td className="px-4 py-3">
-                      <Badge className={LICENSING_COLOR[lic.status]} variant="outline">
-                        {LICENSING_LABEL[lic.status]}
-                      </Badge>
+                      <span
+                        title={licensingTooltip(lic)}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${licensingBadgeClass(lic)}`}
+                      >
+                        {licLabel}
+                      </span>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {monthIdx ? `Prazo: ${MONTH_LABEL_PT[monthIdx]}` : "—"}
-                        {!crlv && lic.status !== "indefinido" && (
+                        {monthIdx && licYear ? `Prazo: ${MONTH_LABEL_PT[monthIdx]}/${licYear}` : v.licensing_year ? "—" : "Sem exercício informado"}
+                        {!crlv && lic.status !== "sem" && (
                           <span className="block text-amber-400">Baseado no calendário (sem CRLV anexado).</span>
                         )}
                         {crlv?.expires_at && (
