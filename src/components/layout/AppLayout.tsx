@@ -116,7 +116,7 @@ export default function AppLayout() {
   const [docPending, setDocPending] = useState(0);
   const [approvalPending, setApprovalPending] = useState(0);
   const [insurancePending, setInsurancePending] = useState(0);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ cadastros: true, movimentacao: true });
+  const [openGroup, setOpenGroup] = useState<string | null>("cadastros");
   const [showNewCompany, setShowNewCompany] = useState(false);
 
   useEffect(() => {
@@ -172,15 +172,12 @@ export default function AppLayout() {
   }, [currentCompanyId, loc.pathname]);
 
   useEffect(() => {
-    setOpenGroups((prev) => {
-      const next = { ...prev };
-      for (const e of nav) {
-        if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
-          next[e.key] = true;
-        }
+    for (const e of nav) {
+      if (isGroup(e) && e.items.some((it) => loc.pathname.startsWith(it.to))) {
+        setOpenGroup(e.key);
+        return;
       }
-      return next;
-    });
+    }
   }, [loc.pathname]);
 
   if (loading)
@@ -299,7 +296,7 @@ export default function AppLayout() {
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {visibleNav.map((entry) => {
             if (!isGroup(entry)) return renderItem(entry, { primary: true });
-            const open = !!openGroups[entry.key];
+            const open = openGroup === entry.key;
             const Icon = entry.icon;
             const pendingCount =
               (entry.items.some((i) => i.badgeKey === "approvals") ? approvalPending : 0) +
@@ -310,7 +307,7 @@ export default function AppLayout() {
               <div key={entry.key} className="space-y-0.5">
                 <button
                   type="button"
-                  onClick={() => setOpenGroups((p) => ({ ...p, [entry.key]: !open }))}
+                  onClick={() => setOpenGroup((prev) => (prev === entry.key ? null : entry.key))}
                   className={cn(
                     "w-full flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-all",
                     groupActive
