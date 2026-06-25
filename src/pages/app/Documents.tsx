@@ -285,6 +285,8 @@ function VehiclesTab({
         </Card>
       </div>
 
+      <LicensingCalendarReference />
+
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
