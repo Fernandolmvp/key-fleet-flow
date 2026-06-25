@@ -43,6 +43,7 @@ export default function LicensingReport() {
   const [q, setQ] = useState("");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [situacaoFilter, setSituacaoFilter] = useState<"all" | LicensingStatus>("all");
+  const [mesFilter, setMesFilter] = useState<string>("all");
   const calendar = useDetranCalendar();
 
   useEffect(() => {
@@ -86,6 +87,10 @@ export default function LicensingReport() {
         if (yearFilter === "none" ? r.licensing_year != null : String(r.licensing_year ?? "") !== yearFilter) return false;
       }
       if (situacaoFilter !== "all" && r.lic.status !== situacaoFilter) return false;
+      if (mesFilter !== "all") {
+        const m = r.lic.vencimento ? r.lic.vencimento.getMonth() + 1 : null;
+        if (m == null || String(m) !== mesFilter) return false;
+      }
       if (!term) return true;
       return (
         (r.plate || "").toUpperCase().includes(term) ||
@@ -109,7 +114,7 @@ export default function LicensingReport() {
       return (a.plate || "").localeCompare(b.plate || "");
     });
     return list;
-  }, [enriched, q, yearFilter, situacaoFilter]);
+  }, [enriched, q, yearFilter, situacaoFilter, mesFilter]);
 
   const isActive = (s: string | null) => {
     const v = (s || "").toLowerCase();
@@ -213,6 +218,20 @@ export default function LicensingReport() {
             <option value="vencendo">A vencer</option>
             <option value="licenciado">Licenciados</option>
             <option value="sem">Sem exercício</option>
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={mesFilter}
+            onChange={(e) => setMesFilter(e.target.value)}
+            aria-label="Mês de vencimento"
+          >
+            <option value="all">Todos os meses</option>
+            {[
+              "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+              "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+            ].map((nome, i) => (
+              <option key={i + 1} value={String(i + 1)}>{nome}</option>
+            ))}
           </select>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1.5" /> Imprimir
