@@ -37,7 +37,7 @@ export function vehicleCategoryFromType(
 ): VehicleCategory {
   const s = (vehicle_type || "").toLowerCase();
   if (!s) return "leve";
-  if (/(caminh|truck|trator|tractor|cavalo\s*mec)/.test(s)) return "pesado";
+  if (/(\bcaminh(?:ão|ao|ões|oes)\b|\btruck\b|\btrator\b|\btractor\b|cavalo\s*mec)/.test(s)) return "pesado";
   return "leve";
 }
 
@@ -51,7 +51,7 @@ export async function loadDetranCalendar(force = false): Promise<DetranCalendar>
   inflight = (async () => {
     const { data, error } = await supabase
       .from("detran_calendar")
-      .select("estado, final_placa, mes_vencimento");
+      .select("estado, categoria, final_placa, mes_vencimento");
     const map: DetranCalendar = new Map();
     if (!error && data) {
       for (const row of data as any[]) {
@@ -118,7 +118,7 @@ function pad2(n: number) {
 
 /**
  * Calcula vencimento e status do licenciamento.
- * - licensing_year é o exercício pago (X). Mantém legal até último dia do mês da placa em X+1.
+  * - licensing_year é o exercício pago (X). Mantém legal até último dia do mês da placa em X.
  * - status: 'vencido' se hoje > vencimento; 'vencendo' se faltam <= 30 dias OU
  *   estamos dentro do mês de vencimento; senão 'licenciado'.
  * - 'sem' quando não há exercício ou final/placa/calendário indisponível.
