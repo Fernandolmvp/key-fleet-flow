@@ -118,7 +118,7 @@ function pad2(n: number) {
 
 /**
  * Calcula vencimento e status do licenciamento.
-  * - licensing_year é o exercício pago (X). Mantém legal até último dia do mês da placa em X.
+  * - licensing_year é o exercício pago (X). Mantém legal até último dia do mês da placa em X + 1.
  * - status: 'vencido' se hoje > vencimento; 'vencendo' se faltam <= 30 dias OU
  *   estamos dentro do mês de vencimento; senão 'licenciado'.
  * - 'sem' quando não há exercício ou final/placa/calendário indisponível.
@@ -157,9 +157,9 @@ export function computeLicensingStatus(opts: {
     return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
   }
 
-  // O exercício pago (licensing_year) define o ANO de vencimento:
-  // CRLV exercício 2026 com placa final 2 vence em 31/julho/2026.
-  const yearDue = Number(opts.licensing_year);
+  // O exercício pago (licensing_year) vence no calendário do ano seguinte:
+  // CRLV exercício 2026 com placa final 2 vence em 31/julho/2027.
+  const yearDue = Number(opts.licensing_year) + 1;
   const vencimento = lastDayOfMonth(yearDue, mes);
   const mesAno = `${pad2(mes)}/${yearDue}`;
   const diff = Math.round((vencimento.getTime() - today.getTime()) / 86_400_000);
