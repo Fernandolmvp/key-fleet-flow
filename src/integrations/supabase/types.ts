@@ -1479,6 +1479,7 @@ export type Database = {
       }
       detran_calendar: {
         Row: {
+          categoria: string
           created_at: string
           estado: string
           final_placa: number
@@ -1487,6 +1488,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          categoria?: string
           created_at?: string
           estado: string
           final_placa: number
@@ -1495,6 +1497,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          categoria?: string
           created_at?: string
           estado?: string
           final_placa?: number
