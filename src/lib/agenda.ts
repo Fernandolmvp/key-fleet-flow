@@ -108,7 +108,7 @@ export async function loadAgendaEvents(
   ] = await Promise.all([
     supabase
       .from("vehicles")
-      .select("id,plate,brand,model,licensing_year,licensing_uf")
+      .select("id,plate,brand,model,licensing_year,licensing_uf,vehicle_type")
       .eq("company_id", companyId),
     supabase
       .from("workshops")
@@ -347,6 +347,7 @@ export async function loadAgendaEvents(
       plate: v.plate,
       uf: v.licensing_uf ?? null,
       calendar,
+      vehicle_type: v.vehicle_type ?? null,
     });
     if (!lic.vencimento) return;
     const iso = `${lic.vencimento.getFullYear()}-${String(lic.vencimento.getMonth() + 1).padStart(2, "0")}-${String(lic.vencimento.getDate()).padStart(2, "0")}`;

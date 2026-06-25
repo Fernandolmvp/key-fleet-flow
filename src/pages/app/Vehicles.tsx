@@ -92,7 +92,7 @@ export default function Vehicles() {
     if (!currentCompanyId) return;
     setLoading(true);
     const { data, error } = await supabase.from("vehicles")
-      .select("id,plate,brand,model,year_model,status,current_km,fuel_type,photos,documents,licensing_year,licensing_uf,insurer,insurance_policy,insurance_expires_at,owner_name,crlv_city,crlv_issue_date,buyer_name,sale_value,sale_date")
+      .select("id,plate,brand,model,year_model,status,current_km,fuel_type,photos,documents,licensing_year,licensing_uf,vehicle_type,insurer,insurance_policy,insurance_expires_at,owner_name,crlv_city,crlv_issue_date,buyer_name,sale_value,sale_date")
       .eq("company_id", currentCompanyId)
       .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
@@ -174,6 +174,7 @@ export default function Vehicles() {
     plate: v.plate,
     uf: v.licensing_uf ?? null,
     calendar,
+    vehicle_type: (v as any).vehicle_type ?? null,
   });
   const findCrlv = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "crlv" && d.file_url);
   const findInsurance = (vid: string) => (docsByVehicle[vid] ?? []).find((d) => d.doc_type === "seguro" && d.file_url);

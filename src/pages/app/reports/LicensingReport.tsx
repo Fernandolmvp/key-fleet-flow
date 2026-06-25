@@ -24,6 +24,7 @@ type Row = {
   renavam: string | null;
   licensing_year: number | null;
   licensing_uf: string | null;
+  vehicle_type: string | null;
   brand: string | null;
   model: string | null;
   status: string | null;
@@ -50,7 +51,7 @@ export default function LicensingReport() {
     (async () => {
       const { data, error } = await supabase
         .from("vehicles")
-        .select("id,plate,chassis,renavam,licensing_year,licensing_uf,brand,model,status")
+        .select("id,plate,chassis,renavam,licensing_year,licensing_uf,vehicle_type,brand,model,status")
         .eq("company_id", currentCompanyId)
         .order("plate", { ascending: true });
       if (error) toast.error("Falha ao carregar veículos");
@@ -72,6 +73,7 @@ export default function LicensingReport() {
         plate: r.plate,
         uf: r.licensing_uf,
         calendar,
+        vehicle_type: r.vehicle_type,
       });
       return { ...r, lic };
     });

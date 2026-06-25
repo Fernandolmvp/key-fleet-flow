@@ -12,17 +12,34 @@ export interface LicensingResult {
   uf: string;
 }
 
-// estado -> final (0-9) -> mes (1-12)
-export type DetranCalendar = Map<string, Map<number, number>>;
+// estado -> categoria -> final (0-9) -> mes (1-12)
+export type VehicleCategory = "leve" | "pesado";
+export type DetranCalendar = Map<string, Map<VehicleCategory, Map<number, number>>>;
 
 const DEFAULT_UF = "SP";
 
 // Fallback embutido do calendário SP (final da placa -> mês de vencimento).
 // Usado como rede de segurança quando o detran_calendar do banco vem vazio
 // no client (ex.: timing de auth/sessão).
-const SP_FALLBACK: Record<number, number> = {
-  1: 7, 2: 7, 3: 8, 4: 8, 5: 8, 6: 9, 7: 10, 8: 10, 9: 11, 0: 12,
+// Leves = carros, motos, ônibus e reboques. Pesados = caminhões e tratores.
+const SP_FALLBACK: Record<VehicleCategory, Record<number, number>> = {
+  leve: { 1: 7, 2: 7, 3: 8, 4: 8, 5: 9, 6: 9, 7: 10, 8: 10, 9: 11, 0: 12 },
+  pesado: { 1: 9, 2: 9, 3: 10, 4: 10, 5: 10, 6: 11, 7: 11, 8: 11, 9: 12, 0: 12 },
 };
+
+/**
+ * Detecta se o veículo é "pesado" (caminhão/trator) pelo campo livre
+ * `vehicle_type` salvo no cadastro. Tudo o que não casar com caminhão/trator
+ * cai em "leve" (carros, motos, ônibus, reboques, utilitários, etc.).
+ */
+export function vehicleCategoryFromType(
+  vehicle_type?: string | null,
+): VehicleCategory {
+  const s = (vehicle_type || "").toLowerCase();
+  if (!s) return "leve";
+  if (/(caminh|truck|trator|tractor|cavalo\s*mec)/.test(s)) return "pesado";
+  return "leve";
+}
 
 let cachedCalendar: DetranCalendar | null = null;
 let inflight: Promise<DetranCalendar> | null = null;
@@ -39,8 +56,11 @@ export async function loadDetranCalendar(force = false): Promise<DetranCalendar>
     if (!error && data) {
       for (const row of data as any[]) {
         const uf = String(row.estado).toUpperCase();
+        const cat = ((row.categoria as string) || "leve").toLowerCase() as VehicleCategory;
         if (!map.has(uf)) map.set(uf, new Map());
-        map.get(uf)!.set(Number(row.final_placa), Number(row.mes_vencimento));
+        const ufMap = map.get(uf)!;
+        if (!ufMap.has(cat)) ufMap.set(cat, new Map());
+        ufMap.get(cat)!.set(Number(row.final_placa), Number(row.mes_vencimento));
       }
     }
     if (error || map.size === 0) {
@@ -109,6 +129,8 @@ export function computeLicensingStatus(opts: {
   uf?: string | null;
   calendar: DetranCalendar;
   today?: Date;
+  vehicle_type?: string | null;
+  category?: VehicleCategory;
 }): LicensingResult {
   const uf = (opts.uf || DEFAULT_UF).toUpperCase();
   const today = opts.today ?? new Date();
@@ -121,11 +143,15 @@ export function computeLicensingStatus(opts: {
   if (final === null) {
     return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
   }
-  let ufMap = opts.calendar.get(uf) ?? opts.calendar.get(DEFAULT_UF);
-  let mes: number | undefined = ufMap?.get(final);
+  const cat: VehicleCategory =
+    opts.category ?? vehicleCategoryFromType(opts.vehicle_type);
+  const ufMap = opts.calendar.get(uf) ?? opts.calendar.get(DEFAULT_UF);
+  // Tenta categoria pedida; se não houver, cai para "leve" do banco.
+  let mes: number | undefined =
+    ufMap?.get(cat)?.get(final) ?? ufMap?.get("leve")?.get(final);
   // Fallback embutido para SP quando o banco não tem a UF ou veio vazio.
   if (!mes && uf === "SP") {
-    mes = SP_FALLBACK[final];
+    mes = SP_FALLBACK[cat][final] ?? SP_FALLBACK.leve[final];
   }
   if (!mes) {
     return { status: "sem", vencimento: null, mesAno: null, diasRestantes: null, uf };
