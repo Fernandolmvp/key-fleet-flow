@@ -40,7 +40,7 @@ type DocRow = {
   ai_extracted: any;
 };
 
-type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null; licensing_year: number | null; licensing_uf: string | null };
+type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null; licensing_year: number | null; licensing_uf: string | null; vehicle_type: string | null };
 type Driver = { id: string; full_name: string; cpf: string | null; cnh_number: string | null; cnh_expires_at: string | null; medical_exam_expires_at: string | null };
 
 export default function Documents() {
@@ -102,7 +102,7 @@ export default function Documents() {
     setLoading(true);
     const [d, v, dr] = await Promise.all([
       supabase.from("documents").select("*").eq("company_id", currentCompanyId).order("expires_at", { ascending: true, nullsFirst: false }),
-      supabase.from("vehicles").select("id,plate,brand,model,year_model,licensing_year,licensing_uf").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,year_model,licensing_year,licensing_uf,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
       supabase.from("drivers").select("id,full_name,cpf,cnh_number,cnh_expires_at,medical_exam_expires_at").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
     ]);
     if (d.error) toast.error(d.error.message);
@@ -310,7 +310,7 @@ function VehiclesTab({
                   if (d.doc_type !== "crlv" && d.doc_type !== "licenciamento") return d;
                   if (!v.licensing_year) return d;
                   const r = computeLicensingStatus({
-                    licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf, calendar,
+                    licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf, calendar, vehicle_type: v.vehicle_type,
                   });
                   if (!r.vencimento) return d;
                   const iso = `${r.vencimento.getFullYear()}-${String(r.vencimento.getMonth()+1).padStart(2,"0")}-${String(r.vencimento.getDate()).padStart(2,"0")}`;
