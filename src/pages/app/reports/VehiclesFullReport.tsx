@@ -23,6 +23,7 @@ type VehicleRow = {
   fipe_value: number | null;
   fipe_reference_month: string | null;
   fipe_value_updated_at: string | null;
+  owner_name: string | null;
 };
 
 type LinkRow = {
@@ -62,7 +63,7 @@ export default function VehiclesFullReport() {
         supabase
           .from("vehicles")
           .select(
-            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,fipe_value,fipe_reference_month,fipe_value_updated_at",
+            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
           )
           .eq("company_id", currentCompanyId)
           .order("plate", { ascending: true }),
@@ -114,6 +115,7 @@ export default function VehiclesFullReport() {
         r.broker_name,
         r.insurer_name,
         r.policy_number,
+        r.owner_name,
       ]
         .filter(Boolean)
         .some((v) => String(v).toUpperCase().includes(term)),
@@ -146,6 +148,7 @@ export default function VehiclesFullReport() {
       "Ano/Modelo",
       "Marca/Modelo",
       "Cor",
+      "Proprietário",
       "Valor FIPE",
       "Mês Ref. FIPE",
       "Corretor",
@@ -162,6 +165,7 @@ export default function VehiclesFullReport() {
           anoModelo(r),
           [r.brand, r.model].filter(Boolean).join(" "),
           r.color ?? "",
+          r.owner_name ?? "",
           r.fipe_value != null ? brl.format(Number(r.fipe_value)) : "",
           r.fipe_reference_month ?? "",
           r.broker_name ?? "",
@@ -236,6 +240,7 @@ export default function VehiclesFullReport() {
                   <th className="text-left px-3 py-2.5">Ano/Mod.</th>
                   <th className="text-left px-3 py-2.5">Marca / Modelo</th>
                   <th className="text-left px-3 py-2.5">Cor</th>
+                  <th className="text-left px-3 py-2.5">Proprietário</th>
                   <th className="text-left px-3 py-2.5">Valor FIPE</th>
                   <th className="text-left px-3 py-2.5">Mês Ref.</th>
                   <th className="text-left px-3 py-2.5">Corretor</th>
@@ -252,6 +257,7 @@ export default function VehiclesFullReport() {
                     <td className="px-3 py-2.5 font-mono text-xs">{anoModelo(r) || "—"}</td>
                     <td className="px-3 py-2.5">{[r.brand, r.model].filter(Boolean).join(" ") || "—"}</td>
                     <td className="px-3 py-2.5">{r.color || "—"}</td>
+                    <td className="px-3 py-2.5 text-xs">{r.owner_name || "—"}</td>
                     <td
                       className="px-3 py-2.5 font-mono text-xs whitespace-nowrap"
                       title={r.fipe_value_updated_at ? `Consultado em ${fmtUpdatedAt(r.fipe_value_updated_at)}` : undefined}
