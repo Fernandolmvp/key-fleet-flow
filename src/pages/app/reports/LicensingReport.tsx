@@ -28,6 +28,7 @@ type Row = {
   brand: string | null;
   model: string | null;
   status: string | null;
+  owner_name: string | null;
 };
 
 function csvEscape(v: any) {
@@ -52,7 +53,7 @@ export default function LicensingReport() {
     (async () => {
       const { data, error } = await supabase
         .from("vehicles")
-        .select("id,plate,chassis,renavam,licensing_year,licensing_uf,vehicle_type,brand,model,status")
+        .select("id,plate,chassis,renavam,licensing_year,licensing_uf,vehicle_type,brand,model,status,owner_name")
         .eq("company_id", currentCompanyId)
         .order("plate", { ascending: true });
       if (error) toast.error("Falha ao carregar veículos");
@@ -95,7 +96,8 @@ export default function LicensingReport() {
       return (
         (r.plate || "").toUpperCase().includes(term) ||
         (r.chassis || "").toUpperCase().includes(term) ||
-        (r.renavam || "").includes(term)
+        (r.renavam || "").includes(term) ||
+        (r.owner_name || "").toUpperCase().includes(term)
       );
     });
     // Ordenação por urgência: vencido (mais antigo primeiro), vencendo (mais próximo),
@@ -142,7 +144,7 @@ export default function LicensingReport() {
   };
 
   function exportCsv() {
-    const header = ["Ano Licenciamento", "Situação", "Vencimento", "Placa", "Chassi", "RENAVAM", "Marca/Modelo", "Status veículo"];
+    const header = ["Ano Licenciamento", "Situação", "Vencimento", "Placa", "Chassi", "RENAVAM", "Marca/Modelo", "Proprietário", "Status veículo"];
     const lines = [header.join(";")];
     filtered.forEach((r) => {
       lines.push(
@@ -154,6 +156,7 @@ export default function LicensingReport() {
           r.chassis ?? "",
           r.renavam ?? "",
           [r.brand, r.model].filter(Boolean).join(" "),
+          r.owner_name ?? "",
           r.status ?? "",
         ]
           .map(csvEscape)
@@ -269,6 +272,7 @@ export default function LicensingReport() {
                   <th className="text-left px-4 py-2.5">Chassi</th>
                   <th className="text-left px-4 py-2.5">RENAVAM</th>
                   <th className="text-left px-4 py-2.5">Marca / Modelo</th>
+                  <th className="text-left px-4 py-2.5">Proprietário</th>
                   <th className="text-left px-4 py-2.5">Status veículo</th>
                 </tr>
               </thead>
@@ -299,6 +303,7 @@ export default function LicensingReport() {
                     <td className="px-4 py-2.5">
                       {[r.brand, r.model].filter(Boolean).join(" ") || "—"}
                     </td>
+                    <td className="px-4 py-2.5 text-xs">{r.owner_name || "—"}</td>
                     <td className="px-4 py-2.5">
                       <span className="text-xs capitalize">{r.status || "—"}</span>
                     </td>
