@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://qvhgivhlgumcxaneizzb.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "frotaops-mcp",
+      "version": "0.1.0",
+      "title": "FrotaOps MCP"
+    },
+    "tools": [
+      {
+        "name": "get_company",
+        "title": "Obter dados da empresa",
+        "description": "Retorna dados da empresa atual do usuário autenticado (nome, CNPJ, endereço, contato).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_vehicles",
+        "title": "Listar veículos",
+        "description": "Lista os veículos da frota do usuário autenticado (respeita permissões da empresa).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Máximo de veículos a retornar."
+            },
+            "status": {
+              "type": "string",
+              "description": "Filtrar por status (ex.: 'ativo', 'inativo', 'vendido')."
+            },
+            "search": {
+              "type": "string",
+              "description": "Busca por placa, marca ou modelo."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_drivers",
+        "title": "Listar motoristas",
+        "description": "Lista os motoristas cadastrados na empresa do usuário autenticado.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "search": {
+              "type": "string",
+              "description": "Busca por nome ou CPF."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

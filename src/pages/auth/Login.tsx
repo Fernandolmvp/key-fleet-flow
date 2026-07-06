@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,10 @@ function maskCpf(v: string) {
 export default function Login() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const safeNext =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,9 +65,13 @@ export default function Login() {
   const [resetCoBusy, setResetCoBusy] = useState(false);
   const [resetCoSent, setResetCoSent] = useState(false);
 
-  if (!loading && user) return <Navigate to="/app" replace />;
+  if (!loading && user) return <Navigate to={safeNext ?? "/app"} replace />;
 
   const routeAfterLogin = async () => {
+    if (safeNext) {
+      window.location.href = safeNext;
+      return;
+    }
     const { data } = await supabase.rpc("get_my_acquisition_state" as any);
     const row: any = Array.isArray(data) ? data[0] : data;
     if (row?.has_company && !row?.is_active) {

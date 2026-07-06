@@ -81,6 +81,7 @@ import MotoristaAbastecimento from "./pages/motorista/MotoristaAbastecimento";
 import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 import Termos from "./pages/legal/Termos";
 import Privacidade from "./pages/legal/Privacidade";
+import OAuthConsent from "./pages/auth/OAuthConsent";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +101,7 @@ const App = () => (
             <Route path="/termos" element={<Termos />} />
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/primeiro-acesso" element={<PrimeiroAcesso />} />
             <Route path="/motorista/primeiro-acesso" element={<DriverFirstAccess />} />
