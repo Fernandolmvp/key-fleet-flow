@@ -33,11 +33,17 @@ type AiVehicle = {
   use?: string | null;
   city?: string | null;
   state?: string | null;
+  owner?: string | null;
+  owner_name?: string | null;
+  proprietario?: string | null;
+  segurado?: string | null;
+  insured_name?: string | null;
 };
 type Row = {
   plate: string;
   ai: AiVehicle;
   policy: Policy;
+  owner: string | null;
 };
 
 const chassisMatch = (a?: string | null, b?: string | null) => {
@@ -112,7 +118,10 @@ export default function OrphanPolicyVehiclesReport() {
             (normRenavam(v.renavam) && normRenavam(v.renavam) === normRenavam(a.renavam)),
         );
         if (matchedByVin) continue;
-        rows.push({ plate: (a.plate || key).toUpperCase(), ai: a, policy: p });
+        const owner =
+          a.owner ?? a.owner_name ?? a.proprietario ?? a.segurado ?? a.insured_name ??
+          ex.owner ?? ex.owner_name ?? ex.proprietario ?? ex.segurado ?? ex.insured_name ?? null;
+        rows.push({ plate: (a.plate || key).toUpperCase(), ai: a, policy: p, owner });
       }
     }
     return rows.sort((x, y) => x.plate.localeCompare(y.plate));
@@ -134,7 +143,8 @@ export default function OrphanPolicyVehiclesReport() {
         (r.ai.renavam || "").includes(term) ||
         (r.policy.policy_number || "").toUpperCase().includes(term) ||
         (r.ai.brand || "").toUpperCase().includes(term) ||
-        (r.ai.model || "").toUpperCase().includes(term)
+        (r.ai.model || "").toUpperCase().includes(term) ||
+        (r.owner || "").toUpperCase().includes(term)
       );
     });
   }, [orphans, q, insurerFilter]);
@@ -149,6 +159,7 @@ export default function OrphanPolicyVehiclesReport() {
       "Ano",
       "Chassi",
       "RENAVAM",
+      "Proprietário",
       "Categoria",
       "Uso",
       "Cidade",
@@ -172,6 +183,7 @@ export default function OrphanPolicyVehiclesReport() {
           a.year ?? "",
           a.chassis ?? "",
           a.renavam ?? "",
+          r.owner ?? "",
           a.category ?? "",
           a.use ?? "",
           a.city ?? "",
@@ -278,6 +290,7 @@ export default function OrphanPolicyVehiclesReport() {
                   <th className="text-left px-3 py-2.5">Ano</th>
                   <th className="text-left px-3 py-2.5">Chassi</th>
                   <th className="text-left px-3 py-2.5">RENAVAM</th>
+                  <th className="text-left px-3 py-2.5">Proprietário</th>
                   <th className="text-left px-3 py-2.5">Cidade/UF</th>
                   <th className="text-right px-3 py-2.5">Valor Segurado</th>
                   <th className="text-right px-3 py-2.5">Prêmio</th>
@@ -302,6 +315,7 @@ export default function OrphanPolicyVehiclesReport() {
                       <td className="px-3 py-2.5 font-mono text-xs">{a.year || "—"}</td>
                       <td className="px-3 py-2.5 font-mono text-xs">{a.chassis || "—"}</td>
                       <td className="px-3 py-2.5 font-mono text-xs">{a.renavam || "—"}</td>
+                      <td className="px-3 py-2.5 text-xs">{r.owner || "—"}</td>
                       <td className="px-3 py-2.5 text-xs">
                         {[a.city, a.state].filter(Boolean).join(" / ") || "—"}
                       </td>
