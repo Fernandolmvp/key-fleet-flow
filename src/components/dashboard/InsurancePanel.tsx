@@ -140,6 +140,64 @@ function normalizeFileName(name: string): string {
   return extClean ? `${baseClean}.${extClean}` : baseClean;
 }
 
+type AiFunctionError = {
+  message: string;
+  code?: string | null;
+  status?: number | null;
+};
+
+async function readAiFunctionError(error: unknown, fallback: string): Promise<AiFunctionError> {
+  const err = error as { message?: string; context?: unknown } | null;
+  let message = err?.message || fallback;
+  let code: string | null = null;
+  let status: number | null = null;
+
+  const context = err?.context as
+    | { status?: number; json?: () => Promise<unknown>; text?: () => Promise<string> }
+    | undefined;
+
+  if (typeof context?.status === "number") status = context.status;
+
+  try {
+    if (typeof context?.json === "function") {
+      const body = (await context.json()) as { error?: string; message?: string; code?: string } | null;
+      if (body?.error || body?.message) message = body.error || body.message || message;
+      if (body?.code) code = body.code;
+    } else if (typeof context?.text === "function") {
+      const txt = await context.text();
+      try {
+        const body = JSON.parse(txt) as { error?: string; message?: string; code?: string };
+        if (body?.error || body?.message) message = body.error || body.message || message;
+        if (body?.code) code = body.code;
+      } catch {
+        if (txt.trim()) message = txt;
+      }
+    }
+  } catch {
+    // Mantém a mensagem original quando o corpo da resposta já foi consumido.
+  }
+
+  return { message, code, status };
+}
+
+function isInsufficientAiCredits(err: AiFunctionError): boolean {
+  const text = `${err.code || ""} ${err.message || ""}`.toLowerCase();
+  return err.status === 402 || text.includes("insufficient_tokens") || text.includes("créditos de ia insuficientes") || text.includes("creditos de ia insuficientes");
+}
+
+function normalizeAiErrorMessage(err: AiFunctionError, fallback: string): string {
+  if (isInsufficientAiCredits(err)) {
+    return "Créditos de IA insuficientes. Você pode salvar a apólice manualmente ou adicionar créditos em Configurações > Créditos de IA.";
+  }
+
+  const lower = String(err.message || "").toLowerCase();
+  if (lower.includes("timeout") || lower.includes("limite") || lower.includes("grande/escaneada")) {
+    return "A leitura automática levou mais tempo que o normal. O sistema já tenta quebrar PDFs grandes, mas este arquivo ainda excedeu o limite. Tente reenviar; se persistir, envie a apólice e os endossos em PDFs separados.";
+  }
+
+  return err.message || fallback;
+}
+
 type MatchStatus = "linked" | "not_found" | "mismatch";
 type MatchResult = {
   ai: AiVehicle;
@@ -281,14 +339,14 @@ export default function InsurancePanel() {
         },
       });
       if (error) {
-        let msg = error.message || "Falha ao revisar com IA";
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx?.json) { const b = await ctx.json(); if (b?.error) msg = b.error; }
-        } catch {}
-        throw new Error(msg);
+        const parsedError = await readAiFunctionError(error, "Falha ao revisar com IA");
+        toast.error(normalizeAiErrorMessage(parsedError, "Falha ao revisar com IA"));
+        return;
       }
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.error) {
+        toast.error(String((data as any).error));
+        return;
+      }
       setReviewResult((data as any)?.data ?? null);
       toast.success("Revisão concluída pela IA");
     } catch (e: any) {
@@ -390,20 +448,9 @@ export default function InsurancePanel() {
         body: { fileBase64: b64, mimeType: file.type || "application/pdf" },
       });
       if (error) {
-        let msg = error.message || "Falha ao processar a apólice";
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx?.json) { const body = await ctx.json(); if (body?.error) msg = body.error; }
-          else if (ctx?.text) {
-            const txt = await ctx.text();
-            try { const j = JSON.parse(txt); if (j?.error) msg = j.error; } catch { /* keep */ }
-          }
-        } catch { /* ignore */ }
-        const lower = String(msg).toLowerCase();
-        if (lower.includes("timeout") || lower.includes("limite") || lower.includes("grande/escaneada")) {
-          msg = "A leitura automática levou mais tempo que o normal. O sistema já tenta quebrar PDFs grandes, mas este arquivo ainda excedeu o limite. Tente reenviar; se persistir, envie a apólice e os endossos em PDFs separados.";
-        }
-        throw new Error(msg);
+        const parsedError = await readAiFunctionError(error, "Falha ao processar a apólice");
+        toast.error(normalizeAiErrorMessage(parsedError, "Falha ao processar a apólice"));
+        return;
       }
       const ex = (data as any)?.data || {};
       setForm((f) => ({
@@ -458,7 +505,6 @@ export default function InsurancePanel() {
         }
       }
     } catch (e: any) {
-      console.error(e);
       toast.error(e?.message ? `IA: ${e.message}` : "IA não conseguiu ler a apólice. Preencha manualmente.");
     } finally {
       setExtracting(false);
