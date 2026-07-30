@@ -110,7 +110,29 @@ export async function guardAiCall(
     console.error("has_enough_ai_tokens error", balErr);
     return { err: { status: 500, body: { error: "Falha ao verificar créditos" } } };
   }
-  console.log("[ai-tokens] guard:balance", { feature, companyId, required, enough: Boolean(enough) });
+
+  let currentPlan = 0;
+  let currentExtra = 0;
+  try {
+    const { data: balance } = await supabase
+      .from("ai_token_balance")
+      .select("plan_tokens_remaining, extra_tokens_balance")
+      .eq("company_id", companyId)
+      .maybeSingle();
+    currentPlan = balance?.plan_tokens_remaining ?? 0;
+    currentExtra = balance?.extra_tokens_balance ?? 0;
+  } catch (_) {
+    /* ignore best-effort read */
+  }
+
+  const available = (currentPlan || 0) + (currentExtra || 0);
+  console.log("[ai-tokens] guard:balance", {
+    feature,
+    companyId,
+    required,
+    available,
+    enough: Boolean(enough),
+  });
   if (!enough) {
     // registra tentativa bloqueada (best-effort, não falha a request)
     try {
@@ -133,10 +155,18 @@ export async function guardAiCall(
         body: {
           error: "Créditos de IA insuficientes. Compre um pacote para continuar.",
           code: "insufficient_tokens",
+          details: {
+            required,
+            available,
+            missing: Math.max(0, required - available),
+            plan_tokens_remaining: currentPlan,
+            extra_tokens_balance: currentExtra,
+          },
         },
       },
     };
   }
+
 
   const requestId =
     req.headers.get("x-request-id") ||
