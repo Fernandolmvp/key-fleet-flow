@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Download, Printer, Search, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, Search, FileText, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 type VehicleRow = {
@@ -24,6 +25,7 @@ type VehicleRow = {
   fipe_reference_month: string | null;
   fipe_value_updated_at: string | null;
   owner_name: string | null;
+  insurance_expires_at: string | null;
 };
 
 type LinkRow = {
@@ -33,6 +35,7 @@ type LinkRow = {
     policy_number: string | null;
     insurer_name: string | null;
     end_date: string | null;
+    status: string | null;
     broker: { name: string | null } | null;
   } | null;
 };
@@ -41,6 +44,7 @@ type Row = VehicleRow & {
   broker_name: string | null;
   insurer_name: string | null;
   policy_number: string | null;
+  policy_end_date: string | null;
 };
 
 function csvEscape(v: any) {
