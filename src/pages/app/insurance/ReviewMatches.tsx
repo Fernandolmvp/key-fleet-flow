@@ -533,15 +533,22 @@ export default function ReviewMatches() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-mono font-bold">{v.plate}</span>
-                          {score >= 60 && (
+                          {score >= 80 ? (
+                            <Badge variant="outline" className="text-[10px] bg-sky-500/10 text-sky-400 border-sky-500/30">
+                              provável mesmo veículo
+                            </Badge>
+                          ) : score >= 60 ? (
                             <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
                               compatível
                             </Badge>
-                          )}
+                          ) : null}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
                           {[v.brand, v.model].filter(Boolean).join(" ") || "—"}
                         </div>
+                        {v.status !== "ativo" && (
+                          <div className="text-[10px] uppercase text-amber-400">status: {v.status}</div>
+                        )}
                         {v.chassis && (
                           <div className="text-[10px] font-mono text-muted-foreground truncate">
                             Chassi: {v.chassis}
