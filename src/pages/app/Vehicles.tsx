@@ -288,7 +288,7 @@ export default function Vehicles() {
         </div>
       ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((v) => {
+          {filtered.map((v, idx) => {
             const crlv = findCrlv(v.id);
             const insurance = findInsurance(v.id);
             const lic = licensingFor(v);
@@ -308,6 +308,9 @@ export default function Vehicles() {
                   </div>
                 )}
                 <Badge className={`absolute top-3 right-3 border ${statusTone[v.status] ?? ""}`}>{statusLabel[v.status] ?? v.status}</Badge>
+                <span className="absolute top-3 left-3 h-6 min-w-6 px-1.5 rounded-full bg-background/80 border border-border text-[11px] font-mono font-bold text-foreground grid place-items-center tabular-nums">
+                  {idx + 1}
+                </span>
               </div>
               <div className="p-4 space-y-3">
                 <div>
