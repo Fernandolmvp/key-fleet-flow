@@ -1335,10 +1335,9 @@ export default function InsurancePanel() {
                       </Badge>
                     )}
                     {selectedPolicy?.file_url && aiVeh?.page_number && (
-                      <Button asChild variant="ghost" size="icon" className="h-6 w-6" title={`Abrir PDF na página ${aiVeh.page_number}`}>
-                        <a href={`${selectedPolicy.file_url}#page=${aiVeh.page_number}`} target="_blank" rel="noreferrer">
-                          <FileText className="h-3 w-3 text-primary" />
-                        </a>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title={`Abrir PDF na página ${aiVeh.page_number}`}
+                        onClick={() => openStoredFile(selectedPolicy.file_url, { bucket: "insurance-policies", hash: `#page=${aiVeh.page_number}` })}>
+                        <FileText className="h-3 w-3 text-primary" />
                       </Button>
                     )}
                   </div>
@@ -1907,8 +1906,9 @@ export default function InsurancePanel() {
                       {isSel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
                     {p.file_url && (
-                      <Button asChild variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
-                        <a href={p.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
+                      <Button variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={(e) => { e.stopPropagation(); openStoredFile(p.file_url, { bucket: "insurance-policies" }); }}>
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                     )}
                     {(() => {

@@ -486,10 +486,11 @@ export default function ReviewMatches() {
                   </div>
                 </div>
                 {active.policy.file_url && (
-                  <a href={active.policy.file_url} target="_blank" rel="noreferrer"
+                  <button type="button"
+                    onClick={() => openStoredFile(active.policy.file_url, { bucket: "insurance-policies" })}
                     className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline">
                     <FileText className="h-3 w-3" /> Abrir PDF da apólice
-                  </a>
+                  </button>
                 )}
 
                 <div className="pt-3 border-t border-border space-y-2">
