@@ -377,7 +377,7 @@ export default function Vehicles() {
                     <Button
                       size="sm" variant="outline" className="flex-1 min-w-[120px]"
                       disabled={!insuranceUrl}
-                      onClick={() => insuranceUrl && openStoredFile(insuranceUrl)}
+                      onClick={() => insuranceUrl && openStoredFile(insuranceUrl, { bucket: "insurance-policies" })}
                       title={insuranceUrl ? "Abrir apólice anexada" : "Nenhuma apólice anexada em Documentação"}
                     >
                       <ShieldCheck className="h-3.5 w-3.5 mr-1" /> {insuranceUrl ? "Ver apólice" : "Sem apólice"}
@@ -517,7 +517,7 @@ export default function Vehicles() {
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!insuranceUrl}
-                            onClick={() => insuranceUrl && openStoredFile(insuranceUrl)} title="Ver apólice">
+                            onClick={() => insuranceUrl && openStoredFile(insuranceUrl, { bucket: "insurance-policies" })} title="Ver apólice">
                             <ShieldCheck className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(v as any); setOpen(true); }} title="Editar">
