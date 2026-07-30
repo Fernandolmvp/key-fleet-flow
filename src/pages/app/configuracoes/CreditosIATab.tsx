@@ -77,20 +77,7 @@ export default function CreditosIATab({ companyId }: Props) {
     (async () => {
       setLoading(true);
 
-      const [balanceRes, subRes, logsRes, membersRes] = await Promise.all([
-        supabase
-          .from("ai_token_balance")
-          .select("plan_tokens_remaining,extra_tokens_balance,last_plan_reset_at")
-          .eq("company_id", companyId)
-          .maybeSingle(),
-        supabase
-          .from("subscriptions")
-          .select("plan_id, plans(tokens_monthly)")
-          .eq("company_id", companyId)
-          .in("status", ["ativa", "atrasada", "aguardando_pagamento"])
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+      const [logsRes, membersRes] = await Promise.all([
         supabase
           .from("ai_usage_logs")
           .select("created_at,feature,tokens_total")
@@ -106,10 +93,7 @@ export default function CreditosIATab({ companyId }: Props) {
 
       if (!alive) return;
 
-      setPlanRemaining(balanceRes.data?.plan_tokens_remaining ?? 0);
-      setExtraBalance(balanceRes.data?.extra_tokens_balance ?? 0);
-      setLastResetAt(balanceRes.data?.last_plan_reset_at ?? null);
-      setPlanTotal(((subRes.data as any)?.plans?.tokens_monthly) ?? 0);
+      await loadBalance();
       setRecentLogs(logsRes.data ?? []);
       const mems = (membersRes.data ?? []).map((m: any) => ({
         id: m.user_id,
@@ -131,10 +115,19 @@ export default function CreditosIATab({ companyId }: Props) {
 
   return (
     <div className="space-y-5">
-      <BalanceAlert
-        totalAvailable={planRemaining + extraBalance}
-        planTotal={planTotal}
-      />
+      <div className="flex items-center justify-between">
+        <BalanceAlert
+          totalAvailable={planRemaining + extraBalance}
+          planTotal={planTotal}
+        />
+        {isSuperAdmin && (
+          <Button variant="outline" onClick={handleReset} disabled={resetting} className="gap-2">
+            {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Recarregar créditos do plano
+          </Button>
+        )}
+      </div>
+
 
       <BalanceCards
         planRemaining={planRemaining}
