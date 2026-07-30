@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import BalanceCards from "./credits/BalanceCards";
 import UsageChart from "./credits/UsageChart";
 import UsageHistory from "./credits/UsageHistory";
 import TopFeatures from "./credits/TopFeatures";
 import BalanceAlert from "./credits/BalanceAlert";
+
 
 interface Props { companyId: string; }
 
