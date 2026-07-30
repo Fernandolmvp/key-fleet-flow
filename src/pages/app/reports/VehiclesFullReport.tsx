@@ -59,22 +59,22 @@ export default function VehiclesFullReport() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
 
-  useEffect(() => {
-    if (!currentCompanyId) return;
-    setLoading(true);
-    (async () => {
+  const load = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!currentCompanyId) return;
+      if (!opts.silent) setLoading(true);
       const [vRes, lRes] = await Promise.all([
         supabase
           .from("vehicles")
           .select(
-            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
+            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,insurance_expires_at,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
           )
           .eq("company_id", currentCompanyId)
           .order("plate", { ascending: true }),
         supabase
           .from("insurance_policy_vehicles")
           .select(
-            "vehicle_id, removed_at, policy:insurance_policies(policy_number,insurer_name,end_date,broker:insurance_brokers(name))",
+            "vehicle_id, removed_at, policy:insurance_policies(policy_number,insurer_name,end_date,status,broker:insurance_brokers(name))",
           )
           .eq("company_id", currentCompanyId)
           .is("removed_at", null),
@@ -83,12 +83,22 @@ export default function VehiclesFullReport() {
       if (lRes.error) toast.error("Falha ao carregar apólices");
 
       const linksByVehicle = new Map<string, LinkRow>();
+      const today = new Date().setHours(0, 0, 0, 0);
+      const score = (l: LinkRow | undefined) => {
+        if (!l) return -Infinity;
+        const end = l.policy?.end_date ? new Date(l.policy.end_date).getTime() : null;
+        const cancelada = (l.policy?.status || "").toLowerCase() === "cancelada";
+        // prioriza apólice vigente, depois a de vencimento mais distante
+        let s = end ?? 0;
+        if (end != null && end >= today) s += 1e15;
+        if (cancelada) s -= 1e16;
+        return s;
+      };
       ((lRes.data as any[]) || []).forEach((l) => {
-        // mantém o mais "fresco" caso haja mais de um
         const existing = linksByVehicle.get(l.vehicle_id);
-        const newEnd = l.policy?.end_date ? new Date(l.policy.end_date).getTime() : 0;
-        const oldEnd = existing?.policy?.end_date ? new Date(existing.policy.end_date).getTime() : -1;
-        if (!existing || newEnd > oldEnd) linksByVehicle.set(l.vehicle_id, l as LinkRow);
+        if (!existing || score(l as LinkRow) > score(existing)) {
+          linksByVehicle.set(l.vehicle_id, l as LinkRow);
+        }
       });
 
       const combined: Row[] = ((vRes.data as VehicleRow[]) || []).map((v) => {
@@ -98,12 +108,24 @@ export default function VehiclesFullReport() {
           broker_name: link?.policy?.broker?.name ?? null,
           insurer_name: link?.policy?.insurer_name ?? v.insurer ?? null,
           policy_number: link?.policy?.policy_number ?? v.insurance_policy ?? null,
+          policy_end_date: link?.policy?.end_date ?? v.insurance_expires_at ?? null,
         };
       });
       setRows(combined);
       setLoading(false);
-    })();
-  }, [currentCompanyId]);
+    },
+    [currentCompanyId],
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAutoRefresh(
+    () => load({ silent: true }),
+    ["vehicles", "insurance_policy_vehicles", "insurance_policies", "insurance_brokers"],
+    { enabled: !!currentCompanyId },
+  );
 
   const filtered = useMemo(() => {
     const term = q.trim().toUpperCase();
