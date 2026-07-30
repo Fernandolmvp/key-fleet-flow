@@ -378,6 +378,9 @@ export default function ReviewMatches() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={resyncAll} disabled={resyncing}>
+            <Link2 className="h-4 w-4" /> {resyncing ? "Revinculando…" : "Revincular tudo"}
+          </Button>
           <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30">
             {stats.pending} pendente(s)
           </Badge>
