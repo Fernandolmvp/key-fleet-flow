@@ -209,6 +209,14 @@ export default function ReviewMatches() {
       .sort((a,b) => b.score - a.score);
   }, [vehicles, linkedVehicleIds, active]);
 
+  // Pré-seleciona automaticamente o candidato altamente compatível (ex.: erro de OCR).
+  useEffect(() => {
+    if (!active) return;
+    const best = candidates[0];
+    if (best && best.score >= 80) setSelectedVehicle(best.v.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
   function openConfirm() {
     if (!active || !selectedVehicle) {
       toast.error("Selecione um veículo da direita.");
