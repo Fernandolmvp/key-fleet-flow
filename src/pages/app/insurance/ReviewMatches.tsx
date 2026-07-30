@@ -15,6 +15,7 @@ import {
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { toast } from "sonner";
 import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type Policy = {
   id: string; policy_number: string; insurer_name: string;
@@ -44,6 +45,10 @@ type External = {
 type OrphanRow = { plate: string; ai: AiVehicle; policy: Policy };
 
 const norm = (s?: string|null) => String(s||"").toUpperCase().replace(/[^A-Z0-9]/g, "");
+/** Tolera confusões clássicas de OCR (O↔0, I↔1, S↔5, B↔8, Z↔2, G↔6). */
+const ocrKey = (s?: string|null) =>
+  normalizePlate(s).replace(/O/g, "0").replace(/I/g, "1").replace(/S/g, "5")
+    .replace(/B/g, "8").replace(/Z/g, "2").replace(/G/g, "6");
 const chassisMatch = (a?: string|null, b?: string|null) => {
   const x = normChassis(a), y = normChassis(b);
   return !!x && !!y && (x === y || x.slice(-8) === y.slice(-8));
@@ -55,6 +60,7 @@ function similarity(plate: string, ai: AiVehicle, v: Vehicle): number {
   const np = normalizePlate(plate), vp = normalizePlate(v.plate);
   if (np && vp) {
     if (np === vp) s += 100;
+    else if (ocrKey(np) && ocrKey(np) === ocrKey(vp)) s += 90;
     else if (np.slice(0,3) === vp.slice(0,3)) s += 30;
     else if (np.slice(-4) === vp.slice(-4)) s += 20;
   }
