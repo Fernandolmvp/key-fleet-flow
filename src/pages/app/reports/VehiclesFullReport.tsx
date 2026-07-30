@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Download, Printer, Search, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, Search, FileText, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 type VehicleRow = {
@@ -24,6 +25,7 @@ type VehicleRow = {
   fipe_reference_month: string | null;
   fipe_value_updated_at: string | null;
   owner_name: string | null;
+  insurance_expires_at: string | null;
 };
 
 type LinkRow = {
@@ -33,6 +35,7 @@ type LinkRow = {
     policy_number: string | null;
     insurer_name: string | null;
     end_date: string | null;
+    status: string | null;
     broker: { name: string | null } | null;
   } | null;
 };
@@ -41,6 +44,7 @@ type Row = VehicleRow & {
   broker_name: string | null;
   insurer_name: string | null;
   policy_number: string | null;
+  policy_end_date: string | null;
 };
 
 function csvEscape(v: any) {
@@ -55,22 +59,22 @@ export default function VehiclesFullReport() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
 
-  useEffect(() => {
-    if (!currentCompanyId) return;
-    setLoading(true);
-    (async () => {
+  const load = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!currentCompanyId) return;
+      if (!opts.silent) setLoading(true);
       const [vRes, lRes] = await Promise.all([
         supabase
           .from("vehicles")
           .select(
-            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
+            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,insurance_expires_at,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
           )
           .eq("company_id", currentCompanyId)
           .order("plate", { ascending: true }),
         supabase
           .from("insurance_policy_vehicles")
           .select(
-            "vehicle_id, removed_at, policy:insurance_policies(policy_number,insurer_name,end_date,broker:insurance_brokers(name))",
+            "vehicle_id, removed_at, policy:insurance_policies(policy_number,insurer_name,end_date,status,broker:insurance_brokers(name))",
           )
           .eq("company_id", currentCompanyId)
           .is("removed_at", null),
@@ -79,12 +83,22 @@ export default function VehiclesFullReport() {
       if (lRes.error) toast.error("Falha ao carregar apólices");
 
       const linksByVehicle = new Map<string, LinkRow>();
+      const today = new Date().setHours(0, 0, 0, 0);
+      const score = (l: LinkRow | undefined) => {
+        if (!l) return -Infinity;
+        const end = l.policy?.end_date ? new Date(l.policy.end_date).getTime() : null;
+        const cancelada = (l.policy?.status || "").toLowerCase() === "cancelada";
+        // prioriza apólice vigente, depois a de vencimento mais distante
+        let s = end ?? 0;
+        if (end != null && end >= today) s += 1e15;
+        if (cancelada) s -= 1e16;
+        return s;
+      };
       ((lRes.data as any[]) || []).forEach((l) => {
-        // mantém o mais "fresco" caso haja mais de um
         const existing = linksByVehicle.get(l.vehicle_id);
-        const newEnd = l.policy?.end_date ? new Date(l.policy.end_date).getTime() : 0;
-        const oldEnd = existing?.policy?.end_date ? new Date(existing.policy.end_date).getTime() : -1;
-        if (!existing || newEnd > oldEnd) linksByVehicle.set(l.vehicle_id, l as LinkRow);
+        if (!existing || score(l as LinkRow) > score(existing)) {
+          linksByVehicle.set(l.vehicle_id, l as LinkRow);
+        }
       });
 
       const combined: Row[] = ((vRes.data as VehicleRow[]) || []).map((v) => {
@@ -94,12 +108,24 @@ export default function VehiclesFullReport() {
           broker_name: link?.policy?.broker?.name ?? null,
           insurer_name: link?.policy?.insurer_name ?? v.insurer ?? null,
           policy_number: link?.policy?.policy_number ?? v.insurance_policy ?? null,
+          policy_end_date: link?.policy?.end_date ?? v.insurance_expires_at ?? null,
         };
       });
       setRows(combined);
       setLoading(false);
-    })();
-  }, [currentCompanyId]);
+    },
+    [currentCompanyId],
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAutoRefresh(
+    () => load({ silent: true }),
+    ["vehicles", "insurance_policy_vehicles", "insurance_policies", "insurance_brokers"],
+    { enabled: !!currentCompanyId },
+  );
 
   const filtered = useMemo(() => {
     const term = q.trim().toUpperCase();
@@ -140,6 +166,12 @@ export default function VehiclesFullReport() {
     }
   }
 
+  function fmtDate(d: string | null) {
+    if (!d) return "";
+    const [y, m, day] = d.slice(0, 10).split("-");
+    return y && m && day ? `${day}/${m}/${y}` : "";
+  }
+
   function exportCsv() {
     const header = [
       "Placa",
@@ -154,6 +186,7 @@ export default function VehiclesFullReport() {
       "Corretor",
       "Seguradora",
       "Apólice",
+      "Fim vigência",
     ];
     const lines = [header.join(";")];
     filtered.forEach((r) => {
@@ -171,6 +204,7 @@ export default function VehiclesFullReport() {
           r.broker_name ?? "",
           r.insurer_name ?? "",
           r.policy_number ?? "",
+          fmtDate(r.policy_end_date),
         ]
           .map(csvEscape)
           .join(";"),
@@ -213,6 +247,9 @@ export default function VehiclesFullReport() {
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1.5" /> Imprimir
           </Button>
+          <Button variant="outline" size="sm" onClick={() => load()}>
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Atualizar
+          </Button>
           <Button size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
           </Button>
@@ -246,6 +283,7 @@ export default function VehiclesFullReport() {
                   <th className="text-left px-3 py-2.5">Corretor</th>
                   <th className="text-left px-3 py-2.5">Seguradora</th>
                   <th className="text-left px-3 py-2.5">Apólice</th>
+                  <th className="text-left px-3 py-2.5">Fim vigência</th>
                 </tr>
               </thead>
               <tbody>
@@ -268,6 +306,7 @@ export default function VehiclesFullReport() {
                     <td className="px-3 py-2.5">{r.broker_name || "—"}</td>
                     <td className="px-3 py-2.5">{r.insurer_name || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.policy_number || "—"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{fmtDate(r.policy_end_date) || "—"}</td>
                   </tr>
                 ))}
               </tbody>
