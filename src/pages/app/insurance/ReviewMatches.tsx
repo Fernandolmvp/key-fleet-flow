@@ -81,6 +81,8 @@ export default function ReviewMatches() {
   const [manuals, setManuals] = useState<ManualMatch[]>([]);
   const [externals, setExternals] = useState<External[]>([]);
   const [linkedVehicleIds, setLinkedVehicleIds] = useState<Set<string>>(new Set());
+  const [policyLinks, setPolicyLinks] = useState<Set<string>>(new Set());
+  const [resyncing, setResyncing] = useState(false);
 
   const [search, setSearch] = useState("");
   const [active, setActive] = useState<OrphanRow | null>(null);
@@ -93,16 +95,16 @@ export default function ReviewMatches() {
   const [vehiclePrefill, setVehiclePrefill] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  async function load(opts: { silent?: boolean } = {}) {
     if (!currentCompanyId) return;
-    setLoading(true);
+    if (!opts.silent) setLoading(true);
     const [p, v, m, e, l] = await Promise.all([
       supabase.from("insurance_policies")
         .select("id,policy_number,insurer_name,start_date,end_date,status,ai_extracted,file_url")
         .eq("company_id", currentCompanyId).eq("status","ativa"),
       supabase.from("vehicles")
         .select("id,plate,brand,model,chassis,renavam,status")
-        .eq("company_id", currentCompanyId).eq("status","ativo").order("plate"),
+        .eq("company_id", currentCompanyId).order("plate"),
       supabase.from("vehicle_policy_manual_matches" as any)
         .select("*").eq("company_id", currentCompanyId).is("revoked_at", null),
       supabase.from("policy_external_plates" as any)
@@ -119,9 +121,34 @@ export default function ReviewMatches() {
     ((l.data as any[])||[]).forEach((r:any) => setIds.add(r.vehicle_id));
     ((m.data as any[])||[]).forEach((r:any) => setIds.add(r.vehicle_id));
     setLinkedVehicleIds(setIds);
+    const pl = new Set<string>();
+    ((l.data as any[])||[]).forEach((r:any) => pl.add(`${r.policy_id}|${r.vehicle_id}`));
+    ((m.data as any[])||[]).forEach((r:any) => pl.add(`${r.policy_id}|${r.vehicle_id}`));
+    setPolicyLinks(pl);
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
+
+  useAutoRefresh(
+    () => load({ silent: true }),
+    ["insurance_policies", "insurance_policy_vehicles", "vehicles", "vehicle_policy_manual_matches", "policy_external_plates"],
+    { enabled: !!currentCompanyId },
+  );
+
+  async function resyncAll() {
+    if (!currentCompanyId) return;
+    setResyncing(true);
+    try {
+      const { error } = await (supabase as any).rpc("sync_company_policy_links", { _company_id: currentCompanyId });
+      if (error) throw error;
+      toast.success("Vinculações automáticas atualizadas.");
+      await load({ silent: true });
+    } catch (err: any) {
+      toast.error(err?.message || "Falha ao revincular.");
+    } finally {
+      setResyncing(false);
+    }
+  }
 
   const orphans = useMemo<OrphanRow[]>(() => {
     const today = new Date().toISOString().slice(0,10);
@@ -139,18 +166,24 @@ export default function ReviewMatches() {
         const key = normalizePlate(a.plate);
         if (!key) continue;
         if (registered.has(key)) continue;
-        const matchedByVin = vehicles.some(v =>
+        // já existe vínculo (automático ou manual) gravado para algum veículo compatível
+        const matched = vehicles.find(v =>
           chassisMatch(v.chassis, a.chassis) ||
           (a.renavam && normRenavam(a.renavam) && normRenavam(v.renavam) === normRenavam(a.renavam)),
         );
-        if (matchedByVin) continue;
+        if (matched) continue;
+        const alreadyLinked = vehicles.some(v =>
+          policyLinks.has(`${p.id}|${v.id}`) &&
+          (normalizePlate(v.plate) === key || ocrKey(v.plate) === ocrKey(key)),
+        );
+        if (alreadyLinked) continue;
         if (externalKeys.has(`${p.id}|${key}`)) continue;
         if (manualKeys.has(`${p.id}|${key}`)) continue;
         rows.push({ plate: (a.plate||key).toUpperCase(), ai: a, policy: p });
       }
     }
     return rows.sort((x,y) => x.plate.localeCompare(y.plate));
-  }, [policies, vehicles, externals, manuals]);
+  }, [policies, vehicles, externals, manuals, policyLinks]);
 
   const filtered = useMemo(() => {
     const q = norm(search);
