@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import BalanceCards from "./credits/BalanceCards";
 import UsageChart from "./credits/UsageChart";
 import UsageHistory from "./credits/UsageHistory";
 import TopFeatures from "./credits/TopFeatures";
 import BalanceAlert from "./credits/BalanceAlert";
 
+
 interface Props { companyId: string; }
 
 export default function CreditosIATab({ companyId }: Props) {
+  const { isSuperAdmin } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
   const [planRemaining, setPlanRemaining] = useState(0);
   const [extraBalance, setExtraBalance] = useState(0);
   const [planTotal, setPlanTotal] = useState(0);
@@ -20,25 +27,57 @@ export default function CreditosIATab({ companyId }: Props) {
   const [members, setMembers] = useState<{ id: string; full_name: string | null }[]>([]);
   const [showBuy, setShowBuy] = useState(false);
 
+  const loadBalance = async () => {
+    const [balanceRes, subRes] = await Promise.all([
+      supabase
+        .from("ai_token_balance")
+        .select("plan_tokens_remaining, extra_tokens_balance, last_plan_reset_at")
+        .eq("company_id", companyId)
+        .maybeSingle(),
+      supabase
+        .from("subscriptions")
+        .select("plan_id, plans(tokens_monthly)")
+        .eq("company_id", companyId)
+        .in("status", ["ativa", "atrasada", "aguardando_pagamento"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    setPlanRemaining(balanceRes.data?.plan_tokens_remaining ?? 0);
+    setExtraBalance(balanceRes.data?.extra_tokens_balance ?? 0);
+    setLastResetAt(balanceRes.data?.last_plan_reset_at ?? null);
+    setPlanTotal(((subRes.data as any)?.plans?.tokens_monthly) ?? 0);
+  };
+
+  const handleReset = async () => {
+    if (!isSuperAdmin) return;
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-plan-tokens", { body: {} });
+      if (error) throw error;
+      await loadBalance();
+      toast({
+        title: "Créditos recarregados",
+        description: `Reset executado. ${data?.reset_count ?? 0} empresa(s) atualizada(s).`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao recarregar créditos",
+        description: err?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
+
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
 
-      const [balanceRes, subRes, logsRes, membersRes] = await Promise.all([
-        supabase
-          .from("ai_token_balance")
-          .select("plan_tokens_remaining,extra_tokens_balance,last_plan_reset_at")
-          .eq("company_id", companyId)
-          .maybeSingle(),
-        supabase
-          .from("subscriptions")
-          .select("plan_id, plans(tokens_monthly)")
-          .eq("company_id", companyId)
-          .in("status", ["ativa", "atrasada", "aguardando_pagamento"])
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+      const [logsRes, membersRes] = await Promise.all([
         supabase
           .from("ai_usage_logs")
           .select("created_at,feature,tokens_total")
@@ -54,10 +93,7 @@ export default function CreditosIATab({ companyId }: Props) {
 
       if (!alive) return;
 
-      setPlanRemaining(balanceRes.data?.plan_tokens_remaining ?? 0);
-      setExtraBalance(balanceRes.data?.extra_tokens_balance ?? 0);
-      setLastResetAt(balanceRes.data?.last_plan_reset_at ?? null);
-      setPlanTotal(((subRes.data as any)?.plans?.tokens_monthly) ?? 0);
+      await loadBalance();
       setRecentLogs(logsRes.data ?? []);
       const mems = (membersRes.data ?? []).map((m: any) => ({
         id: m.user_id,
@@ -79,10 +115,19 @@ export default function CreditosIATab({ companyId }: Props) {
 
   return (
     <div className="space-y-5">
-      <BalanceAlert
-        totalAvailable={planRemaining + extraBalance}
-        planTotal={planTotal}
-      />
+      <div className="flex items-center justify-between">
+        <BalanceAlert
+          totalAvailable={planRemaining + extraBalance}
+          planTotal={planTotal}
+        />
+        {isSuperAdmin && (
+          <Button variant="outline" onClick={handleReset} disabled={resetting} className="gap-2">
+            {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Recarregar créditos do plano
+          </Button>
+        )}
+      </div>
+
 
       <BalanceCards
         planRemaining={planRemaining}
