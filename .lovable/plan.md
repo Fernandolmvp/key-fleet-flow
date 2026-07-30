@@ -1,41 +1,31 @@
-## O que eu verifiquei nos dados (empresa Oquei)
+## O problema (confirmado)
 
-- A apólice **39233116** tem **59 veículos extraídos pela IA** e **0 vínculos** gravados em `insurance_policy_vehicles`. A apólice **53.82.2026.0013043** tem 6 e **0 vínculos**. Ou seja: o cruzamento placa↔frota hoje só acontece **em memória, dentro da tela de revisão** — nada é gravado.
-- Dos 107 registros de veículos extraídos de apólices vigentes, **84 já existem na frota** por placa, mas só **59 veículos** possuem vínculo ativo gravado. Por isso os demais aparecem como "sem apólice" em outras telas e a revisão parece desatualizada.
-- A tela filtra a frota por `status = 'ativo'`. Veículos `vendido`/`manutencao` (ex.: **STJ0G47**) caem na lista de pendências mesmo estando cadastrados.
-- Placas realmente pendentes hoje são poucas e têm causas identificadas:
-  - **Erro de OCR O↔0 / I↔1**: `STFOH46` (frota: `STF0H46`), `GAV0I25` (frota: `GAV0B25`), `UDV0106`, `UGI0178`, `UGL8198`.
-  - `AC0000` e `GAV0I25` já casam por **chassi** com veículos da frota.
-  - Restantes (`QSQ7F99`, `UDG5F99`, `UFD5D44`, `UFZ3A44`) não existem na frota — pendência legítima.
+- O bucket `insurance-policies` é **privado**.
+- No banco, todas as 26 apólices com PDF têm `file_url` gravado como **URL assinada** (`/storage/v1/object/sign/insurance-policies/...?token=...`), gerada no upload em `InsurancePanel.handleFile`.
+- Essas URLs assinadas são tokens JWT: quando expiram ou quando as chaves do projeto são rotacionadas, **param de funcionar** — é o erro que você está vendo ao abrir o PDF.
+- Vários pontos abrem `file_url` cru, sem re-assinar:
+  - `InsurancePanel.tsx`: link da lista de apólices, link "página X" da revisão por IA, e os `fetch(file_url)` de `runAiReview` / `extractWithAI`.
+  - `ReviewMatches.tsx`: link "ver PDF" da apólice.
+  - `Vehicles.tsx`: coluna de seguro usa `policy.file_url`.
+
+Já existe o utilitário correto (`src/lib/storage-url.ts` → `openStoredFile` / `resolveStoredFileUrl`), usado em Documentos e CNH, que extrai bucket+path de qualquer URL de storage e gera uma assinatura nova na hora. Basta aplicá-lo às apólices.
 
 ## O que vou fazer
 
-### 1. Vinculação automática no banco (a peça que falta)
-Criar uma função `public.sync_policy_vehicle_links(p_policy_id)` que, para cada veículo do `ai_extracted` de uma apólice, encontra o veículo da frota da mesma empresa por, nesta ordem:
-1. placa normalizada (antiga ↔ Mercosul, já existente em `normalize_plate`);
-2. chassi (igual ou 8 últimos dígitos);
-3. RENAVAM.
+1. **Abrir sempre com assinatura fresca**
+   - `InsurancePanel.tsx`: trocar os `<a href={file_url}>` por botões que chamam `openStoredFile(file_url)`; para o link "página X", assinar e abrir com `#page=N` anexado.
+   - `ReviewMatches.tsx`: mesmo tratamento no link de PDF da apólice.
+   - `Vehicles.tsx`: garantir que o PDF da apólice também passe por `openStoredFile`.
 
-E grava/reativa a linha em `insurance_policy_vehicles` (idempotente, sem duplicar; respeita `removed_at`).
+2. **Corrigir os fetch da IA**
+   - Em `runAiReview` e no reprocessamento por IA, resolver o URL com `resolveStoredFileUrl` antes do `fetch`, e mostrar mensagem clara ("PDF não encontrado no armazenamento") em vez do erro genérico.
 
-Gatilhos para manter tudo automático:
-- `AFTER INSERT/UPDATE OF ai_extracted, status, end_date` em `insurance_policies` → sincroniza aquela apólice;
-- `AFTER INSERT/UPDATE OF plate, chassis, renavam` em `vehicles` → sincroniza as apólices vigentes da empresa (aproveitando `match_policies_for_vehicle`);
-- Quando uma vinculação manual é criada em `vehicle_policy_manual_matches`, grava também o vínculo real em `insurance_policy_vehicles`.
+3. **Guardar caminho, não URL assinada (novos uploads)**
+   - `handleFile` passa a gravar o **path** (`{company_id}/{timestamp}-arquivo.pdf`) em `file_url`, sem token. `resolveStoredFileUrl` será ajustado para aceitar tanto URL de storage quanto path puro (assumindo o bucket informado), então continua funcionando para os registros antigos.
 
-**Backfill único** rodando a função em todas as apólices vigentes — isso já resolve os ~25 veículos hoje sem vínculo gravado.
-
-### 2. Tela "Revisar vinculações pendentes"
-- Passar a considerar **pendente** apenas a placa que não tem vínculo ativo em `insurance_policy_vehicles`, nem match manual, nem marcação de externa — a fonte da verdade vira o banco, não o cálculo local.
-- Buscar veículos de **todos os status** para detectar "já cadastrado" (o filtro de status continua valendo só para a lista de candidatos à direita, com aviso quando o veículo está vendido/inativo).
-- Adicionar **sugestão tolerante a OCR** (O↔0, I↔1, S↔5, B↔8) com badge "provável mesmo veículo" e o veículo já pré-selecionado à direita — sem vincular sozinho, o usuário confirma em 1 clique.
-- Botão **"Revincular tudo automaticamente"** que chama a função de sincronização e recarrega.
-- Atualização automática via `useAutoRefresh` nas tabelas `insurance_policies`, `insurance_policy_vehicles`, `vehicles`, `vehicle_policy_manual_matches`, `policy_external_plates`.
-
-### 3. Consistência
-Após o backfill, os campos de seguro do veículo (`insurer`, `insurance_policy`, `insurance_expires_at`) ficam coerentes pelo trigger `sync_vehicle_insurance_fields` já existente, refletindo no relatório "Veículos — Dados Completos" e na aba Seguros.
+4. **Sem migração de dados destrutiva**: os registros antigos continuam válidos porque o bucket e o path são extraídos da URL existente; só o token é descartado e refeito na hora da abertura.
 
 ## Detalhes técnicos
-- Migração com a função (`SECURITY DEFINER`, `search_path = public`), triggers e backfill; nenhuma tabela nova.
-- Sem alteração de RLS: a escrita ocorre por trigger no contexto da empresa dona da apólice.
-- Arquivo de frontend afetado: `src/pages/app/insurance/ReviewMatches.tsx`.
+
+- `resolveStoredFileUrl(url, { bucket })`: se `parseStorageUrl` falhar e o valor não começar com `http`, tratar como path no bucket informado.
+- Nada muda em RLS/policies: o usuário já tem acesso de leitura ao bucket via política por empresa, então `createSignedUrl` no cliente funciona.
