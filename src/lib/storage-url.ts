@@ -80,16 +80,6 @@ export async function openStoredFile(
   let win: Window | null = null;
   if (typeof window !== "undefined") {
     win = window.open("about:blank", "_blank");
-    if (win) {
-      try {
-        win.document.write(
-          '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Abrindo arquivo…</title></head><body style="font-family:system-ui;padding:24px">Abrindo arquivo…</body></html>',
-        );
-        win.document.close();
-      } catch {
-        /* ignore */
-      }
-    }
   }
   try {
     const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
@@ -100,7 +90,7 @@ export async function openStoredFile(
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
     if (win && !win.closed) {
-      win.location.href = finalUrl;
+      win.location.assign(finalUrl);
     } else {
       openInNewTab(finalUrl);
     }
