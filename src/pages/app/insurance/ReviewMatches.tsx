@@ -16,6 +16,7 @@ import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { toast } from "sonner";
 import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { openStoredFile } from "@/lib/storage-url";
 
 type Policy = {
   id: string; policy_number: string; insurer_name: string;

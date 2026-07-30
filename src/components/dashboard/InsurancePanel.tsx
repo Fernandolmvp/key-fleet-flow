@@ -17,6 +17,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "r
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
+import { openStoredFile, resolveStoredFileUrl } from "@/lib/storage-url";
 
 type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
 type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; renavam: string | null; vehicle_type: string | null };
