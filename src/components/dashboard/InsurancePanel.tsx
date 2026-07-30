@@ -17,6 +17,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "r
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
+import { openStoredFile, resolveStoredFileUrl } from "@/lib/storage-url";
 
 type Broker = { id: string; name: string; phone?: string | null; email?: string | null };
 type Vehicle = { id: string; plate: string; brand: string; model: string; status: string; chassis: string | null; renavam: string | null; vehicle_type: string | null };
@@ -317,7 +318,9 @@ export default function InsurancePanel() {
     setReviewLoading(true);
     setReviewResult(null);
     try {
-      const resp = await fetch(selectedPolicy.file_url);
+      const signedUrl = await resolveStoredFileUrl(selectedPolicy.file_url, 60 * 60, "insurance-policies");
+      if (!signedUrl) throw new Error("PDF não encontrado no armazenamento. Reenvie o arquivo da apólice.");
+      const resp = await fetch(signedUrl);
       if (!resp.ok) throw new Error("Não foi possível baixar o PDF da apólice.");
       const blob = await resp.blob();
       const mimeType = blob.type || "application/pdf";
@@ -425,8 +428,8 @@ export default function InsurancePanel() {
       const path = `${currentCompanyId}/${Date.now()}-${safeName}`;
       const up = await supabase.storage.from("insurance-policies").upload(path, file, { upsert: false });
       if (up.error) throw up.error;
-      const { data: signed } = await supabase.storage.from("insurance-policies").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
-      setForm((f) => ({ ...f, file_url: signed?.signedUrl || path, file_name: safeName }));
+      // Guardamos apenas o caminho; a URL assinada é gerada na hora de abrir/baixar.
+      setForm((f) => ({ ...f, file_url: path, file_name: safeName }));
       toast.success("PDF enviado");
       // tenta extrair com IA
       await extractWithAI(file);
@@ -516,7 +519,9 @@ export default function InsurancePanel() {
     if (!form.file_url) { toast.error("Anexe o PDF primeiro"); return; }
     setReextracting(true);
     try {
-      const resp = await fetch(form.file_url);
+      const signedUrl = await resolveStoredFileUrl(form.file_url, 60 * 60, "insurance-policies");
+      if (!signedUrl) throw new Error("PDF não encontrado no armazenamento. Reenvie o arquivo da apólice.");
+      const resp = await fetch(signedUrl);
       if (!resp.ok) throw new Error("Não foi possível baixar o PDF anexado");
       const blob = await resp.blob();
       const file = new File([blob], form.file_name || "apolice.pdf", { type: blob.type || "application/pdf" });
@@ -1335,10 +1340,9 @@ export default function InsurancePanel() {
                       </Badge>
                     )}
                     {selectedPolicy?.file_url && aiVeh?.page_number && (
-                      <Button asChild variant="ghost" size="icon" className="h-6 w-6" title={`Abrir PDF na página ${aiVeh.page_number}`}>
-                        <a href={`${selectedPolicy.file_url}#page=${aiVeh.page_number}`} target="_blank" rel="noreferrer">
-                          <FileText className="h-3 w-3 text-primary" />
-                        </a>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title={`Abrir PDF na página ${aiVeh.page_number}`}
+                        onClick={() => openStoredFile(selectedPolicy.file_url, { bucket: "insurance-policies", hash: `#page=${aiVeh.page_number}` })}>
+                        <FileText className="h-3 w-3 text-primary" />
                       </Button>
                     )}
                   </div>
@@ -1907,8 +1911,9 @@ export default function InsurancePanel() {
                       {isSel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
                     {p.file_url && (
-                      <Button asChild variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
-                        <a href={p.file_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
+                      <Button variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={(e) => { e.stopPropagation(); openStoredFile(p.file_url, { bucket: "insurance-policies" }); }}>
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                     )}
                     {(() => {
