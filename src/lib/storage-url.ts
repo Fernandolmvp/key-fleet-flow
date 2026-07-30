@@ -1,14 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-function openInNewTab(url: string): void {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.target = "_blank";
-  anchor.rel = "noopener noreferrer";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
+const STORED_FILE_VIEW_EVENT = "frotaops:open-stored-file";
+
+function showInApp(url: string): void {
+  window.dispatchEvent(new CustomEvent(STORED_FILE_VIEW_EVENT, { detail: { url } }));
 }
 
 /**
@@ -60,40 +56,26 @@ export async function openStoredFile(
   url: string | null | undefined,
   opts?: { hash?: string; bucket?: string },
 ): Promise<void> {
-  // Abre a aba ANTES do await: navegadores bloqueiam popups abertos
-  // depois de uma operação assíncrona (perda do gesto do usuário).
-  // IMPORTANTE: não usar "noopener" aqui — window.open retorna null nesse caso
-  // e a aba fica presa em about:blank.
-  let win: Window | null = null;
-  if (typeof window !== "undefined") {
-    win = window.open("about:blank", "_blank");
-    if (win) {
-      try {
-        win.opener = null;
-        win.document.write(
-          '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Abrindo arquivo…</title></head><body style="font-family:system-ui;padding:24px">Abrindo arquivo…</body></html>',
-        );
-        win.document.close();
-      } catch {
-        /* ignore */
-      }
-    }
+  if (!url) {
+    toast.error("Não foi possível abrir o arquivo. O endereço do PDF está vazio.");
+    return;
+  }
+
+  const parsed = parseStorageUrl(url);
+  const isBareStoragePath = !/^https?:\/\//i.test(url) && Boolean(opts?.bucket);
+  if (!parsed && !isBareStoragePath) {
+    showInApp(opts?.hash ? `${url}${opts.hash}` : url);
+    return;
   }
   try {
     const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
     if (!signed) {
-      win?.close();
       toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
       return;
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
-    if (win && !win.closed) {
-      win.location.replace(finalUrl);
-    } else {
-      openInNewTab(finalUrl);
-    }
+    showInApp(finalUrl);
   } catch (e: any) {
-    win?.close();
     console.error("[storage] openStoredFile failed", e);
     toast.error("Não foi possível abrir o arquivo. Tente novamente.");
   }
