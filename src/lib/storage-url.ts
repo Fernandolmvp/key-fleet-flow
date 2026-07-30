@@ -1,16 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-function openInNewTab(url: string): void {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.target = "_blank";
-  anchor.rel = "noopener noreferrer";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-}
-
 /**
  * Parses a Supabase Storage URL (public, sign, or authenticated) and returns
  * { bucket, path } when possible. Returns null for non-storage URLs.
