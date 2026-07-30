@@ -15,7 +15,10 @@ import BalanceAlert from "./credits/BalanceAlert";
 interface Props { companyId: string; }
 
 export default function CreditosIATab({ companyId }: Props) {
+  const { isSuperAdmin } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
   const [planRemaining, setPlanRemaining] = useState(0);
   const [extraBalance, setExtraBalance] = useState(0);
   const [planTotal, setPlanTotal] = useState(0);
@@ -23,6 +26,51 @@ export default function CreditosIATab({ companyId }: Props) {
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [members, setMembers] = useState<{ id: string; full_name: string | null }[]>([]);
   const [showBuy, setShowBuy] = useState(false);
+
+  const loadBalance = async () => {
+    const [balanceRes, subRes] = await Promise.all([
+      supabase
+        .from("ai_token_balance")
+        .select("plan_tokens_remaining, extra_tokens_balance, last_plan_reset_at")
+        .eq("company_id", companyId)
+        .maybeSingle(),
+      supabase
+        .from("subscriptions")
+        .select("plan_id, plans(tokens_monthly)")
+        .eq("company_id", companyId)
+        .in("status", ["ativa", "atrasada", "aguardando_pagamento"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    setPlanRemaining(balanceRes.data?.plan_tokens_remaining ?? 0);
+    setExtraBalance(balanceRes.data?.extra_tokens_balance ?? 0);
+    setLastResetAt(balanceRes.data?.last_plan_reset_at ?? null);
+    setPlanTotal(((subRes.data as any)?.plans?.tokens_monthly) ?? 0);
+  };
+
+  const handleReset = async () => {
+    if (!isSuperAdmin) return;
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-plan-tokens", { body: {} });
+      if (error) throw error;
+      await loadBalance();
+      toast({
+        title: "Créditos recarregados",
+        description: `Reset executado. ${data?.reset_count ?? 0} empresa(s) atualizada(s).`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao recarregar créditos",
+        description: err?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
 
   useEffect(() => {
     let alive = true;
