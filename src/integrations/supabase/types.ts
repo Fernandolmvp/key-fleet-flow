@@ -7132,6 +7132,14 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      sync_company_policy_links: {
+        Args: { _company_id: string }
+        Returns: number
+      }
+      sync_policy_vehicle_links: {
+        Args: { _policy_id: string }
+        Returns: number
+      }
       sync_vehicle_insurance_fields: {
         Args: { _vehicle_ids: string[] }
         Returns: undefined
