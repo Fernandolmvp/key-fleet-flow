@@ -60,10 +60,25 @@ export async function openStoredFile(
   url: string | null | undefined,
   opts?: { hash?: string; bucket?: string },
 ): Promise<void> {
-  const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
-  if (!signed) {
-    toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
-    return;
+  // Abre a aba ANTES do await: navegadores bloqueiam popups abertos
+  // depois de uma operação assíncrona (perda do gesto do usuário).
+  const win = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null;
+  try {
+    const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
+    if (!signed) {
+      win?.close();
+      toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
+      return;
+    }
+    const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
+    if (win && !win.closed) {
+      win.location.href = finalUrl;
+    } else {
+      openInNewTab(finalUrl);
+    }
+  } catch (e: any) {
+    win?.close();
+    console.error("[storage] openStoredFile failed", e);
+    toast.error("Não foi possível abrir o arquivo. Tente novamente.");
   }
-  openInNewTab(opts?.hash ? `${signed}${opts.hash}` : signed);
 }
