@@ -32,10 +32,21 @@ export function parseStorageUrl(url: string): { bucket: string; path: string } |
  * - If it's a Supabase Storage URL, returns a fresh signed URL (works for private buckets).
  * - Otherwise, returns the URL unchanged.
  */
-export async function resolveStoredFileUrl(url: string | null | undefined, expiresIn = 60 * 60): Promise<string | null> {
+export async function resolveStoredFileUrl(
+  url: string | null | undefined,
+  expiresIn = 60 * 60,
+  fallbackBucket?: string,
+): Promise<string | null> {
   if (!url) return null;
-  const parsed = parseStorageUrl(url);
-  if (!parsed) return url;
+  let parsed = parseStorageUrl(url);
+  if (!parsed) {
+    // Valor pode ser apenas o path dentro de um bucket conhecido
+    if (!/^https?:\/\//i.test(url) && fallbackBucket) {
+      parsed = { bucket: fallbackBucket, path: url.replace(/^\/+/, "") };
+    } else {
+      return url;
+    }
+  }
   const { data, error } = await supabase.storage.from(parsed.bucket).createSignedUrl(parsed.path, expiresIn);
   if (error || !data?.signedUrl) {
     console.warn("[storage] createSignedUrl failed", parsed.bucket, parsed.path, error?.message);
@@ -45,11 +56,14 @@ export async function resolveStoredFileUrl(url: string | null | undefined, expir
 }
 
 /** Open a stored file URL in a new tab, signing it first if it's in Supabase Storage. */
-export async function openStoredFile(url: string | null | undefined): Promise<void> {
-  const signed = await resolveStoredFileUrl(url);
+export async function openStoredFile(
+  url: string | null | undefined,
+  opts?: { hash?: string; bucket?: string },
+): Promise<void> {
+  const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
   if (!signed) {
     toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
     return;
   }
-  openInNewTab(signed);
+  openInNewTab(opts?.hash ? `${signed}${opts.hash}` : signed);
 }
