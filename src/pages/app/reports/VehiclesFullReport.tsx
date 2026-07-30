@@ -166,6 +166,12 @@ export default function VehiclesFullReport() {
     }
   }
 
+  function fmtDate(d: string | null) {
+    if (!d) return "";
+    const [y, m, day] = d.slice(0, 10).split("-");
+    return y && m && day ? `${day}/${m}/${y}` : "";
+  }
+
   function exportCsv() {
     const header = [
       "Placa",
@@ -180,6 +186,7 @@ export default function VehiclesFullReport() {
       "Corretor",
       "Seguradora",
       "Apólice",
+      "Fim vigência",
     ];
     const lines = [header.join(";")];
     filtered.forEach((r) => {
@@ -197,6 +204,7 @@ export default function VehiclesFullReport() {
           r.broker_name ?? "",
           r.insurer_name ?? "",
           r.policy_number ?? "",
+          fmtDate(r.policy_end_date),
         ]
           .map(csvEscape)
           .join(";"),
@@ -239,6 +247,9 @@ export default function VehiclesFullReport() {
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1.5" /> Imprimir
           </Button>
+          <Button variant="outline" size="sm" onClick={() => load()}>
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Atualizar
+          </Button>
           <Button size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
           </Button>
@@ -272,6 +283,7 @@ export default function VehiclesFullReport() {
                   <th className="text-left px-3 py-2.5">Corretor</th>
                   <th className="text-left px-3 py-2.5">Seguradora</th>
                   <th className="text-left px-3 py-2.5">Apólice</th>
+                  <th className="text-left px-3 py-2.5">Fim vigência</th>
                 </tr>
               </thead>
               <tbody>
@@ -294,6 +306,7 @@ export default function VehiclesFullReport() {
                     <td className="px-3 py-2.5">{r.broker_name || "—"}</td>
                     <td className="px-3 py-2.5">{r.insurer_name || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.policy_number || "—"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{fmtDate(r.policy_end_date) || "—"}</td>
                   </tr>
                 ))}
               </tbody>
