@@ -93,7 +93,15 @@ export async function openStoredFile(
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
     if (win && !win.closed) {
-      win.location.assign(finalUrl);
+      try {
+        const link = win.document.createElement("a");
+        link.href = finalUrl;
+        link.textContent = "Abrir documento";
+        win.document.body.appendChild(link);
+        link.click();
+      } catch {
+        win.location.href = finalUrl;
+      }
     } else {
       openInNewTab(finalUrl);
     }
