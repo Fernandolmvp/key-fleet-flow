@@ -82,6 +82,7 @@ import PartnerInviteAccept from "./pages/parceiro/PartnerInviteAccept";
 import Termos from "./pages/legal/Termos";
 import Privacidade from "./pages/legal/Privacidade";
 import OAuthConsent from "./pages/auth/OAuthConsent";
+import StoredFileViewer from "./components/StoredFileViewer";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner theme="dark" />
+      <StoredFileViewer />
       <BrowserRouter>
         <AuthProvider>
          <PostoAuthProvider>

@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const STORED_FILE_VIEW_EVENT = "frotaops:open-stored-file";
+
+function showInApp(url: string): void {
+  window.dispatchEvent(new CustomEvent(STORED_FILE_VIEW_EVENT, { detail: { url } }));
+}
+
 /**
  * Parses a Supabase Storage URL (public, sign, or authenticated) and returns
  * { bucket, path } when possible. Returns null for non-storage URLs.
@@ -58,7 +64,7 @@ export async function openStoredFile(
   const parsed = parseStorageUrl(url);
   const isBareStoragePath = !/^https?:\/\//i.test(url) && Boolean(opts?.bucket);
   if (!parsed && !isBareStoragePath) {
-    window.location.assign(opts?.hash ? `${url}${opts.hash}` : url);
+    showInApp(opts?.hash ? `${url}${opts.hash}` : url);
     return;
   }
   try {
@@ -68,7 +74,7 @@ export async function openStoredFile(
       return;
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
-    window.location.assign(finalUrl);
+    showInApp(finalUrl);
   } catch (e: any) {
     console.error("[storage] openStoredFile failed", e);
     toast.error("Não foi possível abrir o arquivo. Tente novamente.");
