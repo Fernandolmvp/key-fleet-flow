@@ -78,11 +78,12 @@ export async function openStoredFile(
   // `win.opener = null` antes do await rompe o WindowProxy em alguns navegadores
   // e deixa a aba permanentemente em about:blank.
   let win: Window | null = null;
+  const windowName = `frotaops-file-${Date.now()}`;
   if (typeof window !== "undefined") {
     // Uma janela nomeada mantém um WindowProxy navegável durante o await.
     // `_blank` recebe noopener implícito em navegadores modernos e pode ficar
     // preso em about:blank quando a URL assinada chega de forma assíncrona.
-    win = window.open("about:blank", `frotaops-file-${Date.now()}`);
+    win = window.open("about:blank", windowName);
   }
   try {
     const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
@@ -93,15 +94,9 @@ export async function openStoredFile(
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
     if (win && !win.closed) {
-      try {
-        const link = win.document.createElement("a");
-        link.href = finalUrl;
-        link.textContent = "Abrir documento";
-        win.document.body.appendChild(link);
-        link.click();
-      } catch {
-        win.location.href = finalUrl;
-      }
+      // Reabrir pelo mesmo nome pede ao navegador para navegar a aba existente,
+      // sem depender do WindowProxy isolado retornado no primeiro window.open.
+      window.open(finalUrl, windowName);
     } else {
       openInNewTab(finalUrl);
     }
