@@ -317,7 +317,9 @@ export default function InsurancePanel() {
     setReviewLoading(true);
     setReviewResult(null);
     try {
-      const resp = await fetch(selectedPolicy.file_url);
+      const signedUrl = await resolveStoredFileUrl(selectedPolicy.file_url, 60 * 60, "insurance-policies");
+      if (!signedUrl) throw new Error("PDF não encontrado no armazenamento. Reenvie o arquivo da apólice.");
+      const resp = await fetch(signedUrl);
       if (!resp.ok) throw new Error("Não foi possível baixar o PDF da apólice.");
       const blob = await resp.blob();
       const mimeType = blob.type || "application/pdf";
@@ -425,8 +427,8 @@ export default function InsurancePanel() {
       const path = `${currentCompanyId}/${Date.now()}-${safeName}`;
       const up = await supabase.storage.from("insurance-policies").upload(path, file, { upsert: false });
       if (up.error) throw up.error;
-      const { data: signed } = await supabase.storage.from("insurance-policies").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
-      setForm((f) => ({ ...f, file_url: signed?.signedUrl || path, file_name: safeName }));
+      // Guardamos apenas o caminho; a URL assinada é gerada na hora de abrir/baixar.
+      setForm((f) => ({ ...f, file_url: path, file_name: safeName }));
       toast.success("PDF enviado");
       // tenta extrair com IA
       await extractWithAI(file);
@@ -516,7 +518,9 @@ export default function InsurancePanel() {
     if (!form.file_url) { toast.error("Anexe o PDF primeiro"); return; }
     setReextracting(true);
     try {
-      const resp = await fetch(form.file_url);
+      const signedUrl = await resolveStoredFileUrl(form.file_url, 60 * 60, "insurance-policies");
+      if (!signedUrl) throw new Error("PDF não encontrado no armazenamento. Reenvie o arquivo da apólice.");
+      const resp = await fetch(signedUrl);
       if (!resp.ok) throw new Error("Não foi possível baixar o PDF anexado");
       const blob = await resp.blob();
       const file = new File([blob], form.file_name || "apolice.pdf", { type: blob.type || "application/pdf" });
