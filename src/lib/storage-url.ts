@@ -62,7 +62,23 @@ export async function openStoredFile(
 ): Promise<void> {
   // Abre a aba ANTES do await: navegadores bloqueiam popups abertos
   // depois de uma operação assíncrona (perda do gesto do usuário).
-  const win = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null;
+  // IMPORTANTE: não usar "noopener" aqui — window.open retorna null nesse caso
+  // e a aba fica presa em about:blank.
+  let win: Window | null = null;
+  if (typeof window !== "undefined") {
+    win = window.open("about:blank", "_blank");
+    if (win) {
+      try {
+        win.opener = null;
+        win.document.write(
+          '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Abrindo arquivo…</title></head><body style="font-family:system-ui;padding:24px">Abrindo arquivo…</body></html>',
+        );
+        win.document.close();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
   try {
     const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
     if (!signed) {
@@ -72,7 +88,7 @@ export async function openStoredFile(
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
     if (win && !win.closed) {
-      win.location.href = finalUrl;
+      win.location.replace(finalUrl);
     } else {
       openInNewTab(finalUrl);
     }
