@@ -15,6 +15,7 @@ import {
 import VehicleDialog from "@/components/dashboard/VehicleDialog";
 import { toast } from "sonner";
 import { normalizePlate, normChassis, normRenavam } from "@/lib/plate";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type Policy = {
   id: string; policy_number: string; insurer_name: string;
@@ -44,6 +45,10 @@ type External = {
 type OrphanRow = { plate: string; ai: AiVehicle; policy: Policy };
 
 const norm = (s?: string|null) => String(s||"").toUpperCase().replace(/[^A-Z0-9]/g, "");
+/** Tolera confusões clássicas de OCR (O↔0, I↔1, S↔5, B↔8, Z↔2, G↔6). */
+const ocrKey = (s?: string|null) =>
+  normalizePlate(s).replace(/O/g, "0").replace(/I/g, "1").replace(/S/g, "5")
+    .replace(/B/g, "8").replace(/Z/g, "2").replace(/G/g, "6");
 const chassisMatch = (a?: string|null, b?: string|null) => {
   const x = normChassis(a), y = normChassis(b);
   return !!x && !!y && (x === y || x.slice(-8) === y.slice(-8));
@@ -55,6 +60,7 @@ function similarity(plate: string, ai: AiVehicle, v: Vehicle): number {
   const np = normalizePlate(plate), vp = normalizePlate(v.plate);
   if (np && vp) {
     if (np === vp) s += 100;
+    else if (ocrKey(np) && ocrKey(np) === ocrKey(vp)) s += 90;
     else if (np.slice(0,3) === vp.slice(0,3)) s += 30;
     else if (np.slice(-4) === vp.slice(-4)) s += 20;
   }
@@ -75,6 +81,8 @@ export default function ReviewMatches() {
   const [manuals, setManuals] = useState<ManualMatch[]>([]);
   const [externals, setExternals] = useState<External[]>([]);
   const [linkedVehicleIds, setLinkedVehicleIds] = useState<Set<string>>(new Set());
+  const [policyLinks, setPolicyLinks] = useState<Set<string>>(new Set());
+  const [resyncing, setResyncing] = useState(false);
 
   const [search, setSearch] = useState("");
   const [active, setActive] = useState<OrphanRow | null>(null);
@@ -87,16 +95,16 @@ export default function ReviewMatches() {
   const [vehiclePrefill, setVehiclePrefill] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  async function load(opts: { silent?: boolean } = {}) {
     if (!currentCompanyId) return;
-    setLoading(true);
+    if (!opts.silent) setLoading(true);
     const [p, v, m, e, l] = await Promise.all([
       supabase.from("insurance_policies")
         .select("id,policy_number,insurer_name,start_date,end_date,status,ai_extracted,file_url")
         .eq("company_id", currentCompanyId).eq("status","ativa"),
       supabase.from("vehicles")
         .select("id,plate,brand,model,chassis,renavam,status")
-        .eq("company_id", currentCompanyId).eq("status","ativo").order("plate"),
+        .eq("company_id", currentCompanyId).order("plate"),
       supabase.from("vehicle_policy_manual_matches" as any)
         .select("*").eq("company_id", currentCompanyId).is("revoked_at", null),
       supabase.from("policy_external_plates" as any)
@@ -113,9 +121,34 @@ export default function ReviewMatches() {
     ((l.data as any[])||[]).forEach((r:any) => setIds.add(r.vehicle_id));
     ((m.data as any[])||[]).forEach((r:any) => setIds.add(r.vehicle_id));
     setLinkedVehicleIds(setIds);
+    const pl = new Set<string>();
+    ((l.data as any[])||[]).forEach((r:any) => pl.add(`${r.policy_id}|${r.vehicle_id}`));
+    ((m.data as any[])||[]).forEach((r:any) => pl.add(`${r.policy_id}|${r.vehicle_id}`));
+    setPolicyLinks(pl);
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
+
+  useAutoRefresh(
+    () => load({ silent: true }),
+    ["insurance_policies", "insurance_policy_vehicles", "vehicles", "vehicle_policy_manual_matches", "policy_external_plates"],
+    { enabled: !!currentCompanyId },
+  );
+
+  async function resyncAll() {
+    if (!currentCompanyId) return;
+    setResyncing(true);
+    try {
+      const { error } = await (supabase as any).rpc("sync_company_policy_links", { _company_id: currentCompanyId });
+      if (error) throw error;
+      toast.success("Vinculações automáticas atualizadas.");
+      await load({ silent: true });
+    } catch (err: any) {
+      toast.error(err?.message || "Falha ao revincular.");
+    } finally {
+      setResyncing(false);
+    }
+  }
 
   const orphans = useMemo<OrphanRow[]>(() => {
     const today = new Date().toISOString().slice(0,10);
@@ -133,18 +166,24 @@ export default function ReviewMatches() {
         const key = normalizePlate(a.plate);
         if (!key) continue;
         if (registered.has(key)) continue;
-        const matchedByVin = vehicles.some(v =>
+        // já existe vínculo (automático ou manual) gravado para algum veículo compatível
+        const matched = vehicles.find(v =>
           chassisMatch(v.chassis, a.chassis) ||
           (a.renavam && normRenavam(a.renavam) && normRenavam(v.renavam) === normRenavam(a.renavam)),
         );
-        if (matchedByVin) continue;
+        if (matched) continue;
+        const alreadyLinked = vehicles.some(v =>
+          policyLinks.has(`${p.id}|${v.id}`) &&
+          (normalizePlate(v.plate) === key || ocrKey(v.plate) === ocrKey(key)),
+        );
+        if (alreadyLinked) continue;
         if (externalKeys.has(`${p.id}|${key}`)) continue;
         if (manualKeys.has(`${p.id}|${key}`)) continue;
         rows.push({ plate: (a.plate||key).toUpperCase(), ai: a, policy: p });
       }
     }
     return rows.sort((x,y) => x.plate.localeCompare(y.plate));
-  }, [policies, vehicles, externals, manuals]);
+  }, [policies, vehicles, externals, manuals, policyLinks]);
 
   const filtered = useMemo(() => {
     const q = norm(search);
@@ -169,6 +208,14 @@ export default function ReviewMatches() {
       .map(v => ({ v, score: similarity(active.plate, active.ai, v) }))
       .sort((a,b) => b.score - a.score);
   }, [vehicles, linkedVehicleIds, active]);
+
+  // Pré-seleciona automaticamente o candidato altamente compatível (ex.: erro de OCR).
+  useEffect(() => {
+    if (!active) return;
+    const best = candidates[0];
+    if (best && best.score >= 80) setSelectedVehicle(best.v.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   function openConfirm() {
     if (!active || !selectedVehicle) {
@@ -331,6 +378,9 @@ export default function ReviewMatches() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={resyncAll} disabled={resyncing}>
+            <Link2 className="h-4 w-4" /> {resyncing ? "Revinculando…" : "Revincular tudo"}
+          </Button>
           <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30">
             {stats.pending} pendente(s)
           </Badge>
@@ -483,15 +533,22 @@ export default function ReviewMatches() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-mono font-bold">{v.plate}</span>
-                          {score >= 60 && (
+                          {score >= 80 ? (
+                            <Badge variant="outline" className="text-[10px] bg-sky-500/10 text-sky-400 border-sky-500/30">
+                              provável mesmo veículo
+                            </Badge>
+                          ) : score >= 60 ? (
                             <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
                               compatível
                             </Badge>
-                          )}
+                          ) : null}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
                           {[v.brand, v.model].filter(Boolean).join(" ") || "—"}
                         </div>
+                        {v.status !== "ativo" && (
+                          <div className="text-[10px] uppercase text-amber-400">status: {v.status}</div>
+                        )}
                         {v.chassis && (
                           <div className="text-[10px] font-mono text-muted-foreground truncate">
                             Chassi: {v.chassis}

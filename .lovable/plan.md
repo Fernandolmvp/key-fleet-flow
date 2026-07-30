@@ -1,31 +1,41 @@
-## Plano: corrigir créditos de IA insuficientes para Oquei Telecom
+## O que eu verifiquei nos dados (empresa Oquei)
 
-### Causa identificada
-A empresa **Oquei Telecom Ltda** (`80dfb573-977c-48f2-bb98-f2f6d8d4044d`) tem assinatura Enterprise ativa com direito a 1.000.000 tokens/mês, mas o saldo atual do plano está em **1.022 tokens**. A feature `extract_insurance_policy` faz um pré-bloqueio conservador de **8.000 tokens**, então `has_enough_ai_tokens` retorna `false` e a edge function devolve HTTP 402. O `last_plan_reset_at` é `2026-05-10 12:41:51`, indicando que o reset mensal de créditos nunca ocorreu — a função `reset_monthly_plan_tokens` existe, mas não há cron job automático a invocando.
+- A apólice **39233116** tem **59 veículos extraídos pela IA** e **0 vínculos** gravados em `insurance_policy_vehicles`. A apólice **53.82.2026.0013043** tem 6 e **0 vínculos**. Ou seja: o cruzamento placa↔frota hoje só acontece **em memória, dentro da tela de revisão** — nada é gravado.
+- Dos 107 registros de veículos extraídos de apólices vigentes, **84 já existem na frota** por placa, mas só **59 veículos** possuem vínculo ativo gravado. Por isso os demais aparecem como "sem apólice" em outras telas e a revisão parece desatualizada.
+- A tela filtra a frota por `status = 'ativo'`. Veículos `vendido`/`manutencao` (ex.: **STJ0G47**) caem na lista de pendências mesmo estando cadastrados.
+- Placas realmente pendentes hoje são poucas e têm causas identificadas:
+  - **Erro de OCR O↔0 / I↔1**: `STFOH46` (frota: `STF0H46`), `GAV0I25` (frota: `GAV0B25`), `UDV0106`, `UGI0178`, `UGL8198`.
+  - `AC0000` e `GAV0I25` já casam por **chassi** com veículos da frota.
+  - Restantes (`QSQ7F99`, `UDG5F99`, `UFD5D44`, `UFZ3A44`) não existem na frota — pendência legítima.
 
-### Passos
+## O que vou fazer
 
-1. **Recarga imediata dos tokens da empresa afetada**
-   - Chamar a função existente `public.reset_monthly_plan_tokens()` ou, se preferirmos controle fino, atualizar a linha de `ai_token_balance` para `plan_tokens_remaining = 1.000.000` e `last_plan_reset_at = now()` para a empresa `80dfb573-977c-48f2-bb98-f2f6d8d4044d`.
-   - Verificar na tela Configurações > Créditos IA que o saldo do plano aparece correto e que a extração de apólice deixa de retornar 402.
+### 1. Vinculação automática no banco (a peça que falta)
+Criar uma função `public.sync_policy_vehicle_links(p_policy_id)` que, para cada veículo do `ai_extracted` de uma apólice, encontra o veículo da frota da mesma empresa por, nesta ordem:
+1. placa normalizada (antiga ↔ Mercosul, já existente em `normalize_plate`);
+2. chassi (igual ou 8 últimos dígitos);
+3. RENAVAM.
 
-2. **Criação de rotina automática de reset mensal**
-   - Criar um job recorrente (pg_cron ou edge function agendada) que execute `public.reset_monthly_plan_tokens()` no primeiro dia de cada período de faturamento.
-   - Alternativa: trigger `AFTER UPDATE` em `subscriptions` que recarrega o saldo quando o status muda para `ativa` ou quando `current_period_start` é renovado.
+E grava/reativa a linha em `insurance_policy_vehicles` (idempotente, sem duplicar; respeita `removed_at`).
 
-3. **Melhoria da UX de erro e observabilidade**
-   - No `extract-insurance-policy` (e demais funções que usam `guardAiCall`), incluir na resposta 402 o saldo atual e o valor necessário, para a UI explicar melhor ao usuário.
-   - Garantir que o `InsurancePanel` mostre uma mensagem clara quando faltar crédito, com link para Configurações > Créditos IA.
+Gatilhos para manter tudo automático:
+- `AFTER INSERT/UPDATE OF ai_extracted, status, end_date` em `insurance_policies` → sincroniza aquela apólice;
+- `AFTER INSERT/UPDATE OF plate, chassis, renavam` em `vehicles` → sincroniza as apólices vigentes da empresa (aproveitando `match_policies_for_vehicle`);
+- Quando uma vinculação manual é criada em `vehicle_policy_manual_matches`, grava também o vínculo real em `insurance_policy_vehicles`.
 
-4. **Ferramenta de admin para reset manual (super-admin)**
-   - Adicionar no painel de admin ou em Configurações > Créditos IA um botão “Recarregar créditos do plano agora” visível apenas para super-admins, que chame `reset_monthly_plan_tokens` para a empresa selecionada.
+**Backfill único** rodando a função em todas as apólices vigentes — isso já resolve os ~25 veículos hoje sem vínculo gravado.
 
-### Resultado esperado
-- Oquei Telecom volta a ter 1.000.000 tokens de plano disponíveis e a extração de apólice por IA funciona normalmente.
-- O reset passa a ser automático, evitando que outras empresas ativas caiam para saldo zero ao longo do tempo.
-- O usuário passa a receber mensagem informativa (saldo vs. necessário) em vez de erro genérico de créditos.
+### 2. Tela "Revisar vinculações pendentes"
+- Passar a considerar **pendente** apenas a placa que não tem vínculo ativo em `insurance_policy_vehicles`, nem match manual, nem marcação de externa — a fonte da verdade vira o banco, não o cálculo local.
+- Buscar veículos de **todos os status** para detectar "já cadastrado" (o filtro de status continua valendo só para a lista de candidatos à direita, com aviso quando o veículo está vendido/inativo).
+- Adicionar **sugestão tolerante a OCR** (O↔0, I↔1, S↔5, B↔8) com badge "provável mesmo veículo" e o veículo já pré-selecionado à direita — sem vincular sozinho, o usuário confirma em 1 clique.
+- Botão **"Revincular tudo automaticamente"** que chama a função de sincronização e recarrega.
+- Atualização automática via `useAutoRefresh` nas tabelas `insurance_policies`, `insurance_policy_vehicles`, `vehicles`, `vehicle_policy_manual_matches`, `policy_external_plates`.
 
-### Riscos / observações
-- Alteração de dados (não de schema): a recarga imediata será feita via ferramenta de insert/update do banco, não via migration.
-- A função `reset_monthly_plan_tokens` já existe e recarrega para todas as empresas ativas; se quisermos ações mais granulares, usamos UPDATE direto na tabela.
-- O job agendado depende de `pg_cron` estar habilitado no projeto; caso contrário, usaremos uma edge function com scheduler externo ou trigger em `subscriptions`.
+### 3. Consistência
+Após o backfill, os campos de seguro do veículo (`insurer`, `insurance_policy`, `insurance_expires_at`) ficam coerentes pelo trigger `sync_vehicle_insurance_fields` já existente, refletindo no relatório "Veículos — Dados Completos" e na aba Seguros.
+
+## Detalhes técnicos
+- Migração com a função (`SECURITY DEFINER`, `search_path = public`), triggers e backfill; nenhuma tabela nova.
+- Sem alteração de RLS: a escrita ocorre por trigger no contexto da empresa dona da apólice.
+- Arquivo de frontend afetado: `src/pages/app/insurance/ReviewMatches.tsx`.
