@@ -68,40 +68,18 @@ export async function openStoredFile(
   const parsed = parseStorageUrl(url);
   const isBareStoragePath = !/^https?:\/\//i.test(url) && Boolean(opts?.bucket);
   if (!parsed && !isBareStoragePath) {
-    openInNewTab(opts?.hash ? `${url}${opts.hash}` : url);
+    window.location.assign(opts?.hash ? `${url}${opts.hash}` : url);
     return;
-  }
-
-  // Abre a aba ANTES do await: navegadores bloqueiam popups abertos
-  // depois de uma operação assíncrona (perda do gesto do usuário).
-  // A referência precisa permanecer conectada até o redirecionamento. Definir
-  // `win.opener = null` antes do await rompe o WindowProxy em alguns navegadores
-  // e deixa a aba permanentemente em about:blank.
-  let win: Window | null = null;
-  const windowName = `frotaops-file-${Date.now()}`;
-  if (typeof window !== "undefined") {
-    // Uma janela nomeada mantém um WindowProxy navegável durante o await.
-    // `_blank` recebe noopener implícito em navegadores modernos e pode ficar
-    // preso em about:blank quando a URL assinada chega de forma assíncrona.
-    win = window.open("about:blank", windowName);
   }
   try {
     const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
     if (!signed) {
-      win?.close();
       toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
       return;
     }
     const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
-    if (win && !win.closed) {
-      // Reabrir pelo mesmo nome pede ao navegador para navegar a aba existente,
-      // sem depender do WindowProxy isolado retornado no primeiro window.open.
-      window.open(finalUrl, windowName);
-    } else {
-      openInNewTab(finalUrl);
-    }
+    window.location.assign(finalUrl);
   } catch (e: any) {
-    win?.close();
     console.error("[storage] openStoredFile failed", e);
     toast.error("Não foi possível abrir o arquivo. Tente novamente.");
   }
