@@ -1,66 +1,31 @@
-## Objetivo
+## Plano: corrigir créditos de IA insuficientes para Oquei Telecom
 
-Hoje a Manutenção tem 5 abas paralelas (Agenda, Preventivo, Corretivo, Custos, Histórico) e os dados moram em 4 tabelas distintas (`maintenance_requests`, `maintenance_schedules`, `maintenance_work_orders`, `maintenance_records`). Isso obriga o usuário a pular de tela em tela para entender "o que está acontecendo com cada carro". Vamos transformar isso em uma visão única, sequencial e por veículo, e fazer o status do veículo (`ativo` ↔ `manutencao`) acompanhar essa realidade automaticamente.
+### Causa identificada
+A empresa **Oquei Telecom Ltda** (`80dfb573-977c-48f2-bb98-f2f6d8d4044d`) tem assinatura Enterprise ativa com direito a 1.000.000 tokens/mês, mas o saldo atual do plano está em **1.022 tokens**. A feature `extract_insurance_policy` faz um pré-bloqueio conservador de **8.000 tokens**, então `has_enough_ai_tokens` retorna `false` e a edge function devolve HTTP 402. O `last_plan_reset_at` é `2026-05-10 12:41:51`, indicando que o reset mensal de créditos nunca ocorreu — a função `reset_monthly_plan_tokens` existe, mas não há cron job automático a invocando.
 
-## O que muda na tela `/app/maintenance`
+### Passos
 
-Nova estrutura de abas (na ordem do fluxo real):
+1. **Recarga imediata dos tokens da empresa afetada**
+   - Chamar a função existente `public.reset_monthly_plan_tokens()` ou, se preferirmos controle fino, atualizar a linha de `ai_token_balance` para `plan_tokens_remaining = 1.000.000` e `last_plan_reset_at = now()` para a empresa `80dfb573-977c-48f2-bb98-f2f6d8d4044d`.
+   - Verificar na tela Configurações > Créditos IA que o saldo do plano aparece correto e que a extração de apólice deixa de retornar 402.
 
-```
-[ Situação da frota ]  [ Agenda ]  [ Histórico & Custos ]  [ Configurações ]
-       ↑ NOVA              ↑ unifica preventivo+corretivo+OS+solicitações
-```
+2. **Criação de rotina automática de reset mensal**
+   - Criar um job recorrente (pg_cron ou edge function agendada) que execute `public.reset_monthly_plan_tokens()` no primeiro dia de cada período de faturamento.
+   - Alternativa: trigger `AFTER UPDATE` em `subscriptions` que recarrega o saldo quando o status muda para `ativa` ou quando `current_period_start` é renovado.
 
-### Aba 1 — Situação da frota (default)
-Lista 1 linha por veículo, ordenada por urgência. Cada linha mostra o **estado atual + próximo passo**:
+3. **Melhoria da UX de erro e observabilidade**
+   - No `extract-insurance-policy` (e demais funções que usam `guardAiCall`), incluir na resposta 402 o saldo atual e o valor necessário, para a UI explicar melhor ao usuário.
+   - Garantir que o `InsurancePanel` mostre uma mensagem clara quando faltar crédito, com link para Configurações > Créditos IA.
 
-```
-PLACA  Modelo            Status agora        Próxima ação                 KM atual / alvo
-ABC1D23 Fiat Strada      🔧 Em manutenção    OS #123 na Oficina X         85.412 km
-                                              (em execução desde 14/06)
-DEF4G56 VW Delivery      ⚠ Preventiva venc.  Sem agendamento — agendar     91.000 / 90.000
-GHI7J89 Renault Master   ✅ Em dia            Próx. preventiva ~120k km     108.300 / 120.000
-```
+4. **Ferramenta de admin para reset manual (super-admin)**
+   - Adicionar no painel de admin ou em Configurações > Créditos IA um botão “Recarregar créditos do plano agora” visível apenas para super-admins, que chame `reset_monthly_plan_tokens` para a empresa selecionada.
 
-Cada linha é clicável → abre um drawer com a **timeline sequencial** do veículo:
-`Solicitação → Aprovada → Agendada → OS aberta → Em execução → Concluída`, marcando onde está agora.
+### Resultado esperado
+- Oquei Telecom volta a ter 1.000.000 tokens de plano disponíveis e a extração de apólice por IA funciona normalmente.
+- O reset passa a ser automático, evitando que outras empresas ativas caiam para saldo zero ao longo do tempo.
+- O usuário passa a receber mensagem informativa (saldo vs. necessário) em vez de erro genérico de créditos.
 
-### Aba 2 — Agenda
-Mantém a `AgendaSection` atual (calendário/lista) — já está boa. Removemos as abas separadas "Preventivo" e "Corretivo" da página principal e movemos os botões "Lançar corretiva / Agendar preventiva" para dentro da Agenda e do drawer do veículo, no contexto certo.
-
-### Aba 3 — Histórico & Custos
-Funde a aba "Histórico" + "Custos por veículo" de hoje. Tabela de registros concluídos + ranking de gasto por veículo + KPIs (gasto total, últimos 30 dias).
-
-### Aba 4 — Configurações
-Intervalo padrão de preventiva (já existe), default de oficina, etc.
-
-## Status automático do veículo
-
-Hoje `vehicles.status` é editado manualmente. Vamos sincronizar automaticamente:
-
-| Evento                                                                                 | Vira         |
-| -------------------------------------------------------------------------------------- | ------------ |
-| OS muda para `em_execucao` **ou** registro `em_andamento` é criado/atualizado          | `manutencao` |
-| Toda OS e todo registro do veículo estão `concluido`/`concluida`/`cancelada`           | `ativo`      |
-
-Implementado via trigger em `maintenance_work_orders` e `maintenance_records` (AFTER INSERT/UPDATE), que recalcula `vehicles.status` olhando se existe algo em execução para aquele veículo. Não mexe em veículos `inativo` / `vendido` / `baixado`.
-
-Toda transição automática gera linha em `vehicle_movements` com motivo `"auto: manutenção iniciada"` / `"auto: manutenção concluída"` para auditoria.
-
-## Detalhes técnicos
-
-- **Migration**: 1 função `public.recompute_vehicle_maintenance_status(uuid)` SECURITY DEFINER + 2 triggers (`maintenance_work_orders`, `maintenance_records`). Função ignora veículos com status terminal (`inativo`, `vendido`, `baixado`). Registra `vehicle_movements` apenas quando o status realmente muda.
-- **Frontend**:
-  - Novo componente `src/pages/app/maintenance/SituacaoSection.tsx` — busca em paralelo `vehicles` + `maintenance_work_orders` (não concluído) + `maintenance_records` (em_andamento/agendada) + `maintenance_schedules` (não concluída) + último `maintenance_record` concluído por veículo. Monta a linha + drawer com timeline.
-  - `src/pages/app/Maintenance.tsx`: reorganiza `<Tabs>` para as 4 abas novas; remove "calendar" e "corretivo" como abas top-level (a lógica vai pra dentro do drawer/agenda). Mantém compatibilidade da chave de permissões expandindo para `["situacao","agenda","historico","config"]` com fallback para `agenda` se a permissão de `situacao` não existir ainda.
-  - Drawer `VehicleMaintenanceTimeline.tsx` com 6 passos visuais e ações contextuais ("Abrir OS", "Marcar como concluída", "Agendar próxima preventiva").
-- **Sem alteração** em `frota-api`, em RLS existente, em schemas das tabelas (só nova função + triggers) e em telas fora de `/app/maintenance`.
-
-## Critérios de aceite
-
-1. Abrir `/app/maintenance` cai em "Situação da frota" e mostra todos os veículos ordenados por urgência, com o status real.
-2. Criar/iniciar uma OS muda o veículo para `manutencao` sozinho (visível na lista de Veículos sem reload manual graças ao `useAutoRefresh` já instalado).
-3. Concluir a última OS/registro em aberto devolve o veículo para `ativo` automaticamente.
-4. A Agenda continua funcionando igual (mesmo `AgendaSection`, mesmos eventos).
-5. Histórico e Custos seguem mostrando os mesmos números de hoje, só fundidos em uma aba.
-6. Nenhuma mudança em `supabase/functions/frota-api/index.ts`.
+### Riscos / observações
+- Alteração de dados (não de schema): a recarga imediata será feita via ferramenta de insert/update do banco, não via migration.
+- A função `reset_monthly_plan_tokens` já existe e recarrega para todas as empresas ativas; se quisermos ações mais granulares, usamos UPDATE direto na tabela.
+- O job agendado depende de `pg_cron` estar habilitado no projeto; caso contrário, usaremos uma edge function com scheduler externo ou trigger em `subscriptions`.
