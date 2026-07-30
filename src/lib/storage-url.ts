@@ -79,7 +79,10 @@ export async function openStoredFile(
   // e deixa a aba permanentemente em about:blank.
   let win: Window | null = null;
   if (typeof window !== "undefined") {
-    win = window.open("about:blank", "_blank");
+    // Uma janela nomeada mantém um WindowProxy navegável durante o await.
+    // `_blank` recebe noopener implícito em navegadores modernos e pode ficar
+    // preso em about:blank quando a URL assinada chega de forma assíncrona.
+    win = window.open("about:blank", `frotaops-file-${Date.now()}`);
   }
   try {
     const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
