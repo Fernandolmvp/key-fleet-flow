@@ -49,6 +49,7 @@ import Reports from "./pages/app/Reports";
 import LicensingReport from "./pages/app/reports/LicensingReport";
 import OrphanPolicyVehiclesReport from "./pages/app/reports/OrphanPolicyVehiclesReport";
 import VehiclesFullReport from "./pages/app/reports/VehiclesFullReport";
+import ActiveVehiclesReport from "./pages/app/reports/ActiveVehiclesReport";
 import SuperAdminShell from "./pages/admin/SuperAdminShell";
 import CompaniesPanel from "./pages/admin/CompaniesPanel";
 import ProvidersPage from "./pages/admin/ai/ProvidersPage";
@@ -179,6 +180,7 @@ const App = () => (
                   <Route path="reports/licenciamento" element={<LicensingReport />} />
                   <Route path="reports/veiculos-em-apolice-sem-cadastro" element={<OrphanPolicyVehiclesReport />} />
                   <Route path="reports/veiculos-completo" element={<VehiclesFullReport />} />
+                 <Route path="reports/veiculos-ativos-completo" element={<ActiveVehiclesReport />} />
                 </Route>
               </Route>
             </Route>
