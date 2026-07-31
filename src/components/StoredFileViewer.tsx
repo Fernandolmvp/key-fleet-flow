@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
-import { Download, FileText, X } from "lucide-react";
+import { Document, Page, pdfjs } from "react-pdf";
+import { Download, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 export const STORED_FILE_VIEW_EVENT = "frotaops:open-stored-file";
 
@@ -10,6 +18,7 @@ type ViewerFile = { url: string; filename: string };
 
 export default function StoredFileViewer() {
   const [file, setFile] = useState<ViewerFile | null>(null);
+  const [pageCount, setPageCount] = useState(0);
 
   useEffect(() => {
     const open = (event: Event) => {
@@ -19,6 +28,7 @@ export default function StoredFileViewer() {
         if (current?.url.startsWith("blob:")) URL.revokeObjectURL(current.url.split("#")[0]);
         return { url: detail.url, filename: detail.filename || "documento.pdf" };
       });
+      setPageCount(0);
     };
     window.addEventListener(STORED_FILE_VIEW_EVENT, open);
     return () => window.removeEventListener(STORED_FILE_VIEW_EVENT, open);
@@ -53,7 +63,26 @@ export default function StoredFileViewer() {
           </Button>
         </div>
       </header>
-       <iframe src={file.url} title={file.filename} className="min-h-0 flex-1 w-full bg-muted" />
+       <main className="min-h-0 flex-1 overflow-auto bg-muted p-3 sm:p-6">
+         <Document
+           file={file.url.split("#")[0]}
+           onLoadSuccess={({ numPages }) => setPageCount(numPages)}
+           loading={<div className="grid min-h-64 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}
+           error={<div className="grid min-h-64 place-items-center text-sm text-destructive">Não foi possível renderizar este PDF.</div>}
+           className="mx-auto flex w-fit max-w-full flex-col gap-4"
+         >
+           {Array.from({ length: pageCount }, (_, index) => (
+             <Page
+               key={index + 1}
+               pageNumber={index + 1}
+               width={Math.min(960, Math.max(280, window.innerWidth - 48))}
+               renderAnnotationLayer
+               renderTextLayer
+               className="max-w-full overflow-hidden shadow-sm"
+             />
+           ))}
+         </Document>
+       </main>
     </div>
   );
 }
