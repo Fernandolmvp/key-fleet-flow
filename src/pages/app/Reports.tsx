@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { BarChart3, FileText, ChevronRight, Sparkles } from "lucide-react";
+import { BarChart3, FileText, ChevronRight, Sparkles, CarFront } from "lucide-react";
 
 const REPORTS = [
   {
@@ -22,6 +22,13 @@ const REPORTS = [
     title: "Veículos — Dados Completos",
     description: "Placa, chassi, RENAVAM, ano/modelo, cor, corretor, seguradora e apólice.",
     icon: FileText,
+    available: true,
+  },
+  {
+    to: "/app/reports/veiculos-ativos-completo",
+    title: "Veículos Ativos — Cadastro Completo",
+    description: "Todos os dados cadastrais dos veículos ativos, FIPE, licenciamento e seguro vigente.",
+    icon: CarFront,
     available: true,
   },
 ];
