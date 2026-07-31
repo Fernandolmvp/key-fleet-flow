@@ -3,8 +3,17 @@ import { toast } from "sonner";
 
 const STORED_FILE_VIEW_EVENT = "frotaops:open-stored-file";
 
-function showInApp(url: string): void {
-  window.dispatchEvent(new CustomEvent(STORED_FILE_VIEW_EVENT, { detail: { url } }));
+function showInApp(url: string, filename?: string): void {
+  window.dispatchEvent(new CustomEvent(STORED_FILE_VIEW_EVENT, { detail: { url, filename } }));
+}
+
+function filenameFromPath(path: string): string {
+  const raw = path.split("/").pop() || "documento.pdf";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 /**
@@ -68,15 +77,15 @@ export async function openStoredFile(
     return;
   }
   try {
-    const signed = await resolveStoredFileUrl(url, 60 * 60, opts?.bucket);
-    if (!signed) {
-      toast.error("Não foi possível abrir o arquivo. Verifique se o PDF ainda existe no armazenamento.");
-      return;
-    }
-    const finalUrl = opts?.hash ? `${signed}${opts.hash}` : signed;
-    showInApp(finalUrl);
+    const target = parsed ?? { bucket: opts?.bucket ?? "", path: url.replace(/^\/+/, "") };
+    const { data: blob, error } = await supabase.storage.from(target.bucket).download(target.path);
+    if (error || !blob) throw error ?? new Error("Arquivo vazio");
+
+    const objectUrl = URL.createObjectURL(blob);
+    const finalUrl = opts?.hash ? `${objectUrl}${opts.hash}` : objectUrl;
+    showInApp(finalUrl, filenameFromPath(target.path));
   } catch (e: any) {
     console.error("[storage] openStoredFile failed", e);
-    toast.error("Não foi possível abrir o arquivo. Tente novamente.");
+    toast.error("Não foi possível abrir o arquivo. Verifique seu acesso ou se o PDF ainda existe.");
   }
 }
