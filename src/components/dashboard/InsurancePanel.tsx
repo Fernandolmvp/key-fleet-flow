@@ -612,7 +612,7 @@ export default function InsurancePanel() {
       const aiList: AiVehicle[] = aiVehicles.length
         ? aiVehicles
         : aiPlates.map((p) => ({ plate: p } as AiVehicle));
-      const results = aiList.map((a) => matchAiVehicle(a, vehicles));
+      const results = aiList.map((a) => matchAiVehicle(a, allVehicles));
       const linked = results.filter((r) => r.status === "linked" && r.vehicle);
       const notFound = results.filter((r) => r.status === "not_found");
       const mismatch = results.filter((r) => r.status === "mismatch" && r.vehicle);
