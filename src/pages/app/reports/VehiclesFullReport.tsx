@@ -25,6 +25,7 @@ type VehicleRow = {
   fipe_reference_month: string | null;
   fipe_value_updated_at: string | null;
   owner_name: string | null;
+  status: string | null;
   insurance_expires_at: string | null;
 };
 
