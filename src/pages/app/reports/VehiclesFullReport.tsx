@@ -128,6 +128,19 @@ export default function VehiclesFullReport() {
     { enabled: !!currentCompanyId },
   );
 
+  async function resyncPolicies() {
+    if (!currentCompanyId) return;
+    setSyncing(true);
+    const { error } = await supabase.rpc("sync_company_policy_links", { _company_id: currentCompanyId });
+    if (error) {
+      toast.error("Falha ao sincronizar apólices");
+    } else {
+      toast.success("Apólices sincronizadas");
+      await load({ silent: true });
+    }
+    setSyncing(false);
+  }
+
   const filtered = useMemo(() => {
     const term = q.trim().toUpperCase();
     if (!term) return rows;
