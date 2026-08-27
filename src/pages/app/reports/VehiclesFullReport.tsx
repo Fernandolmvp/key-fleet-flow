@@ -25,6 +25,7 @@ type VehicleRow = {
   fipe_reference_month: string | null;
   fipe_value_updated_at: string | null;
   owner_name: string | null;
+  status: string | null;
   insurance_expires_at: string | null;
 };
 
@@ -68,7 +69,7 @@ export default function VehiclesFullReport() {
         supabase
           .from("vehicles")
           .select(
-            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,insurance_expires_at,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
+            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,status,insurer,insurance_policy,insurance_expires_at,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
           )
           .eq("company_id", currentCompanyId)
           .order("plate", { ascending: true }),
@@ -147,6 +148,7 @@ export default function VehiclesFullReport() {
     return rows.filter((r) =>
       [
         r.plate,
+        r.status,
         r.chassis,
         r.renavam,
         r.brand,
@@ -189,6 +191,7 @@ export default function VehiclesFullReport() {
   function exportCsv() {
     const header = [
       "Placa",
+      "Status",
       "Chassi",
       "RENAVAM",
       "Ano/Modelo",
@@ -207,6 +210,7 @@ export default function VehiclesFullReport() {
       lines.push(
         [
           r.plate ?? "",
+          r.status ? String(r.status).toUpperCase() : "",
           r.chassis ?? "",
           r.renavam ?? "",
           anoModelo(r),
@@ -289,7 +293,8 @@ export default function VehiclesFullReport() {
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase font-mono text-muted-foreground">
                 <tr>
-                  <th className="text-left px-3 py-2.5">Placa</th>
+                <th className="text-left px-3 py-2.5">Placa</th>
+                  <th className="text-left px-3 py-2.5">Status</th>
                   <th className="text-left px-3 py-2.5">Chassi</th>
                   <th className="text-left px-3 py-2.5">RENAVAM</th>
                   <th className="text-left px-3 py-2.5">Ano/Mod.</th>
@@ -308,6 +313,7 @@ export default function VehiclesFullReport() {
                 {filtered.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 hover:bg-muted/20">
                     <td className="px-3 py-2.5 font-mono font-semibold">{r.plate || "—"}</td>
+                    <td className="px-3 py-2.5 text-xs capitalize">{r.status || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.chassis || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.renavam || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{anoModelo(r) || "—"}</td>
