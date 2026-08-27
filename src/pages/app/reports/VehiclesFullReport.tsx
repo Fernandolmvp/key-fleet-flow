@@ -292,7 +292,8 @@ export default function VehiclesFullReport() {
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase font-mono text-muted-foreground">
                 <tr>
-                  <th className="text-left px-3 py-2.5">Placa</th>
+                <th className="text-left px-3 py-2.5">Placa</th>
+                  <th className="text-left px-3 py-2.5">Status</th>
                   <th className="text-left px-3 py-2.5">Chassi</th>
                   <th className="text-left px-3 py-2.5">RENAVAM</th>
                   <th className="text-left px-3 py-2.5">Ano/Mod.</th>
