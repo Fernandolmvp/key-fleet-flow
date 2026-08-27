@@ -263,7 +263,8 @@ export default function InsurancePanel() {
   const { currentCompanyId } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [brokers, setBrokers] = useState<Broker[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [allVehicles, setAllVehicles] = useState<Vehicle[]>([]);
+  const [vehicleScope, setVehicleScope] = useState<"ativos" | "todos">("ativos");
   const [links, setLinks] = useState<Link[]>([]);
   const [manualMatches, setManualMatches] = useState<Array<{ id: string; vehicle_id: string; policy_id: string; normalized_plate: string }>>([]);
   const [externalPlates, setExternalPlates] = useState<Array<{ policy_id: string; normalized_plate: string }>>([]);
