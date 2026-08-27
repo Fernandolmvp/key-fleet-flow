@@ -263,7 +263,8 @@ export default function InsurancePanel() {
   const { currentCompanyId } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [brokers, setBrokers] = useState<Broker[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [allVehicles, setAllVehicles] = useState<Vehicle[]>([]);
+  const [vehicleScope, setVehicleScope] = useState<"ativos" | "todos">("ativos");
   const [links, setLinks] = useState<Link[]>([]);
   const [manualMatches, setManualMatches] = useState<Array<{ id: string; vehicle_id: string; policy_id: string; normalized_plate: string }>>([]);
   const [externalPlates, setExternalPlates] = useState<Array<{ policy_id: string; normalized_plate: string }>>([]);
@@ -297,6 +298,13 @@ export default function InsurancePanel() {
   // Cadastro rápido de veículo (Cenário 3 / placa órfã)
   const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
   const [vehiclePrefill, setVehiclePrefill] = useState<any | null>(null);
+
+  // Veículos exibidos respeitam o escopo selecionado (ativos ou ativos+inativos).
+  // allVehicles é mantido para matching/cruzamento de dados, independente do filtro de tela.
+  const vehicles = useMemo(
+    () => allVehicles.filter((v) => vehicleScope === "todos" || v.status === "ativo"),
+    [allVehicles, vehicleScope]
+  );
 
   function openRegisterFromPolicy(ai: AiVehicle) {
     setVehiclePrefill({
@@ -365,7 +373,7 @@ export default function InsurancePanel() {
     const [p, b, v, l, mm, ep] = await Promise.all([
       supabase.from("insurance_policies").select("*").eq("company_id", currentCompanyId).order("end_date", { ascending: false, nullsFirst: false }),
       supabase.from("insurance_brokers").select("id,name,phone,email").eq("company_id", currentCompanyId).eq("active", true).order("name"),
-      supabase.from("vehicles").select("id,plate,brand,model,status,chassis,renavam,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,status,chassis,renavam,vehicle_type").eq("company_id", currentCompanyId).order("plate"),
       supabase.from("insurance_policy_vehicles").select("*").eq("company_id", currentCompanyId).is("removed_at", null),
       supabase.from("vehicle_policy_manual_matches" as any).select("id,vehicle_id,policy_id,normalized_plate").eq("company_id", currentCompanyId).is("revoked_at", null),
       supabase.from("policy_external_plates" as any).select("policy_id,normalized_plate").eq("company_id", currentCompanyId),
@@ -376,7 +384,7 @@ export default function InsurancePanel() {
     const linksData = (l.data as any[]) || [];
     setPolicies(policiesData);
     setBrokers((b.data as any[]) || []);
-    setVehicles(vehiclesData);
+    setAllVehicles(vehiclesData);
     setLinks(linksData);
     setManualMatches(((mm as any)?.data as any[]) || []);
     setExternalPlates(((ep as any)?.data as any[]) || []);
@@ -604,7 +612,7 @@ export default function InsurancePanel() {
       const aiList: AiVehicle[] = aiVehicles.length
         ? aiVehicles
         : aiPlates.map((p) => ({ plate: p } as AiVehicle));
-      const results = aiList.map((a) => matchAiVehicle(a, vehicles));
+      const results = aiList.map((a) => matchAiVehicle(a, allVehicles));
       const linked = results.filter((r) => r.status === "linked" && r.vehicle);
       const notFound = results.filter((r) => r.status === "not_found");
       const mismatch = results.filter((r) => r.status === "mismatch" && r.vehicle);
@@ -978,7 +986,7 @@ export default function InsurancePanel() {
   const globalSearchResult = useMemo(() => {
     const q = normId(globalSearch);
     if (!q || q.length < 3 || globalSearchMode !== "veiculo") return null;
-    const matches = vehicles.filter(
+    const matches = allVehicles.filter(
       (v) => normId(v.plate).includes(q) || normId(v.chassis).includes(q)
     );
     return matches.slice(0, 10);
@@ -1010,7 +1018,7 @@ export default function InsurancePanel() {
     const isVigente = (p: Policy) =>
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
-    const registeredPlates = new Set(vehicles.map((v) => normPlate(v.plate)).filter(Boolean));
+    const registeredPlates = new Set(allVehicles.map((v) => normPlate(v.plate)).filter(Boolean));
     const externalKeys = new Set(externalPlates.map((e) => `${e.policy_id}|${e.normalized_plate}`));
     const manualKeys = new Set(manualMatches.map((m) => `${m.policy_id}|${m.normalized_plate}`));
     const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
@@ -1024,7 +1032,7 @@ export default function InsurancePanel() {
         if (!key) continue;
         if (registeredPlates.has(key)) continue;
         // antes de marcar como órfã, tenta cruzar por chassi/renavam
-        const matchedByVin = vehicles.some(
+        const matchedByVin = allVehicles.some(
           (v) => chassisMatch(v.chassis, a.chassis) || renavamEq(v.renavam, (a as any).renavam),
         );
         if (matchedByVin) continue;
@@ -1056,7 +1064,7 @@ export default function InsurancePanel() {
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
 
-    const matchedVehicles = vehicles.filter(
+    const matchedVehicles = allVehicles.filter(
       (v) =>
         normPlate(v.plate).includes(term) ||
         (termPlate && normPlate(v.plate) === termPlate) ||
@@ -1098,7 +1106,7 @@ export default function InsurancePanel() {
       // se a placa exata já corresponde a um veículo cadastrado, foi tratada acima
       if (matchedPlates.has(key)) continue;
       const ai0 = entries[0].ai;
-      const isRegistered = vehicles.some(
+      const isRegistered = allVehicles.some(
         (v) =>
           normPlate(v.plate) === key ||
           chassisMatch(v.chassis, ai0.chassis) ||
@@ -1114,7 +1122,7 @@ export default function InsurancePanel() {
 
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
-    const v = vehicles.find((x) => x.id === vehicleId);
+    const v = allVehicles.find((x) => x.id === vehicleId);
     const plateN = normPlate(v?.plate);
     const renavamN = normRenavam(v?.renavam);
     const ids = new Set<string>(links
@@ -1398,6 +1406,35 @@ export default function InsurancePanel() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Escopo da frota: ativos ou ativos+inativos */}
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">Exibir frota:</span>
+          <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => setVehicleScope("ativos")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                vehicleScope === "ativos"
+                  ? "bg-background text-foreground shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ativos
+            </button>
+            <button
+              type="button"
+              onClick={() => setVehicleScope("todos")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                vehicleScope === "todos"
+                  ? "bg-background text-foreground shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ativos + Inativos
+            </button>
+          </div>
+        </div>
+
         {/* ===================== TAB 0 — VISÃO GERAL ===================== */}
         <TabsContent value="overview" className="space-y-4 mt-0">
           {orphanPlates.length > 0 && (
@@ -1649,7 +1686,9 @@ export default function InsurancePanel() {
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Sem cobertura</p>
                   <p className="font-display text-4xl font-bold mt-2 text-destructive">{fleetSummary.uncoveredCount}</p>
-                  <p className="text-xs text-muted-foreground mt-1">de {vehicles.length} veículos ativos</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    de {vehicles.length} veículo{vehicles.length !== 1 ? "s" : ""} {vehicleScope === "ativos" ? "ativos" : "ativos/inativos"}
+                  </p>
                 </div>
                 <div className="h-10 w-10 rounded-lg grid place-items-center bg-destructive/15 text-destructive">
                   <ShieldAlert className="h-5 w-5" />
@@ -1964,7 +2003,7 @@ export default function InsurancePanel() {
                 <div className="text-xs text-muted-foreground">
                   {companyUncovered.length === 0
                     ? "Toda a frota possui apólice vigente."
-                    : `${companyUncovered.length} veículo(s) ativos da frota sem nenhuma apólice vigente.`}
+                    : `${companyUncovered.length} veículo(s) ${vehicleScope === "ativos" ? "ativos" : "ativos/inativos"} da frota sem nenhuma apólice vigente.`}
                 </div>
               </div>
             </div>
@@ -2204,7 +2243,7 @@ export default function InsurancePanel() {
             const linkedSet = new Set(selectedLinks.map((l) => l.vehicle_id));
             const rows = aiVeh.map((v) => {
               const plateN = norm(v.plate);
-              const reg = vehicles.find((x) => norm(x.plate) === plateN) || null;
+              const reg = allVehicles.find((x) => norm(x.plate) === plateN) || null;
               const linked = reg ? linkedSet.has(reg.id) : false;
               return { v, reg, linked, plateN };
             });
