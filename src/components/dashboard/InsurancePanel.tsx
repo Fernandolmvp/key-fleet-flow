@@ -903,6 +903,11 @@ export default function InsurancePanel() {
       else if (d <= 30) { vencendo30++; vigentes++; }
       else vigentes++;
     });
+    // Restringe a contagem ao escopo de exibição (ativos ou ativos+inativos)
+    const scopeIds = new Set(vehicles.map((v) => v.id));
+    Array.from(coveredVehicleIds).forEach((id) => {
+      if (!scopeIds.has(id)) coveredVehicleIds.delete(id);
+    });
     // Veículos contados como "manuais": vínculos diretos com inclusion_type='manual'
     // (insurance_policy_vehicles) + matches manuais (vehicle_policy_manual_matches).
     const manualVehicleIds = new Set<string>();
