@@ -1106,7 +1106,7 @@ export default function InsurancePanel() {
       // se a placa exata já corresponde a um veículo cadastrado, foi tratada acima
       if (matchedPlates.has(key)) continue;
       const ai0 = entries[0].ai;
-      const isRegistered = vehicles.some(
+      const isRegistered = allVehicles.some(
         (v) =>
           normPlate(v.plate) === key ||
           chassisMatch(v.chassis, ai0.chassis) ||
