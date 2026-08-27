@@ -264,6 +264,10 @@ export default function VehiclesFullReport() {
           <Button variant="outline" size="sm" onClick={() => load()}>
             <RefreshCw className="h-4 w-4 mr-1.5" /> Atualizar
           </Button>
+          <Button variant="secondary" size="sm" onClick={resyncPolicies} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+            Atualizar relatório (revincular apólices)
+          </Button>
           <Button size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
           </Button>
