@@ -1406,6 +1406,35 @@ export default function InsurancePanel() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Escopo da frota: ativos ou ativos+inativos */}
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">Exibir frota:</span>
+          <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => setVehicleScope("ativos")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                vehicleScope === "ativos"
+                  ? "bg-background text-foreground shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ativos
+            </button>
+            <button
+              type="button"
+              onClick={() => setVehicleScope("todos")}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                vehicleScope === "todos"
+                  ? "bg-background text-foreground shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ativos + Inativos
+            </button>
+          </div>
+        </div>
+
         {/* ===================== TAB 0 — VISÃO GERAL ===================== */}
         <TabsContent value="overview" className="space-y-4 mt-0">
           {orphanPlates.length > 0 && (
