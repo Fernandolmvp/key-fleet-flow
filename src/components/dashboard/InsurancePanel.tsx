@@ -1122,7 +1122,7 @@ export default function InsurancePanel() {
 
   function activePoliciesForVehicle(vehicleId: string) {
     const today = new Date();
-    const v = vehicles.find((x) => x.id === vehicleId);
+    const v = allVehicles.find((x) => x.id === vehicleId);
     const plateN = normPlate(v?.plate);
     const renavamN = normRenavam(v?.renavam);
     const ids = new Set<string>(links
