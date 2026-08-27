@@ -148,6 +148,7 @@ export default function VehiclesFullReport() {
     return rows.filter((r) =>
       [
         r.plate,
+        r.status,
         r.chassis,
         r.renavam,
         r.brand,
