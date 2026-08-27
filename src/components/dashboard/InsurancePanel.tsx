@@ -1064,7 +1064,7 @@ export default function InsurancePanel() {
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
 
-    const matchedVehicles = vehicles.filter(
+    const matchedVehicles = allVehicles.filter(
       (v) =>
         normPlate(v.plate).includes(term) ||
         (termPlate && normPlate(v.plate) === termPlate) ||
