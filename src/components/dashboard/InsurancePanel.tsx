@@ -299,6 +299,13 @@ export default function InsurancePanel() {
   const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
   const [vehiclePrefill, setVehiclePrefill] = useState<any | null>(null);
 
+  // Veículos exibidos respeitam o escopo selecionado (ativos ou ativos+inativos).
+  // allVehicles é mantido para matching/cruzamento de dados, independente do filtro de tela.
+  const vehicles = useMemo(
+    () => allVehicles.filter((v) => vehicleScope === "todos" || v.status === "ativo"),
+    [allVehicles, vehicleScope]
+  );
+
   function openRegisterFromPolicy(ai: AiVehicle) {
     setVehiclePrefill({
       plate: (ai.plate || "").toUpperCase(),
