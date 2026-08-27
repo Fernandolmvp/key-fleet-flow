@@ -58,6 +58,7 @@ export default function VehiclesFullReport() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(
     async (opts: { silent?: boolean } = {}) => {
