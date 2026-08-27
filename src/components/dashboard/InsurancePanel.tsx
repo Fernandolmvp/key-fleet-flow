@@ -2212,7 +2212,7 @@ export default function InsurancePanel() {
             const linkedSet = new Set(selectedLinks.map((l) => l.vehicle_id));
             const rows = aiVeh.map((v) => {
               const plateN = norm(v.plate);
-              const reg = vehicles.find((x) => norm(x.plate) === plateN) || null;
+              const reg = allVehicles.find((x) => norm(x.plate) === plateN) || null;
               const linked = reg ? linkedSet.has(reg.id) : false;
               return { v, reg, linked, plateN };
             });
