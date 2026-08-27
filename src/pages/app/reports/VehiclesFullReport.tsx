@@ -69,7 +69,7 @@ export default function VehiclesFullReport() {
         supabase
           .from("vehicles")
           .select(
-            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,insurer,insurance_policy,insurance_expires_at,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
+            "id,plate,chassis,renavam,year_manufacture,year_model,color,brand,model,status,insurer,insurance_policy,insurance_expires_at,fipe_value,fipe_reference_month,fipe_value_updated_at,owner_name",
           )
           .eq("company_id", currentCompanyId)
           .order("plate", { ascending: true }),
