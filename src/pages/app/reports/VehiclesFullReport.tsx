@@ -312,6 +312,7 @@ export default function VehiclesFullReport() {
                 {filtered.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 hover:bg-muted/20">
                     <td className="px-3 py-2.5 font-mono font-semibold">{r.plate || "—"}</td>
+                    <td className="px-3 py-2.5 text-xs capitalize">{r.status || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.chassis || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{r.renavam || "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs">{anoModelo(r) || "—"}</td>
