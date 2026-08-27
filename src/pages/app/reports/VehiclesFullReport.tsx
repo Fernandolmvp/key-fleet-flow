@@ -190,6 +190,7 @@ export default function VehiclesFullReport() {
   function exportCsv() {
     const header = [
       "Placa",
+      "Status",
       "Chassi",
       "RENAVAM",
       "Ano/Modelo",
