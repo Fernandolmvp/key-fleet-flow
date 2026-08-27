@@ -1018,7 +1018,7 @@ export default function InsurancePanel() {
     const isVigente = (p: Policy) =>
       p.status === "ativa" &&
       (!p.end_date || new Date(p.end_date + "T00:00:00") >= new Date(today.toDateString()));
-    const registeredPlates = new Set(vehicles.map((v) => normPlate(v.plate)).filter(Boolean));
+    const registeredPlates = new Set(allVehicles.map((v) => normPlate(v.plate)).filter(Boolean));
     const externalKeys = new Set(externalPlates.map((e) => `${e.policy_id}|${e.normalized_plate}`));
     const manualKeys = new Set(manualMatches.map((m) => `${m.policy_id}|${m.normalized_plate}`));
     const map = new Map<string, { plate: string; entries: { policy: Policy; ai: AiVehicle }[] }>();
