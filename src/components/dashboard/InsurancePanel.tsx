@@ -1032,7 +1032,7 @@ export default function InsurancePanel() {
         if (!key) continue;
         if (registeredPlates.has(key)) continue;
         // antes de marcar como órfã, tenta cruzar por chassi/renavam
-        const matchedByVin = vehicles.some(
+        const matchedByVin = allVehicles.some(
           (v) => chassisMatch(v.chassis, a.chassis) || renavamEq(v.renavam, (a as any).renavam),
         );
         if (matchedByVin) continue;
