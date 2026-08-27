@@ -209,6 +209,7 @@ export default function VehiclesFullReport() {
       lines.push(
         [
           r.plate ?? "",
+          r.status ? String(r.status).toUpperCase() : "",
           r.chassis ?? "",
           r.renavam ?? "",
           anoModelo(r),
