@@ -58,6 +58,7 @@ export default function VehiclesFullReport() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(
     async (opts: { silent?: boolean } = {}) => {
@@ -126,6 +127,19 @@ export default function VehiclesFullReport() {
     ["vehicles", "insurance_policy_vehicles", "insurance_policies", "insurance_brokers"],
     { enabled: !!currentCompanyId },
   );
+
+  async function resyncPolicies() {
+    if (!currentCompanyId) return;
+    setSyncing(true);
+    const { error } = await supabase.rpc("sync_company_policy_links", { _company_id: currentCompanyId });
+    if (error) {
+      toast.error("Falha ao sincronizar apólices");
+    } else {
+      toast.success("Apólices sincronizadas");
+      await load({ silent: true });
+    }
+    setSyncing(false);
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toUpperCase();
@@ -249,6 +263,10 @@ export default function VehiclesFullReport() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => load()}>
             <RefreshCw className="h-4 w-4 mr-1.5" /> Atualizar
+          </Button>
+          <Button variant="secondary" size="sm" onClick={resyncPolicies} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+            Atualizar relatório (revincular apólices)
           </Button>
           <Button size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
