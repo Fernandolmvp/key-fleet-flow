@@ -986,7 +986,7 @@ export default function InsurancePanel() {
   const globalSearchResult = useMemo(() => {
     const q = normId(globalSearch);
     if (!q || q.length < 3 || globalSearchMode !== "veiculo") return null;
-    const matches = vehicles.filter(
+    const matches = allVehicles.filter(
       (v) => normId(v.plate).includes(q) || normId(v.chassis).includes(q)
     );
     return matches.slice(0, 10);
