@@ -1974,7 +1974,7 @@ export default function InsurancePanel() {
                 <div className="text-xs text-muted-foreground">
                   {companyUncovered.length === 0
                     ? "Toda a frota possui apólice vigente."
-                    : `${companyUncovered.length} veículo(s) ativos da frota sem nenhuma apólice vigente.`}
+                    : `${companyUncovered.length} veículo(s) ${vehicleScope === "ativos" ? "ativos" : "ativos/inativos"} da frota sem nenhuma apólice vigente.`}
                 </div>
               </div>
             </div>
