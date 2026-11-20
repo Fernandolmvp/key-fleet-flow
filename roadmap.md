@@ -1,4 +1,6 @@
 # Status automáticos na leitura
+- [x] Unificar preventiva por KM: atingir ou ultrapassar alvo vence mesmo com agendamento futuro; KM zero exibe aviso.
+- [x] Validar cálculos de contadores, filtro e Dashboard com testes da regra por KM e typecheck, sem publicar.
 - [x] Calcular manutenção vencida, acerto de viagens e multas vencidas sem modificar registros.
 - [x] Sincronizar selos, contadores e alertas do Dashboard, preservando o visual.
 - [x] Executar testes das regras e typecheck; não publicar.

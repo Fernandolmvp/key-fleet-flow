@@ -22,6 +22,7 @@ import { STATUS_TONE, fmtBRL } from "@/lib/maintenance";
 import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
 import { isMaintenanceClosed, isMaintenanceOverdue } from "@/lib/automatic-status";
 import { useLocalToday } from "@/hooks/useLocalToday";
+import { preventiveKmState } from "@/lib/preventive-status";
 
 const IN_PROGRESS_EXEC = new Set([
   "em_execucao", "em_andamento", "iniciado", "iniciada", "aguardando_pecas",
@@ -84,6 +85,7 @@ type VehicleState = {
   bucketTone: string;
   rank: number;
   overdueDate: boolean;
+  hasOdometer: boolean;
 };
 
 const isDoneStr = (s?: string | null) =>
@@ -150,7 +152,7 @@ export default function SituacaoSection() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
   useAutoRefresh(load, [
     "vehicles", "maintenance_work_orders", "maintenance_records",
-    "maintenance_schedules", "maintenance_requests",
+    "maintenance_schedules", "maintenance_requests", "companies",
   ]);
 
   const states: VehicleState[] = useMemo(() => {
@@ -182,11 +184,8 @@ export default function SituacaoSection() {
       const lastDoneRec = vRecs.find((x) => x.status === "concluida");
 
       // Preventive forecast
-      const lastPrev = vRecs.find((x) => x.type === "preventiva" && x.status === "concluida" && x.km_at_service != null);
-      const baseKm = lastPrev?.km_at_service ?? (v.current_km ?? 0);
-      const nextPrevKm = baseKm + intervalKm;
-      const currentKm = v.current_km ?? 0;
-      const remainingKm = nextPrevKm - currentKm;
+      const { baseKm, nextKm: nextPrevKm, remaining: remainingKm, overdue: overdueKm, hasOdometer } =
+        preventiveKmState(v.current_km, vRecs, vSchs, intervalKm);
 
       const hasPrevScheduled = vSchs.some((x) => x.type === "preventiva") ||
         vRecs.some((x) => x.type === "preventiva" && x.status === "agendada");
@@ -200,28 +199,29 @@ export default function SituacaoSection() {
       let bucketTone = "bg-success/15 text-success border-success/30";
       let rank = 5;
 
-      if (overdueDate) {
+      if (overdueDate || overdueKm) {
         bucket = "overdue"; bucketLabel = "Vencida";
         bucketTone = "bg-destructive/15 text-destructive border-destructive/30"; rank = 0;
       } else if (activeWO || inProgressRec || v.status === "manutencao") {
         bucket = "in_maint"; bucketLabel = "Em manutenção";
         bucketTone = "bg-blue-500/15 text-blue-300 border-blue-500/30"; rank = 1;
-      } else if (!hasPrevScheduled && remainingKm < 0) {
-        bucket = "overdue"; bucketLabel = "Preventiva vencida";
-        bucketTone = "bg-destructive/15 text-destructive border-destructive/30"; rank = 2;
-      } else if (!hasPrevScheduled && remainingKm <= ALERT_THRESHOLD_KM) {
+      } else if (!hasPrevScheduled && hasOdometer && remainingKm <= ALERT_THRESHOLD_KM) {
         bucket = "due_soon"; bucketLabel = "Vence em breve";
         bucketTone = "bg-warning/15 text-warning border-warning/30"; rank = 3;
       } else if (nextWO || nextSch || nextRec) {
         bucket = "scheduled"; bucketLabel = "Agendado";
         bucketTone = "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"; rank = 4;
       }
+      if (!hasOdometer && bucket === "ok") {
+        bucketLabel = "Sem hodômetro lançado";
+        bucketTone = "bg-warning/15 text-warning border-warning/30";
+      }
 
       return {
         v, activeWO, inProgressRec, nextWO, nextSch, nextRec,
         openRequests: vReqs, lastDoneRec,
         baseKm, nextPrevKm, remainingKm,
-        bucket, bucketLabel, bucketTone, rank, overdueDate,
+        bucket, bucketLabel, bucketTone, rank, overdueDate, hasOdometer,
       };
     }).sort((a, b) => a.rank - b.rank || a.remainingKm - b.remainingKm);
   }, [vehicles, wos, recs, schs, reqs, intervalKm, today]);
@@ -303,6 +303,9 @@ export default function SituacaoSection() {
                   </TableCell>
                   <TableCell>
                     <Badge className={`border ${s.bucketTone}`}>{s.bucketLabel}</Badge>
+                    {!s.hasOdometer && s.bucketLabel !== "Sem hodômetro lançado" && (
+                      <div className="text-xs text-warning mt-1">Sem hodômetro lançado</div>
+                    )}
                     {s.activeWO && (
                       <div className="text-[11px] text-muted-foreground mt-1">
                         OS {s.activeWO.os_number ?? "—"} · {EXEC_STATUS[s.activeWO.execution_status]?.label ?? s.activeWO.execution_status}
@@ -369,6 +372,9 @@ export default function SituacaoSection() {
               <SheetHeader>
                 <div className="flex items-center gap-2">
                   <Badge className={`border ${selectedState.bucketTone}`}>{selectedState.bucketLabel}</Badge>
+                  {!selectedState.hasOdometer && selectedState.bucketLabel !== "Sem hodômetro lançado" && (
+                    <span className="text-xs text-warning">Sem hodômetro lançado</span>
+                  )}
                 </div>
                 <SheetTitle className="font-display font-mono text-primary">
                   {selectedState.v.plate}

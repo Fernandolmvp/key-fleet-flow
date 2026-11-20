@@ -21,6 +21,7 @@ import AgendaSection from "./maintenance/AgendaSection";
 import SituacaoSection from "./maintenance/SituacaoSection";
 import { isMaintenanceClosed, isMaintenanceOverdue, overdueMaintenanceVehicles, type MaintenanceDeadline } from "@/lib/automatic-status";
 import { useLocalToday } from "@/hooks/useLocalToday";
+import { preventiveKmState } from "@/lib/preventive-status";
 
 interface MRec {
   id: string; vehicle_id: string; type: string; status: string; category: string | null;
@@ -112,7 +113,7 @@ export default function Maintenance() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
-  useAutoRefresh(load, ["maintenance_records", "maintenance_schedules", "maintenance_work_orders", "maintenance_requests"]);
+  useAutoRefresh(load, ["vehicles", "companies", "maintenance_records", "maintenance_schedules", "maintenance_work_orders", "maintenance_requests"]);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este registro?")) return;
@@ -131,7 +132,7 @@ export default function Maintenance() {
       const remainingKm = s.target_km != null && veh ? s.target_km - veh.current_km : null;
       const remainingDays = s.target_date ? Math.round((new Date(s.target_date.slice(0, 10) + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000) : null;
       if (!isMaintenanceClosed(s.status)) {
-        if ((remainingKm !== null && remainingKm < 0) || isMaintenanceOverdue(s.status, s.target_date, today)) status = "vencida";
+        if ((remainingKm !== null && remainingKm <= 0 && veh?.current_km > 0) || isMaintenanceOverdue(s.status, s.target_date, today)) status = "vencida";
         else if ((remainingKm !== null && remainingKm <= 1000) || (remainingDays !== null && remainingDays <= 15)) status = "proxima";
       }
       if (remainingKm !== null) progress = `${remainingKm.toLocaleString("pt-BR")} km`;
@@ -164,19 +165,14 @@ export default function Maintenance() {
   // Preventive maintenance forecast per vehicle
   const calendar = useMemo(() => {
     return Object.entries(vehicles).map(([id, v]) => {
-      // last preventive service for this vehicle
-      const lastPrev = records
-        .filter((r) => r.vehicle_id === id && r.type === "preventiva" && r.km_at_service != null)
-        .sort((a, b) => new Date(b.service_at).getTime() - new Date(a.service_at).getTime())[0];
       const fuel = lastFuelKm[id];
-      const currentKm = Math.max(v.current_km ?? 0, fuel?.km ?? 0);
-      // Se nunca houve preventiva, usa o KM cadastrado no veículo como base inicial.
-      const baseKm = lastPrev?.km_at_service ?? (v.current_km ?? 0);
-      const nextKm = baseKm + intervalKm;
-      const remaining = nextKm - currentKm;
+      const { lastPrev, currentKm, baseKm, nextKm, remaining, overdue, hasOdometer } = preventiveKmState(
+        v.current_km, records.filter((r) => r.vehicle_id === id), schedules.filter((s) => s.vehicle_id === id), intervalKm,
+      );
       let tone = "bg-success/20 text-success border-success/30";
       let label = "Em dia";
-      if (remaining < 0) { tone = "bg-destructive/20 text-destructive border-destructive/30"; label = "Vencida"; }
+      if (!hasOdometer) { tone = "bg-warning/20 text-warning border-warning/30"; label = "Sem hodômetro lançado"; }
+      else if (overdue) { tone = "bg-destructive/20 text-destructive border-destructive/30"; label = "Vencida"; }
       else if (remaining <= ALERT_THRESHOLD_KM) { tone = "bg-warning/20 text-warning border-warning/30"; label = "Fazer agora"; }
       return {
         id, plate: v.plate, currentKm, fuelKm: fuel?.km ?? null, fuelAt: fuel?.at ?? null,
@@ -186,7 +182,7 @@ export default function Maintenance() {
         nextKm, remaining, tone, label,
       };
     }).sort((a, b) => a.remaining - b.remaining);
-  }, [vehicles, records, lastFuelKm, intervalKm]);
+  }, [vehicles, records, schedules, lastFuelKm, intervalKm]);
 
   const filteredCalendar = useMemo(
     () => calendar.filter((c) => c.plate.toLowerCase().includes(calQ.toLowerCase())),
@@ -205,7 +201,7 @@ export default function Maintenance() {
       ...records.map((r) => ({ vehicle_id: r.vehicle_id, status: r.status, date: r.service_at })),
       ...workOrderDeadlines,
     ], today);
-    calendar.forEach((c) => { if (c.label === "Vencida" && !hasOpenPreventive.has(c.id)) ids.add(c.id); });
+    calendar.forEach((c) => { if (c.label === "Vencida") ids.add(c.id); });
     return ids;
   }, [schedules, records, workOrderDeadlines, calendar, hasOpenPreventive, today]);
   const toDoNow = filteredCalendar.filter((c) => (c.label === "Fazer agora" || c.label === "Vencida") && !hasOpenPreventive.has(c.id));
@@ -219,7 +215,7 @@ export default function Maintenance() {
         plate: c.plate,
         nextKm: c.nextKm,
         remaining: c.remaining,
-        overdue: c.remaining < 0,
+        overdue: c.remaining <= 0,
       }))
       .sort((a, b) => a.remaining - b.remaining);
   }, [calendar, hasOpenPreventive]);

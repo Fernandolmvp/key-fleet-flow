@@ -112,7 +112,7 @@ export default function Dashboard() {
       };
     },
   });
-  useAutoRefresh(refetch, ["maintenance_schedules", "maintenance_records", "maintenance_work_orders", "trips", "traffic_fines"], { enabled: !!currentCompanyId });
+  useAutoRefresh(refetch, ["vehicles", "companies", "maintenance_schedules", "maintenance_records", "maintenance_work_orders", "trips", "traffic_fines"], { enabled: !!currentCompanyId });
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();

@@ -15,6 +15,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         not: () => query,
         order: () => query,
         range: async (from: number, to: number) => ({ data: (tables[table] ?? []).slice(from, to + 1), error: null }),
+        maybeSingle: async () => ({ data: (tables[table] ?? [])[0] ?? null, error: null }),
         update: writes,
         delete: writes,
         insert: writes,
@@ -41,8 +42,9 @@ describe("Dashboard com status calculados", () => {
     expect(result.maint_overdue).toBe(1);
     expect(result.maint_7d).toBe(1);
     expect(result.alerts.filter((a) => a.kind === "maintenance")).toHaveLength(1);
-    expect(scopes).toHaveLength(6);
-    expect(scopes.every((scope) => scope === "company_id:company-A")).toBe(true);
+    expect(scopes).toHaveLength(7);
+    expect(scopes.slice(0, 6).every((scope) => scope === "company_id:company-A")).toBe(true);
+    expect(scopes[6]).toBe("id:company-A");
     expect(writes).not.toHaveBeenCalled();
   });
 
@@ -57,6 +59,21 @@ describe("Dashboard com status calculados", () => {
     const result = await loadDashboardDeadlines("company-A", "2026-11-20");
     expect(result.trips_pending).toBe(2);
     expect(result.alerts.filter((a) => a.kind === "trip")).toHaveLength(2);
+    expect(writes).not.toHaveBeenCalled();
+  });
+
+  it("conta KM no alvo mesmo com preventiva futura e não conta KM zero como vencido", async () => {
+    tables.vehicles = [{ id: "A", plate: "AAA0001", current_km: 20000 }, { id: "B", plate: "BBB0002", current_km: 0 }];
+    tables.companies = [{ maintenance_default_interval_km: 10000 }];
+    tables.maintenance_records = [{ vehicle_id: "A", type: "preventiva", status: "concluida", service_at: "2026-01-10", km_at_service: 10000 }];
+    tables.maintenance_schedules = [
+      { vehicle_id: "A", type: "preventiva", status: "pendente", target_date: "2027-01-10", target_km: 25000 },
+      { vehicle_id: "B", type: "preventiva", status: "pendente", target_date: "2027-01-10", target_km: 10000 },
+    ];
+    const result = await loadDashboardDeadlines("company-A", "2026-11-20");
+    expect(result.maint_overdue).toBe(1);
+    expect(result.alerts.filter((a) => a.kind === "maintenance")).toHaveLength(1);
+    expect(result.alerts[0].subtitle).toContain("20.000 km");
     expect(writes).not.toHaveBeenCalled();
   });
 
