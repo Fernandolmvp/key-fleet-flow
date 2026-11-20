@@ -7,6 +7,7 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { compareAlerts, overdueText, daysBetween, localTodayIso } from "@/lib/document-urgency";
 import { cn } from "@/lib/utils";
 import { loadDashboardDeadlines } from "@/lib/dashboard-deadlines";
 import { loadDashboardMetrics } from "@/lib/dashboard-metrics";
@@ -113,7 +114,7 @@ export default function Dashboard() {
           fines_open: deadlines.fines_open,
           critical_alerts: metrics.docs_expiring + deadlines.maint_7d + deadlines.maint_overdue + deadlines.trips_pending + deadlines.fines_overdue,
         },
-        alerts: [...deadlines.alerts, ...metrics.alerts, ...summary.alerts.filter((a) => !["maintenance", "trip", "fine", "document", "cnh"].includes(a.kind))],
+        alerts: [...deadlines.alerts, ...metrics.alerts, ...summary.alerts.filter((a) => !["maintenance", "trip", "fine", "document", "cnh"].includes(a.kind))].sort(compareAlerts),
       };
     },
   });
@@ -677,7 +678,7 @@ function FullDashboard({
                   <AlertTriangle className={cn("h-4 w-4 shrink-0", alert.severity === "high" ? "text-destructive" : "text-warning")} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{alert.title}</p>
-                    <p className="text-xs text-muted-foreground">{alert.subtitle} · {fmtDate(alert.date)}</p>
+                    <p className="text-xs text-muted-foreground">{alert.subtitle} · {fmtDate(alert.date)}{overdueText(daysBetween(alert.date, localTodayIso())) && <span className="text-destructive font-medium"> · {overdueText(daysBetween(alert.date, localTodayIso()))}</span>}</p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </Link>

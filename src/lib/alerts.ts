@@ -1,3 +1,4 @@
+import { compareAlerts } from "@/lib/document-urgency";
 import { supabase } from "@/integrations/supabase/client";
 import { readAll, loadDashboardDeadlines } from "./dashboard-deadlines";
 import { dashboardDocumentMetrics } from "./dashboard-metrics";
@@ -61,5 +62,5 @@ export async function loadFleetAlerts(companyId: string, today: string): Promise
     alerts.push({ id: `document:${doc.id}`, kind: "document", severity: state.kind === "vencida" ? "high" : "medium", title: `${doc.title || DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type} · ${name}`, subtitle: state.label, date: doc.expires_at, link: "/app/documents" });
   });
   alerts.push(...insuranceAlerts(vehicles, policies, links, manual, today));
-  return alerts.sort((a, b) => Number(b.severity === "high") - Number(a.severity === "high") || (a.date ?? "9999").localeCompare(b.date ?? "9999") || a.title.localeCompare(b.title));
+  return alerts.sort(compareAlerts);
 }

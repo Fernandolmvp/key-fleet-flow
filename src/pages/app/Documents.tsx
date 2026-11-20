@@ -26,6 +26,55 @@ import { useTabPermissions } from "@/lib/permissions";
 import { openStoredFile } from "@/lib/storage-url";
 import { currentVehicleDocuments, documentationVehiclePage } from "@/lib/documentation-list";
 import { readAll } from "@/lib/dashboard-deadlines";
+import {
+  entityUrgency, sortByUrgency, countByBucket, overdueText, URGENCY_ORDER, URGENCY_LABEL,
+  type Urgency, type UrgencyBucket,
+} from "@/lib/document-urgency";
+
+function UrgencyFilter({ counts, value, onChange }: { counts: Record<UrgencyBucket, number>; value: UrgencyBucket | "todos"; onChange: (v: UrgencyBucket | "todos") => void }) {
+  const tone: Record<UrgencyBucket, string> = {
+    atrasado: "data-[active=true]:bg-destructive/15 data-[active=true]:text-destructive data-[active=true]:border-destructive/40",
+    a_vencer: "data-[active=true]:bg-warning/15 data-[active=true]:text-warning data-[active=true]:border-warning/40",
+    pendente: "data-[active=true]:bg-muted data-[active=true]:text-foreground",
+    em_dia: "data-[active=true]:bg-success/15 data-[active=true]:text-success data-[active=true]:border-success/40",
+  };
+  const total = URGENCY_ORDER.reduce((n, b) => n + counts[b], 0);
+  return (
+    <div role="group" aria-label="Filtro rápido" className="flex flex-wrap gap-2">
+      {URGENCY_ORDER.map((b) => (
+        <button key={b} type="button" data-active={value === b} aria-pressed={value === b}
+          onClick={() => onChange(value === b ? "todos" : b)}
+          className={`inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm transition-colors hover:bg-muted/40 ${tone[b]}`}>
+          {URGENCY_LABEL[b]} <span className="font-mono text-xs rounded-full bg-muted/60 px-1.5">{counts[b]}</span>
+        </button>
+      ))}
+      <button type="button" data-active={value === "todos"} aria-pressed={value === "todos"} onClick={() => onChange("todos")}
+        className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-muted/40 data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:border-primary/40">
+        Todos <span className="font-mono text-xs rounded-full bg-muted/60 px-1.5">{total}</span>
+      </button>
+    </div>
+  );
+}
+
+/** Seleciona "Atrasados" automaticamente uma vez, quando houver algum atrasado. */
+function useDefaultUrgencyFilter(counts: Record<UrgencyBucket, number>, ready: boolean) {
+  const [filter, setFilter] = useState<UrgencyBucket | "todos">("todos");
+  const [initialized, setInitialized] = useState(false);
+  useEffect(() => {
+    if (!ready || initialized) return;
+    setInitialized(true);
+    if (counts.atrasado > 0) setFilter("atrasado");
+  }, [ready, initialized, counts.atrasado]);
+  return [filter, setFilter] as const;
+}
+
+function UrgencyNote({ u }: { u: Urgency }) {
+  const late = overdueText(u.days);
+  if (late) return <div className="text-xs font-semibold text-destructive mt-1">{late}</div>;
+  if (u.bucket === "a_vencer" && u.days != null) return <div className="text-xs font-medium text-warning mt-1">{u.days === 0 ? "Vence hoje" : `Vence em ${u.days} ${u.days === 1 ? "dia" : "dias"}`}</div>;
+  if (u.bucket === "pendente") return <div className="text-xs text-muted-foreground mt-1">Pendente</div>;
+  return null;
+}
 
 type DocRow = {
   id: string;
@@ -245,8 +294,39 @@ function VehiclesTab({
   onDelete: (id: string) => void;
 }) {
   const [requestedPage, setRequestedPage] = useState(1);
-  useEffect(() => { setRequestedPage(1); }, [search]);
-  const pagination = useMemo(() => documentationVehiclePage(vehicles, search, requestedPage), [vehicles, search, requestedPage]);
+  const views = useMemo(() => {
+    const map = new Map<string, { vDocs: DocRow[]; crlv?: DocRow; lic: ReturnType<typeof computeLicensingStatus>; adjustedDocs: DocRow[]; urgency: Urgency }>();
+    vehicles.forEach((v) => {
+      const vDocs = currentVehicleDocuments(docs.filter((d) => d.entity_id === v.id));
+      const crlv = vDocs.find((d) => d.doc_type === "crlv");
+      const lic = computeLicensingStatus({
+        licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf,
+        calendar, vehicle_type: v.vehicle_type,
+      });
+      const adjustedDocs = vDocs.map((d) => {
+        if (d.doc_type !== "crlv" && d.doc_type !== "licenciamento") return d;
+        if (!lic.vencimento) return d;
+        const iso = `${lic.vencimento.getFullYear()}-${String(lic.vencimento.getMonth()+1).padStart(2,"0")}-${String(lic.vencimento.getDate()).padStart(2,"0")}`;
+        const status: DocStatus = lic.status === "vencido" ? "vencido" : lic.status === "vencendo" ? "vencendo" : "valido";
+        return { ...d, expires_at: d.expires_at || iso, status };
+      });
+      const licIso = lic.vencimento ? `${lic.vencimento.getFullYear()}-${String(lic.vencimento.getMonth()+1).padStart(2,"0")}-${String(lic.vencimento.getDate()).padStart(2,"0")}` : null;
+      const deadlines = [daysUntil(licIso), ...adjustedDocs.map((d) => daysUntil(d.expires_at))];
+      const missing = adjustedDocs.length === 0 || adjustedDocs.some((d) => !d.expires_at);
+      map.set(v.id, { vDocs, crlv, lic, adjustedDocs, urgency: entityUrgency(deadlines, missing) });
+    });
+    return map;
+  }, [vehicles, docs, calendar]);
+  const sorted = useMemo(() => sortByUrgency(vehicles, (v) => views.get(v.id)!.urgency, (v) => `${v.plate}|${v.id}`), [vehicles, views]);
+  const searchedAll = useMemo(() => {
+    const q = search.toUpperCase().replace(/[\s-]/g, "");
+    return sorted.filter((v) => v.plate.toUpperCase().replace(/[\s-]/g, "").includes(q));
+  }, [sorted, search]);
+  const counts = useMemo(() => countByBucket(searchedAll.map((v) => views.get(v.id)!.urgency)), [searchedAll, views]);
+  const [filter, setFilter] = useDefaultUrgencyFilter(counts, !loading && vehicles.length > 0);
+  useEffect(() => { setRequestedPage(1); }, [search, filter]);
+  const visible = useMemo(() => filter === "todos" ? sorted : sorted.filter((v) => views.get(v.id)!.urgency.bucket === filter), [sorted, views, filter]);
+  const pagination = useMemo(() => documentationVehiclePage(visible, search, requestedPage), [visible, search, requestedPage]);
 
   // KPIs
   const stats = useMemo(() => {
@@ -292,6 +372,8 @@ function VehiclesTab({
 
       <LicensingCalendarReference />
 
+      <UrgencyFilter counts={counts} value={filter} onChange={setFilter} />
+
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -307,15 +389,10 @@ function VehiclesTab({
             <tbody>
               {loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Carregando…</td></tr>}
               {!loading && pagination.total === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Nenhum veículo cadastrado.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{vehicles.length === 0 ? "Nenhum veículo cadastrado." : "Nenhum veículo neste filtro."}</td></tr>
               )}
               {!loading && pagination.rows.map((v) => {
-                const vDocs = currentVehicleDocuments(docs.filter((d) => d.entity_id === v.id));
-                const crlv = vDocs.find((d) => d.doc_type === "crlv");
-                const lic = computeLicensingStatus({
-                  licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf,
-                  calendar, vehicle_type: v.vehicle_type,
-                });
+                const { crlv, lic, adjustedDocs, urgency } = views.get(v.id)!;
                 const last = plateLastDigit(v.plate);
                 const monthIdx = lic.vencimento ? lic.vencimento.getMonth() + 1 : null;
                 const licYear = lic.vencimento ? lic.vencimento.getFullYear() : null;
@@ -324,19 +401,13 @@ function VehiclesTab({
                   : lic.status === "vencendo" ? "Vence em breve"
                   : lic.status === "vencido" ? "Vencido"
                   : "Sem exercício";
-                const adjustedDocs = vDocs.map((d) => {
-                  if (d.doc_type !== "crlv" && d.doc_type !== "licenciamento") return d;
-                  if (!lic.vencimento) return d;
-                  const iso = `${lic.vencimento.getFullYear()}-${String(lic.vencimento.getMonth()+1).padStart(2,"0")}-${String(lic.vencimento.getDate()).padStart(2,"0")}`;
-                  const status: DocStatus = lic.status === "vencido" ? "vencido" : lic.status === "vencendo" ? "vencendo" : "valido";
-                  return { ...d, expires_at: d.expires_at || iso, status };
-                });
 
                 return (
                   <tr key={v.id} className="border-t border-border align-top hover:bg-muted/20">
                     <td className="px-4 py-3">
                       <div className="font-mono font-bold text-primary">{v.plate}</div>
                       <div className="text-xs text-muted-foreground">{v.brand} {v.model} {v.year_model || ""}</div>
+                      <UrgencyNote u={urgency} />
                     </td>
                     <td className="px-4 py-3 font-mono">{last || "—"}</td>
                     <td className="px-4 py-3">
@@ -408,11 +479,25 @@ function DriversTab({
   onEdit: (d: DocRow) => void;
   onDelete: (id: string) => void;
 }) {
-  const filtered = useMemo(() => drivers.filter((d) => {
+  const urgencies = useMemo(() => {
+    const map = new Map<string, Urgency>();
+    drivers.forEach((dr) => {
+      const dDocs = docs.filter((x) => x.entity_id === dr.id);
+      const cnhExp = documentationCnhExpiry(dr, dDocs);
+      const deadlines = [daysUntil(cnhExp), ...dDocs.filter((x) => x.doc_type !== "cnh").map((x) => daysUntil(x.expires_at))];
+      const missing = dDocs.length === 0 || !cnhExp || dDocs.some((x) => !x.expires_at && x.doc_type !== "cnh");
+      map.set(dr.id, entityUrgency(deadlines, missing));
+    });
+    return map;
+  }, [drivers, docs]);
+  const searched = useMemo(() => sortByUrgency(drivers.filter((d) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return [d.full_name, d.cpf || "", d.cnh_number || ""].join(" ").toLowerCase().includes(q);
-  }), [drivers, search]);
+  }), (d) => urgencies.get(d.id)!, (d) => `${d.full_name}|${d.id}`), [drivers, search, urgencies]);
+  const counts = useMemo(() => countByBucket(searched.map((d) => urgencies.get(d.id)!)), [searched, urgencies]);
+  const [filter, setFilter] = useDefaultUrgencyFilter(counts, !loading && drivers.length > 0);
+  const filtered = useMemo(() => filter === "todos" ? searched : searched.filter((d) => urgencies.get(d.id)!.bucket === filter), [searched, urgencies, filter]);
 
   const stats = useMemo(() => {
     let semDoc = 0, vencidos = 0, vencendo = 0, ok = 0;
@@ -456,6 +541,8 @@ function DriversTab({
         </Card>
       </div>
 
+      <UrgencyFilter counts={counts} value={filter} onChange={setFilter} />
+
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -470,9 +557,9 @@ function DriversTab({
             <tbody>
               {loading && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Carregando…</td></tr>}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Nenhum motorista cadastrado.</td></tr>
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">{drivers.length === 0 ? "Nenhum motorista cadastrado." : "Nenhum motorista neste filtro."}</td></tr>
               )}
-              {filtered.map((dr) => {
+              {!loading && filtered.map((dr) => {
                 const dDocs = docs.filter((x) => x.entity_id === dr.id);
                 const cnh = dDocs.find((x) => x.doc_type === "cnh");
                 const cnhExp = documentationCnhExpiry(dr, dDocs);
@@ -488,6 +575,7 @@ function DriversTab({
                     <td className="px-4 py-3">
                       <div className="font-medium">{dr.full_name}</div>
                       <div className="text-xs text-muted-foreground">CPF: {dr.cpf || "—"}</div>
+                      <UrgencyNote u={urgencies.get(dr.id)!} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-mono text-xs">{dr.cnh_number || "—"}</div>
@@ -538,7 +626,7 @@ function DocLine({ d, onEdit, onDelete }: { d: DocRow; onEdit: (d: DocRow) => vo
       <span className="font-medium">{DOC_TYPE_LABELS[d.doc_type] || d.doc_type}</span>
       {d.document_number && <span className="text-muted-foreground font-mono">#{d.document_number}</span>}
       <Badge className={STATUS_COLOR[d.status]} variant="outline">
-        {STATUS_LABEL[d.status]}{dl !== null ? ` · ${dl < 0 ? `${Math.abs(dl)}d atrás` : `${dl}d`}` : ""}
+        {STATUS_LABEL[d.status]}{dl !== null ? ` · ${dl < 0 ? `vencido há ${Math.abs(dl)} ${Math.abs(dl) === 1 ? "dia" : "dias"}` : `${dl}d`}` : ""}
       </Badge>
       {d.validation_warning && (
         <span className="text-amber-400 flex items-center gap-1"><ShieldAlert className="h-3 w-3" />{d.validation_warning}</span>

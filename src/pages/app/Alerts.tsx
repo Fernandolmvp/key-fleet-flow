@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocalToday } from "@/hooks/useLocalToday";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { loadFleetAlerts } from "@/lib/alerts";
+import { overdueText, daysBetween } from "@/lib/document-urgency";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -77,7 +78,7 @@ export default function Alerts() {
                   <Badge variant="outline" className={alert.severity === "high" ? "text-destructive border-destructive/30" : "text-warning border-warning/30"}>{alert.severity === "high" ? "Urgente" : "A vencer"}</Badge>
                 </div>
                 <p className="font-medium break-words">{alert.title}</p>
-                <p className="text-xs text-muted-foreground break-words">{alert.subtitle}{alert.date ? ` · ${new Date(alert.date.slice(0, 10) + "T00:00:00").toLocaleDateString("pt-BR")}` : ""}</p>
+                <p className="text-xs text-muted-foreground break-words">{alert.subtitle}{alert.date ? ` · ${new Date(alert.date.slice(0, 10) + "T00:00:00").toLocaleDateString("pt-BR")}` : ""}{overdueText(daysBetween(alert.date, today)) && <span className="text-destructive font-medium"> · {overdueText(daysBetween(alert.date, today))}</span>}</p>
               </div>
               <Button asChild variant="ghost" size="sm" className="shrink-0">
                 <Link to={alert.link}>Ver origem <ArrowRight className="h-4 w-4 ml-2" /></Link>
