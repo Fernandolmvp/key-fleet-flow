@@ -1,4 +1,6 @@
 # Status automáticos na leitura
+- [x] Confirmar e restringir somente SELECT/INSERT/UPDATE de fuel-receipts; 11 testes PostgreSQL isolados aprovados, incluindo empresa, motorista, posto e isolamento; sem modificar arquivos ou dados reais nem publicar.
+- [ ] Conferir comprovantes no portal real do posto — armazenamento vazio, nenhum usuário de posto ativo e login próprio não integrado ao armazenamento; corrigir o portal exige autorização além do escopo de permissões.
 - [x] Paginar Documentação em 25 veículos com busca por placa, deduplicar CRLV e aplicar calendário da UF com SP como padrão.
 - [x] Testar paginação, deduplicação e UF: 16 testes aprovados; sem alterar dados ou publicar. Conferência autenticada aguarda login.
 - [x] Validar placa antiga/Mercosul e avisar placas parecidas; motorista obrigatório no abastecimento; aviso de razão social no motorista.

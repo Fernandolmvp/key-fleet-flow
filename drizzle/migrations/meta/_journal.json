@@ -8,6 +8,13 @@
       "when": 1795184906342,
       "tag": "0000_validate_new_vehicle_plates_and_fuel_drivers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795185754341,
+      "tag": "0001_restrict_fuel_receipts_access",
+      "breakpoints": true
     }
   ]
 }

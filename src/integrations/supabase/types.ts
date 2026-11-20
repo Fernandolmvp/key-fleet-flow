@@ -6849,6 +6849,7 @@ export type Database = {
         Args: { _group_id: string }
         Returns: number
       }
+      can_access_fuel_receipt: { Args: { _name: string }; Returns: boolean }
       can_manage_fleet: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
