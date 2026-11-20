@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTread, treadLevel, isAboveLast, groupPositionsByAxle, defaultLayoutForVehicleType } from "./tread-measurement";
+import { parseTread, treadLevel, isAboveLast, groupPositionsByAxle, defaultLayoutForVehicleType, buildAutomaticTire } from "./tread-measurement";
 
 describe("tread measurement", () => {
   it("aceita vírgula e ponto", () => {
@@ -27,5 +27,23 @@ describe("tread measurement", () => {
     expect(defaultLayoutForVehicleType("moto")).toBe("moto_2");
     expect(defaultLayoutForVehicleType("caminhao")).toBe("truck_6");
     expect(defaultLayoutForVehicleType(null)).toBe("carro_4");
+  });
+  it("cria pneu instalado e não informado para uma posição vazia medida", () => {
+    expect(buildAutomaticTire({
+      companyId: "company-1", vehicleId: "vehicle-1", position: "DE",
+      treadMm: 3.5, measuredAt: "2026-11-20T12:00:00.000Z", createdBy: "user-1",
+    })).toMatchObject({
+      company_id: "company-1",
+      brand: "Não informado",
+      model: "Não informado",
+      size: "Não informado",
+      status: "instalado",
+      current_vehicle_id: "vehicle-1",
+      current_position: "DE",
+      initial_tread_mm: 3.5,
+      current_tread_mm: 3.5,
+      last_measured_at: "2026-11-20T12:00:00.000Z",
+      created_by: "user-1",
+    });
   });
 });

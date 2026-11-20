@@ -85,3 +85,30 @@ export function groupPositionsByAxle(positions: string[]): { axle: string; posit
 }
 
 export const normalizePlateInput = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
+
+export function buildAutomaticTire(input: {
+  companyId: string;
+  vehicleId: string;
+  position: string;
+  treadMm: number;
+  measuredAt: string;
+  createdBy?: string | null;
+}) {
+  return {
+    company_id: input.companyId,
+    brand: "Não informado",
+    model: "Não informado",
+    size: "Não informado",
+    kind: "novo" as const,
+    status: "instalado" as const,
+    current_vehicle_id: input.vehicleId,
+    current_position: input.position,
+    initial_tread_mm: input.treadMm,
+    current_tread_mm: input.treadMm,
+    min_tread_mm: LEGAL_TREAD_MM,
+    last_measured_at: input.measuredAt,
+    measurement_interval_days: 30,
+    notes: "Criado automaticamente pela medição de sulco.",
+    created_by: input.createdBy ?? null,
+  };
+}

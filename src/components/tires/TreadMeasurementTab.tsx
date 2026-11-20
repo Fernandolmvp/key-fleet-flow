@@ -11,14 +11,14 @@ import { cn } from "@/lib/utils";
 import { AxleLayout, getLayoutPositions } from "@/lib/tires";
 import {
   parseTread, treadLevel, isAboveLast, groupPositionsByAxle, positionLabel,
-  defaultLayoutForVehicleType, normalizePlateInput,
+  defaultLayoutForVehicleType, normalizePlateInput, buildAutomaticTire,
 } from "@/lib/tread-measurement";
 
 interface Props {
   tires: any[];
   vehicles: { id: string; plate: string; brand?: string; model?: string; current_km?: number | null; vehicle_type?: string | null }[];
   layouts: Record<string, { layout: AxleLayout; positions: string[] }>;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
 }
 
 export default function TreadMeasurementTab({ tires, vehicles, layouts, onSaved }: Props) {
@@ -53,13 +53,12 @@ export default function TreadMeasurementTab({ tires, vehicles, layouts, onSaved 
   }, [tires, vehicleId]);
 
   const groups = useMemo(() => groupPositionsByAxle(positions), [positions]);
-  const order = groups.flatMap((g) => g.positions).filter((p) => installed[p]);
+  const order = groups.flatMap((g) => g.positions);
 
   const selectVehicle = (v: Props["vehicles"][number]) => {
     setVehicleId(v.id); setPlate(v.plate); setShowSug(false); setValues({});
     setTimeout(() => {
-      const first = groupPositionsByAxle(getPositionsFor(v)).flatMap((g) => g.positions)
-        .find((p) => tires.some((t) => t.status === "instalado" && t.current_vehicle_id === v.id && t.current_position === p));
+      const first = groupPositionsByAxle(getPositionsFor(v)).flatMap((g) => g.positions)[0];
       if (first) fieldRefs.current[first]?.focus();
     }, 50);
   };
@@ -86,7 +85,7 @@ export default function TreadMeasurementTab({ tires, vehicles, layouts, onSaved 
 
   const save = async () => {
     if (busy || !currentCompanyId || !vehicle) return;
-    const entries: { tire: any; pos: string; mm: number }[] = [];
+    const entries: { tire?: any; pos: string; mm: number }[] = [];
     for (const pos of order) {
       const mm = parseTread(values[pos] ?? "");
       if (mm == null) continue;
@@ -99,19 +98,51 @@ export default function TreadMeasurementTab({ tires, vehicles, layouts, onSaved 
     if (!entries.length) return toast.error("Informe ao menos uma medição");
     setBusy(true);
     const now = new Date().toISOString();
+    const missing = entries.filter((e) => !e.tire);
+    const createdByPosition: Record<string, string> = {};
+
+    if (missing.length) {
+      const { data: created, error: createError } = await supabase.from("tires").insert(missing.map((e) => buildAutomaticTire({
+        companyId: currentCompanyId,
+        vehicleId: vehicle.id,
+        position: e.pos,
+        treadMm: e.mm,
+        measuredAt: now,
+        createdBy: user?.id,
+      }))).select("id,current_position");
+      if (createError) {
+        setBusy(false);
+        return toast.error(`Não foi possível criar os pneus das posições vazias: ${createError.message}`);
+      }
+      (created ?? []).forEach((t) => { if (t.current_position) createdByPosition[t.current_position] = t.id; });
+    }
+
+    const tireIdFor = (e: { tire?: any; pos: string }) => e.tire?.id ?? createdByPosition[e.pos];
+    if (entries.some((e) => !tireIdFor(e))) {
+      setBusy(false);
+      await onSaved();
+      return toast.error("Os pneus foram criados, mas não foi possível identificá-los. Recarregue e tente salvar novamente.");
+    }
+
     const { error } = await supabase.from("tire_movements").insert(entries.map((e) => ({
-      company_id: currentCompanyId, tire_id: e.tire.id, vehicle_id: vehicle.id,
+      company_id: currentCompanyId, tire_id: tireIdFor(e), vehicle_id: vehicle.id,
       movement_type: "inspecao" as const, from_position: e.pos, to_position: null,
       occurred_at: now, tread_mm: e.mm, vehicle_km: vehicle.current_km ?? null,
       reason: "Medição de sulco", created_by: user?.id ?? null,
     })));
-    if (error) { setBusy(false); return toast.error(error.message); }
-    const results = await Promise.all(entries.map((e) => supabase.from("tires")
+    if (error) {
+      setBusy(false);
+      if (missing.length) await onSaved();
+      return toast.error(missing.length
+        ? `Os pneus foram criados, mas as medições não foram salvas. Tente salvar novamente: ${error.message}`
+        : error.message);
+    }
+    const results = await Promise.all(entries.filter((e) => e.tire).map((e) => supabase.from("tires")
       .update({ current_tread_mm: e.mm, last_measured_at: now })
       .eq("id", e.tire.id).eq("company_id", currentCompanyId)));
     setBusy(false);
     if (results.some((r) => r.error)) toast.error("Medições registradas, mas alguns pneus não tiveram o resumo atualizado");
-    else toast.success(`${entries.length} medição(ões) salvas para ${vehicle.plate}`);
+    else toast.success(`${entries.length} medição(ões) salvas para ${vehicle.plate}${missing.length ? `; ${missing.length} pneu(s) criado(s) automaticamente` : ""}`);
     setValues({}); setVehicleId(""); setPlate("");
     onSaved();
     setTimeout(() => plateRef.current?.focus(), 50);
@@ -164,10 +195,6 @@ export default function TreadMeasurementTab({ tires, vehicles, layouts, onSaved 
             {!layouts[vehicle.id] && <Badge variant="outline">Layout padrão pelo tipo do veículo</Badge>}
           </div>
 
-          {order.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhum pneu instalado neste veículo. Instale os pneus antes de medir.</p>
-          )}
-
           {groups.map((g) => (
             <div key={g.axle}>
               <div className="text-[10px] font-mono uppercase text-muted-foreground mb-2">{g.axle}</div>
@@ -180,31 +207,26 @@ export default function TreadMeasurementTab({ tires, vehicles, layouts, onSaved 
                   const above = isAboveLast(mm, tire?.current_tread_mm);
                   return (
                     <div key={p} className={cn("rounded-lg border p-2 space-y-1",
-                      !tire ? "border-dashed border-border bg-muted/20"
-                      : level === "critico" ? "border-destructive bg-destructive/10"
-                      : level === "atencao" ? "border-warning bg-warning/10" : "border-border")}>
+                      level === "critico" ? "border-destructive bg-destructive/10"
+                      : level === "atencao" ? "border-warning bg-warning/10"
+                      : !tire ? "border-dashed border-border bg-muted/20" : "border-border")}>
                       <Label htmlFor={`tread-${p}`} className="text-xs leading-tight block">{positionLabel(p)}</Label>
-                      {tire ? (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              id={`tread-${p}`} ref={(el) => { fieldRefs.current[p] = el; }}
-                              inputMode="decimal" enterKeyHint={order.indexOf(p) === order.length - 1 ? "done" : "next"}
-                              autoComplete="off" placeholder="mm"
-                              className={cn("h-11 text-lg font-mono", Number.isNaN(mm) && "border-destructive")}
-                              value={raw}
-                              onChange={(e) => setValues((s) => ({ ...s, [p]: e.target.value.replace(/[^\d.,]/g, "") }))}
-                              onKeyDown={(e) => onFieldKey(e, p)}
-                            />
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Último: <span className="font-mono">{tire.current_tread_mm != null ? `${String(tire.current_tread_mm).replace(".", ",")} mm` : "—"}</span>
-                          </div>
-                          {level === "critico" && <div className="text-[11px] text-destructive font-medium">No limite legal (≤ 1,6 mm)</div>}
-                          {level === "atencao" && <div className="text-[11px] text-warning font-medium">Perto do limite</div>}
-                          {above && <div className="text-[11px] text-warning font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Maior que a última</div>}
-                        </>
-                      ) : <div className="text-[11px] text-muted-foreground">Sem pneu</div>}
+                      <Input
+                        id={`tread-${p}`} ref={(el) => { fieldRefs.current[p] = el; }}
+                        inputMode="decimal" enterKeyHint={order.indexOf(p) === order.length - 1 ? "done" : "next"}
+                        autoComplete="off" placeholder="mm"
+                        className={cn("h-11 text-lg font-mono", Number.isNaN(mm) && "border-destructive")}
+                        value={raw}
+                        onChange={(e) => setValues((s) => ({ ...s, [p]: e.target.value.replace(/[^\d.,]/g, "") }))}
+                        onKeyDown={(e) => onFieldKey(e, p)}
+                      />
+                      <div className="text-[11px] text-muted-foreground">
+                        Último: <span className="font-mono">{tire?.current_tread_mm != null ? `${String(tire.current_tread_mm).replace(".", ",")} mm` : "—"}</span>
+                      </div>
+                      {!tire && <div className="text-[11px] text-muted-foreground">Sem pneu cadastrado · será criado ao salvar</div>}
+                      {level === "critico" && <div className="text-[11px] text-destructive font-medium">No limite legal (≤ 1,6 mm)</div>}
+                      {level === "atencao" && <div className="text-[11px] text-warning font-medium">Perto do limite</div>}
+                      {above && <div className="text-[11px] text-warning font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Maior que a última</div>}
                     </div>
                   );
                 })}
