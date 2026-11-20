@@ -15,6 +15,13 @@
       "when": 1795185754341,
       "tag": "0001_restrict_fuel_receipts_access",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795187962179,
+      "tag": "0002_harden_email_functions_and_company_insert",
+      "breakpoints": true
     }
   ]
 }
