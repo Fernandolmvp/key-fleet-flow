@@ -25,6 +25,7 @@ import { isAddressMissingNumber } from "@/lib/address";
 import { formatCpf, isValidCpf, onlyDigits } from "@/lib/document";
 import { translateDbError } from "@/lib/db-error";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { looksLikeCompanyName } from "@/lib/form-validation";
 
 interface Driver {
   id: string; full_name: string; cpf: string | null; phone: string | null;
@@ -568,7 +569,13 @@ export default function Drivers() {
                 </label>
               </div>
             </div>
-                <div className="space-y-2 sm:col-span-2"><Label>Nome completo *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="driver-full-name">Nome completo *</Label>
+                  <Input id="driver-full-name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+                  {looksLikeCompanyName(form.full_name) && (
+                    <p role="status" className="text-xs text-warning">Este nome parece uma razão social (LTDA, ME ou EIRELI). Considere cadastrar como terceiro, em vez de motorista.</p>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Label>CPF</Label>
                   {(() => {

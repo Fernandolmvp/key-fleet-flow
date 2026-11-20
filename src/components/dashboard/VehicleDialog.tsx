@@ -16,7 +16,9 @@ import { toast } from "sonner";
 import { Loader2, Upload, X, Sparkles, FileText, History, Undo2, HelpCircle, BarChart3 } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
 import VehicleFipePanel from "./VehicleFipePanel";
-import { isValidPlate, normalizePlate } from "@/lib/plate";
+import { isValidPlate, plateSchema } from "@/lib/plate";
+import { similarRegisteredPlates } from "@/lib/form-validation";
+import { readAll } from "@/lib/dashboard-deadlines";
 import { translateDbError } from "@/lib/db-error";
 import { isValidDocument, onlyDigits } from "@/lib/document";
 
@@ -206,6 +208,22 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
   const [activeTab, setActiveTab] = useState<string>("dados");
   const [movements, setMovements] = useState<MovementRow[]>([]);
   const [form, setForm] = useState<any>(buildFormState());
+  const [registeredPlates, setRegisteredPlates] = useState<{ id: string; plate: string }[]>([]);
+  const [plateLookupFailed, setPlateLookupFailed] = useState(false);
+  const similarPlates = similarRegisteredPlates(form.plate, registeredPlates, vehicle?.id);
+
+  useEffect(() => {
+    let alive = true;
+    setRegisteredPlates([]);
+    setPlateLookupFailed(false);
+    if (open && currentCompanyId) {
+      readAll((from, to) => supabase.from("vehicles").select("id,plate")
+        .eq("company_id", currentCompanyId).order("id").range(from, to))
+        .then((rows) => { if (alive) setRegisteredPlates(rows); })
+        .catch(() => { if (alive) setPlateLookupFailed(true); });
+    }
+    return () => { alive = false; };
+  }, [open, currentCompanyId]);
 
   useEffect(() => {
     let alive = true;
@@ -390,10 +408,12 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
   const save = async () => {
     if (!currentCompanyId) return toast.error("Selecione uma empresa");
     if (!form.plate.trim() || !form.brand.trim() || !form.model.trim()) return toast.error("Placa, marca e modelo são obrigatórios");
-    const normPlate = normalizePlate(form.plate);
-    if (!isValidPlate(normPlate)) {
+    const parsedPlate = plateSchema.safeParse(form.plate);
+    if (!parsedPlate.success) {
       return toast.error("Placa inválida — use o formato AAA9999 (antigo) ou AAA9A99 (Mercosul)");
     }
+    if ((!isEdit || activeTab === "dados") && similarPlates.length > 0 &&
+      !confirm(`Já existe placa igual ou muito parecida cadastrada: ${similarPlates.map((row) => row.plate).join(", ")}. Confira para evitar duplicidade. Deseja salvar mesmo assim?`)) return;
     const nowYear = new Date().getFullYear();
     const minYear = 1950;
     const maxYear = nowYear + 1;
@@ -423,7 +443,7 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
     }
 
     const dataPayload: any = {
-      plate: form.plate.toUpperCase().trim(),
+      plate: parsedPlate.data,
       renavam: form.renavam || null,
       chassis: form.chassis || null,
       brand: form.brand.trim(),
@@ -684,8 +704,9 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
 
           <TabsContent value="dados" className="space-y-4 mt-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label>Placa *</Label>
+          <div className="space-y-2"><Label htmlFor="vehicle-plate">Placa *</Label>
             <Input
+              id="vehicle-plate"
               value={form.plate}
               onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7) })}
               className={`font-mono uppercase ${form.plate && !isValidPlate(form.plate) ? "border-destructive focus-visible:ring-destructive" : ""}`}
@@ -695,6 +716,10 @@ export default function VehicleDialog({ open, onOpenChange, vehicle, onSaved, pr
             {form.plate && !isValidPlate(form.plate) && (
               <p className="text-xs text-destructive">Placa inválida (AAA9999 ou AAA9A99)</p>
             )}
+            {similarPlates.length > 0 && (
+              <p role="status" className="text-xs text-warning">Placa igual ou muito parecida já cadastrada: {similarPlates.map((row) => row.plate).join(", ")}. Confira antes de salvar.</p>
+            )}
+            {plateLookupFailed && <p role="status" className="text-xs text-warning">Não foi possível conferir placas parecidas. Reabra o cadastro para tentar novamente.</p>}
           </div>
           <div className="space-y-2"><Label>RENAVAM</Label><Input value={form.renavam} onChange={(e) => setForm({ ...form, renavam: e.target.value })} /></div>
           <div className="space-y-2 sm:col-span-2"><Label>Chassi</Label><Input value={form.chassis} onChange={(e) => setForm({ ...form, chassis: e.target.value })} /></div>

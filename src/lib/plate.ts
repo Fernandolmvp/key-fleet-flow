@@ -1,3 +1,9 @@
+import { z } from "zod";
+
+export const plateSchema = z.string().trim().max(16)
+  .transform((value) => value.toUpperCase().replace(/[\s-]/g, ""))
+  .pipe(z.string().regex(/^(?:[A-Z]{3}[0-9]{4}|[A-Z]{3}[0-9][A-Z][0-9]{2})$/, "Placa inválida — use ABC1234 ou ABC1D23"));
+
 /**
  * Normaliza placa para formato Mercosul (AAA9A99) para comparação.
  * Placa antiga AAA9999: converte 5º dígito (0-9) → letra (A-J).
@@ -25,13 +31,7 @@ export const normRenavam = (r?: string | null) =>
  * Normaliza para A-Z0-9 maiúsculas antes de validar.
  */
 export function isValidPlate(p?: string | null): boolean {
-  const s = String(p ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (s.length !== 7) return false;
-  // Mercosul: 3 letras + 1 dígito + 1 letra + 2 dígitos
-  if (/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(s)) return true;
-  // Antigo: 3 letras + 4 dígitos
-  if (/^[A-Z]{3}[0-9]{4}$/.test(s)) return true;
-  return false;
+  return plateSchema.safeParse(p).success;
 }
 
 /** Match entre veículo e dados extraídos da apólice (placa/chassi/renavam). */

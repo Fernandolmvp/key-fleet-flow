@@ -1,4 +1,5 @@
 # Architecture rules
+- Keep form validation in shared schema/helpers; similar-plate and company-name checks are advisory, while database triggers enforce new/changed plates and fuel driver ownership without rewriting legacy rows.
 - Keep automatic overdue/settlement statuses in shared read-only presentation helpers; retain stored workflow statuses for editing and explicit actions to prevent reads from modifying historical records.
 - Use the local calendar day, refreshed at midnight and on focus, for deadline-based presentation rules so today's deadlines never expire early.
 - Enrich Dashboard summaries with company-scoped, paginated read queries using the same deadline helpers as list views; avoid database migrations or writes for presentation-only statuses.

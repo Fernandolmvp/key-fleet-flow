@@ -1,4 +1,6 @@
 # Status automáticos na leitura
+- [ ] Validar placa antiga/Mercosul e avisar placas parecidas; motorista obrigatório no abastecimento; aviso de razão social no motorista.
+- [ ] Testar validações sem modificar registros existentes e sem publicar.
 - [x] Criar /app/alerts com alertas calculados, filtro por tipo e links de origem; retirar SOON.
 - [x] Testar alertas de apólices vencidas e veículos sem seguro: 27 testes e typecheck aprovados; /app/alerts abre login sem 404, sem publicar.
 - [x] Alinhar documentos, motoristas/CNH e custos do mês do Dashboard com as telas usando somente leitura.

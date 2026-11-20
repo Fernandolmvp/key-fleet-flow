@@ -14,6 +14,7 @@ import { extractDocument } from "@/lib/ai-extract";
 import { getMaxVehicleKm, friendlyKmError } from "@/lib/km-validation";
 import { translateDbError } from "@/lib/db-error";
 import KmOverrideField from "@/components/dashboard/KmOverrideField";
+import { fuelDriverSchema } from "@/lib/form-validation";
 
 interface Props { open: boolean; onOpenChange: (b: boolean) => void; record: any; onSaved: () => void; }
 
@@ -37,10 +38,12 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const [plateCheck, setPlateCheck] = useState<{ plate: string; ok: boolean; vehicleId?: string } | null>(null);
   const [maxKm, setMaxKm] = useState<number>(0);
   const [kmOverrideReason, setKmOverrideReason] = useState<string>("");
+  const [driverError, setDriverError] = useState(false);
 
   useEffect(() => {
     if (!open || !currentCompanyId) return;
     setPlateCheck(null);
+    setDriverError(false);
     setKmOverrideReason("");
     setMaxKm(0);
     (async () => {
@@ -154,6 +157,11 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
   const save = async () => {
     if (!currentCompanyId) return;
     if (!form.vehicle_id) return toast.error("Selecione um veículo");
+    const driver = fuelDriverSchema.safeParse(form.driver_id);
+    if (!driver.success) {
+      setDriverError(true);
+      return toast.error("Selecione um motorista — obrigatório no abastecimento");
+    }
     if (plateCheck && !plateCheck.ok) return toast.error("Placa não autorizada — abastecimento bloqueado");
     if (!form.liters || !form.price_per_liter || !form.km_at_fueling) return toast.error("Litros, valor/L e KM são obrigatórios");
     if (Number(form.liters) <= 0) return toast.error("A quantidade de litros precisa ser maior que zero");
@@ -171,7 +179,7 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
       ...form,
       company_id: currentCompanyId,
       created_by: user?.id,
-      driver_id: form.driver_id || null,
+      driver_id: driver.data,
       fuel_station_id: form.fuel_station_id || null,
       liters: Number(form.liters),
       price_per_liter: Number(form.price_per_liter),
@@ -270,11 +278,12 @@ export default function FuelDialog({ open, onOpenChange, record, onSaved }: Prop
           </div>
 
           <div className="space-y-2">
-            <Label>Motorista</Label>
-            <Select value={form.driver_id} onValueChange={(v) => setForm({ ...form, driver_id: v })}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+            <Label htmlFor="fuel-driver">Motorista *</Label>
+            <Select value={form.driver_id} onValueChange={(v) => { setForm({ ...form, driver_id: v }); setDriverError(false); }}>
+              <SelectTrigger id="fuel-driver" aria-required="true" aria-invalid={driverError} aria-describedby={driverError ? "fuel-driver-error" : undefined}><SelectValue placeholder="Selecione o motorista" /></SelectTrigger>
               <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}</SelectContent>
             </Select>
+            {driverError && <p id="fuel-driver-error" role="alert" className="text-xs text-destructive">Selecione um motorista para registrar o abastecimento.</p>}
           </div>
 
           <div className="space-y-2"><Label>Data/hora *</Label>
