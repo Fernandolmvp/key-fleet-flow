@@ -713,6 +713,7 @@ export type Database = {
           created_at: string
           help_text: string | null
           id: string
+          is_critical: boolean
           label: string
           max_value: number | null
           min_value: number | null
@@ -731,6 +732,7 @@ export type Database = {
           created_at?: string
           help_text?: string | null
           id?: string
+          is_critical?: boolean
           label: string
           max_value?: number | null
           min_value?: number | null
@@ -749,6 +751,7 @@ export type Database = {
           created_at?: string
           help_text?: string | null
           id?: string
+          is_critical?: boolean
           label?: string
           max_value?: number | null
           min_value?: number | null
@@ -938,6 +941,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          vehicle_type: string | null
           version: number
         }
         Insert: {
@@ -951,6 +955,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string
+          vehicle_type?: string | null
           version?: number
         }
         Update: {
@@ -964,6 +969,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+          vehicle_type?: string | null
           version?: number
         }
         Relationships: [
@@ -2422,6 +2428,9 @@ export type Database = {
           price_per_liter: number
           pump_photo_url: string | null
           receipt_url: string | null
+          reconciled_at: string | null
+          reconciliation_notes: string | null
+          reconciliation_status: string
           source_origin: string
           state: string | null
           station_cnpj: string | null
@@ -2463,6 +2472,9 @@ export type Database = {
           price_per_liter: number
           pump_photo_url?: string | null
           receipt_url?: string | null
+          reconciled_at?: string | null
+          reconciliation_notes?: string | null
+          reconciliation_status?: string
           source_origin?: string
           state?: string | null
           station_cnpj?: string | null
@@ -2504,6 +2516,9 @@ export type Database = {
           price_per_liter?: number
           pump_photo_url?: string | null
           receipt_url?: string | null
+          reconciled_at?: string | null
+          reconciliation_notes?: string | null
+          reconciliation_status?: string
           source_origin?: string
           state?: string | null
           station_cnpj?: string | null
@@ -3549,6 +3564,7 @@ export type Database = {
       maintenance_requests: {
         Row: {
           audio_url: string | null
+          checklist_run_id: string | null
           company_id: string
           created_at: string
           driver_id: string | null
@@ -3578,6 +3594,7 @@ export type Database = {
         }
         Insert: {
           audio_url?: string | null
+          checklist_run_id?: string | null
           company_id: string
           created_at?: string
           driver_id?: string | null
@@ -3607,6 +3624,7 @@ export type Database = {
         }
         Update: {
           audio_url?: string | null
+          checklist_run_id?: string | null
           company_id?: string
           created_at?: string
           driver_id?: string | null
@@ -5002,6 +5020,9 @@ export type Database = {
           kind: Database["public"]["Enums"]["tire_kind"]
           km_accumulated: number
           km_target: number | null
+          last_measured_at: string | null
+          last_pressure_psi: number | null
+          measurement_interval_days: number
           min_tread_mm: number | null
           model: string | null
           notes: string | null
@@ -5012,6 +5033,7 @@ export type Database = {
           size: string
           status: Database["public"]["Enums"]["tire_status"]
           supplier: string | null
+          target_pressure_psi: number | null
           updated_at: string
         }
         Insert: {
@@ -5031,6 +5053,9 @@ export type Database = {
           kind?: Database["public"]["Enums"]["tire_kind"]
           km_accumulated?: number
           km_target?: number | null
+          last_measured_at?: string | null
+          last_pressure_psi?: number | null
+          measurement_interval_days?: number
           min_tread_mm?: number | null
           model?: string | null
           notes?: string | null
@@ -5041,6 +5066,7 @@ export type Database = {
           size: string
           status?: Database["public"]["Enums"]["tire_status"]
           supplier?: string | null
+          target_pressure_psi?: number | null
           updated_at?: string
         }
         Update: {
@@ -5060,6 +5086,9 @@ export type Database = {
           kind?: Database["public"]["Enums"]["tire_kind"]
           km_accumulated?: number
           km_target?: number | null
+          last_measured_at?: string | null
+          last_pressure_psi?: number | null
+          measurement_interval_days?: number
           min_tread_mm?: number | null
           model?: string | null
           notes?: string | null
@@ -5070,6 +5099,7 @@ export type Database = {
           size?: string
           status?: Database["public"]["Enums"]["tire_status"]
           supplier?: string | null
+          target_pressure_psi?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -5648,6 +5678,7 @@ export type Database = {
           destination_state: string | null
           driver_id: string | null
           estimated_km: number | null
+          freight_value: number | null
           id: string
           km_at_end: number | null
           km_at_start: number | null
@@ -5688,6 +5719,7 @@ export type Database = {
           destination_state?: string | null
           driver_id?: string | null
           estimated_km?: number | null
+          freight_value?: number | null
           id?: string
           km_at_end?: number | null
           km_at_start?: number | null
@@ -5728,6 +5760,7 @@ export type Database = {
           destination_state?: string | null
           driver_id?: string | null
           estimated_km?: number | null
+          freight_value?: number | null
           id?: string
           km_at_end?: number | null
           km_at_start?: number | null

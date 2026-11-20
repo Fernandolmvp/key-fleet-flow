@@ -18,3 +18,8 @@
 - [x] Landing pública: remover indicadores numéricos (-27%, +41%, 100%) e trocar por frases sem números.
 - [x] Landing pública: criar seção Planos — Starter R$ 149 (até 10), Pro R$ 349 (até 30), Business R$ 749 (até 100), Enterprise sob consulta, cada um com "Agendar demonstração".
 - [x] Testes da seção Planos (preços, limites, CTA) e typecheck; não publicar.
+## Melhorias Checklists / Pneus / Abastecimentos / Viagens
+- [ ] Checklists: pendentes/atrasados, modelos por tipo, críticos, solicitação automática, restrito, fotos, histórico, conformidade
+- [ ] Pneus: mapa por eixo, sulco/pressão/medição, alertas, rodízio/recapagem, custo/km
+- [ ] Abastecimentos: filtros, anomalias explicadas, conferência, CSV, ranking
+- [ ] Viagens: abas por status, criação rápida, despesas/adiantamento/acerto, custo/km, resultado
