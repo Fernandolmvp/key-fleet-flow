@@ -29,6 +29,13 @@
       "when": 1795188600248,
       "tag": "0003_fleet_modules_additions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795192212901,
+      "tag": "0004_tire_kind_usado",
+      "breakpoints": true
     }
   ]
 }

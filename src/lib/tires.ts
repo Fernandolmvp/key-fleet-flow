@@ -32,6 +32,7 @@ export const TIRE_KIND = [
   { value: "novo", label: "Novo" },
   { value: "recapado", label: "Recapado" },
   { value: "remold", label: "Remold" },
+  { value: "usado", label: "Usado" },
 ] as const;
 
 export const TIRE_STATUS = [
@@ -63,6 +64,7 @@ export const KIND_TONE: Record<string, string> = {
   novo: "bg-primary/20 text-primary border-primary/30",
   recapado: "bg-warning/20 text-warning border-warning/30",
   remold: "bg-accent/20 text-accent border-accent/30",
+  usado: "bg-muted text-muted-foreground border-border",
 };
 
 export const fmtBRL = (n: number) =>

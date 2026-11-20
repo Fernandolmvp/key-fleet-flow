@@ -7321,7 +7321,7 @@ export type Database = {
         | "cancelada"
         | "trial"
         | "expirada"
-      tire_kind: "novo" | "recapado" | "remold"
+      tire_kind: "novo" | "recapado" | "remold" | "usado"
       tire_movement_type:
         | "instalacao"
         | "remocao"
@@ -7606,7 +7606,7 @@ export const Constants = {
         "trial",
         "expirada",
       ],
-      tire_kind: ["novo", "recapado", "remold"],
+      tire_kind: ["novo", "recapado", "remold", "usado"],
       tire_movement_type: [
         "instalacao",
         "remocao",

@@ -1,0 +1,1 @@
+ALTER TYPE public.tire_kind ADD VALUE IF NOT EXISTS 'usado';

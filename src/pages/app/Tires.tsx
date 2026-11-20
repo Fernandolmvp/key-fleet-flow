@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Plus, Search, CircleDot, Pencil, Trash2, ArrowRightLeft, AlertTriangle, Map,
-  PackageCheck, RefreshCw, Activity,
+  PackageCheck, RefreshCw, Activity, Layers, Ban, MoreVertical, Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -18,6 +18,12 @@ import TireDialog from "@/components/dashboard/TireDialog";
 import TireMovementDialog from "@/components/dashboard/TireMovementDialog";
 import TireAxleMap from "@/components/dashboard/TireAxleMap";
 import TreadMeasurementTab from "@/components/tires/TreadMeasurementTab";
+import TireActionDialog, { TireAction, positionsForVehicle } from "@/components/tires/TireActionDialog";
+import TireBatchDialog from "@/components/tires/TireBatchDialog";
+import { KIND_LABEL } from "@/lib/tire-ops";
+import { positionLabel } from "@/lib/tread-measurement";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AXLE_LAYOUTS, AxleLayout, STATUS_TONE, KIND_TONE, getLayoutPositions,
   treadHealth, fmtBRL,
@@ -40,9 +46,17 @@ export default function Tires() {
   const [defaultMove, setDefaultMove] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [mapVehicleId, setMapVehicleId] = useState<string>("");
-  const [tab, setTab] = useState<string>("list");
+  const [tab, setTab] = useState<string>("stock");
+  const [act, setAct] = useState<{ action: TireAction; tire?: any; vehicleId?: string; position?: string } | null>(null);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [posMenu, setPosMenu] = useState<string | null>(null);
+  const [mapPlate, setMapPlate] = useState("");
+  const [fBrand, setFBrand] = useState("all");
+  const [fSize, setFSize] = useState("all");
+  const [fKind, setFKind] = useState("all");
+  const [fStatus, setFStatus] = useState("estoque");
   const { canViewTab, isVisible, fallback } = useTabPermissions(
-    "tires", ["list", "map", "tread", "movements", "alerts"], tab,
+    "tires", ["stock", "list", "map", "tread", "movements", "alerts"], tab,
   );
   useEffect(() => {
     if (!isVisible && fallback) setTab(fallback);
@@ -112,6 +126,13 @@ export default function Tires() {
   const inStock = tires.filter((t) => t.status === "estoque").length;
   const installed = tires.filter((t) => t.status === "instalado").length;
   const inRecap = tires.filter((t) => t.status === "recapagem").length;
+  const discarded = tires.filter((t) => t.status === "descartado").length;
+  const brands = useMemo(() => [...new Set(tires.map((t) => t.brand).filter(Boolean))].sort(), [tires]);
+  const sizes = useMemo(() => [...new Set(tires.map((t) => t.size).filter(Boolean))].sort(), [tires]);
+  const stockList = tires.filter((t) =>
+    (fStatus === "all" || t.status === fStatus) && (fBrand === "all" || t.brand === fBrand) &&
+    (fSize === "all" || t.size === fSize) && (fKind === "all" || t.kind === fKind) &&
+    [t.brand, t.model, t.size, t.dot, t.serial, t.supplier].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase()));
   const alerts = tires.filter((t) => tireAlertLevel(t).level !== "ok").length;
 
   const costByTire = useMemo(() => {
@@ -138,7 +159,8 @@ export default function Tires() {
 
   const currentMapLayout = mapVehicleId ? layouts[mapVehicleId] : null;
   const currentMapPositions = currentMapLayout
-    ? getLayoutPositions(currentMapLayout.layout, currentMapLayout.positions) : [];
+    ? getLayoutPositions(currentMapLayout.layout, currentMapLayout.positions)
+    : positionsForVehicle(vehicles.find((v) => v.id === mapVehicleId), layouts);
 
   const vehiclesById = useMemo(() => {
     const m: Record<string, any> = {};
@@ -158,15 +180,19 @@ export default function Tires() {
           <h1 className="font-display text-3xl font-bold">Pneus</h1>
           <p className="text-muted-foreground">{tires.length} pneu(s) cadastrado(s)</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => setBatchOpen(true)}><Layers className="h-4 w-4 mr-2" /> Cadastro em lote</Button>
         <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
           <Plus className="h-4 w-4 mr-2" /> Novo pneu
         </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         <KpiCard label="Em estoque" value={String(inStock)} icon={PackageCheck} tone="primary" />
         <KpiCard label="Instalados" value={String(installed)} icon={CircleDot} tone="success" />
         <KpiCard label="Em recapagem" value={String(inRecap)} icon={RefreshCw} tone="warning" />
+        <KpiCard label="Descartados" value={String(discarded)} icon={Ban} tone="primary" />
         <KpiCard label="Alertas" value={String(alerts)} icon={AlertTriangle} tone="destructive" />
       </div>
 
@@ -180,12 +206,65 @@ export default function Tires() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="max-w-full overflow-x-auto justify-start">
-          {canViewTab("list") && <TabsTrigger value="list">Pneus</TabsTrigger>}
+          {canViewTab("stock") && <TabsTrigger value="stock">Estoque</TabsTrigger>}
+          {canViewTab("list") && <TabsTrigger value="list">Todos os pneus</TabsTrigger>}
           {canViewTab("map") && <TabsTrigger value="map">Mapa do veículo</TabsTrigger>}
           {canViewTab("tread") && <TabsTrigger value="tread">Medição de sulco</TabsTrigger>}
           {canViewTab("movements") && <TabsTrigger value="movements">Movimentações</TabsTrigger>}
           {canViewTab("alerts") && <TabsTrigger value="alerts">Alertas {alerts > 0 && <Badge className="ml-2 bg-destructive/30 text-destructive">{alerts}</Badge>}</TabsTrigger>}
         </TabsList>
+
+        {/* STOCK */}
+        <TabsContent value="stock" className="mt-4 space-y-4">
+          <div className="surface-card rounded-xl p-4 grid gap-2 grid-cols-2 md:grid-cols-5">
+            <div className="relative col-span-2 md:col-span-1">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Buscar..." value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <Select value={fStatus} onValueChange={setFStatus}><SelectTrigger aria-label="Status"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="estoque">Em estoque</SelectItem><SelectItem value="instalado">Instalados</SelectItem><SelectItem value="recapagem">Em recapagem</SelectItem><SelectItem value="descartado">Descartados</SelectItem></SelectContent></Select>
+            <Select value={fBrand} onValueChange={setFBrand}><SelectTrigger aria-label="Marca"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todas as marcas</SelectItem>{brands.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent></Select>
+            <Select value={fSize} onValueChange={setFSize}><SelectTrigger aria-label="Medida"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todas as medidas</SelectItem>{sizes.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent></Select>
+            <Select value={fKind} onValueChange={setFKind}><SelectTrigger aria-label="Tipo"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todos os tipos</SelectItem>{Object.entries(KIND_LABEL).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}</SelectContent></Select>
+          </div>
+          {loading ? <div className="text-center text-muted-foreground py-12">Carregando...</div> : stockList.length === 0 ? (
+            <div className="surface-card rounded-xl p-12 text-center">
+              <PackageCheck className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">Nenhum pneu encontrado. Use "Cadastro em lote" ou envie a NF para a IA preencher.</p>
+            </div>
+          ) : (
+            <div className="surface-card rounded-xl overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Marca / Modelo</TableHead><TableHead>Medida</TableHead><TableHead>DOT / Serial</TableHead><TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Sulco</TableHead><TableHead className="text-right">Preço</TableHead><TableHead>Fornecedor</TableHead><TableHead></TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {stockList.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell><div className="font-medium">{t.brand}</div><div className="text-xs text-muted-foreground">{t.model ?? ""}</div></TableCell>
+                      <TableCell className="font-mono text-xs">{t.size}</TableCell>
+                      <TableCell className="font-mono text-xs">{t.dot ?? "—"}{t.serial && <div className="text-muted-foreground">{t.serial}</div>}</TableCell>
+                      <TableCell><Badge className={`border ${KIND_TONE[t.kind] ?? ""}`}>{KIND_LABEL[t.kind] ?? t.kind}</Badge></TableCell>
+                      <TableCell className="text-right font-mono text-xs">{t.current_tread_mm != null ? `${t.current_tread_mm} mm` : "—"}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{t.purchase_price != null ? fmtBRL(Number(t.purchase_price)) : "—"}</TableCell>
+                      <TableCell className="text-xs">{t.supplier ?? "—"}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {t.status === "estoque" && <Button size="sm" onClick={() => setAct({ action: "instalacao", tire: t })}>Instalar</Button>}
+                        {t.status === "instalado" && <TireQuickMenu t={t} onPick={(a) => setAct({ action: a, tire: t })} />}
+                        {t.status === "recapagem" && <Button size="sm" variant="outline" onClick={() => setAct({ action: "instalacao", tire: t })}>Instalar</Button>}
+                        <Button size="icon" variant="ghost" aria-label="Editar" onClick={() => { setEditing(t); setOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
 
         <TabsContent value="tread" className="mt-4">
           <TreadMeasurementTab tires={tires} vehicles={vehicles} layouts={layouts} onSaved={load} />
@@ -262,6 +341,8 @@ export default function Tires() {
                         <TableCell>
                           <div className="flex gap-1 justify-end">
                             <Button size="icon" variant="ghost" onClick={() => openMove(t, "inspecao")} title="Registrar medição" aria-label="Registrar medição"><Activity className="h-3.5 w-3.5" /></Button>
+                            {t.status === "instalado" && <TireQuickMenu t={t} onPick={(a) => setAct({ action: a, tire: t })} />}
+                            {t.status === "estoque" && <Button size="sm" variant="outline" onClick={() => setAct({ action: "instalacao", tire: t })}>Instalar</Button>}
                             <Button size="icon" variant="ghost" onClick={() => openMove(t)} title="Movimentar">
                               <ArrowRightLeft className="h-3.5 w-3.5" />
                             </Button>
@@ -286,15 +367,16 @@ export default function Tires() {
         <TabsContent value="map" className="mt-4 space-y-4">
           <div className="surface-card rounded-xl p-4 grid md:grid-cols-2 gap-4">
             <div>
-              <Label>Veículo</Label>
-              <Select value={mapVehicleId} onValueChange={setMapVehicleId}>
-                <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                <SelectContent>
-                  {vehicles.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>{v.plate} — {v.brand} {v.model}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="map-plate">Placa</Label>
+              <Input id="map-plate" list="map-plates" placeholder="Digite a placa" value={mapPlate || (vehiclesById[mapVehicleId]?.plate ?? "")}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase(); setMapPlate(val);
+                  const norm = (x: string) => x.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+                  const v = vehicles.find((x) => norm(x.plate) === norm(val));
+                  if (v) { setMapVehicleId(v.id); setMapPlate(""); }
+                }} />
+              <datalist id="map-plates">{vehicles.map((v) => <option key={v.id} value={v.plate}>{v.brand} {v.model}</option>)}</datalist>
+              {mapPlate && <p className="text-xs text-muted-foreground mt-1">Continue digitando até a placa completa.</p>}
             </div>
             <div>
               <Label>Layout de eixos</Label>
@@ -320,26 +402,7 @@ export default function Tires() {
             <TireAxleMap
               positions={currentMapPositions}
               installed={installedByVehicle[mapVehicleId] ?? {}}
-              onSelect={(pos) => {
-                const installedTire = (installedByVehicle[mapVehicleId] ?? {})[pos];
-                if (installedTire) {
-                  openMove(tiresById[installedTire.id], "inspecao");
-                } else {
-                  // Choose a stock tire to install
-                  const stock = tires.filter((t) => t.status === "estoque");
-                  if (!stock.length) return toast.error("Nenhum pneu em estoque para instalar");
-                  // Prompt simple: install the first in stock
-                  const t = stock[0];
-                  if (confirm(`Instalar pneu ${t.brand} ${t.size} na posição ${pos}?`)) {
-                    setMoveTire(t);
-                    setDefaultMove("instalacao");
-                    // Pre-fill via state in dialog: vehicle + position
-                    setMoveOpen(true);
-                    // Position selection will happen in dialog (the user can confirm/change).
-                    toast.info(`Selecione a posição ${pos} no diálogo`);
-                  }
-                }
-              }}
+              onSelect={(pos) => setPosMenu(pos)}
             />
           )}
         </TabsContent>
@@ -439,6 +502,38 @@ export default function Tires() {
         </TabsContent>
       </Tabs>
 
+      <TireBatchDialog open={batchOpen} onOpenChange={setBatchOpen} onSaved={load} />
+      {act && (
+        <TireActionDialog open={!!act} onOpenChange={(b) => !b && setAct(null)} action={act.action} tire={act.tire}
+          vehicleId={act.vehicleId} position={act.position} tires={tires} vehicles={vehicles} layouts={layouts} onSaved={load} />
+      )}
+      <Dialog open={!!posMenu} onOpenChange={(b) => !b && setPosMenu(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{posMenu ? `${positionLabel(posMenu)} (${posMenu})` : ""}</DialogTitle></DialogHeader>
+          {posMenu && (() => {
+            const t = (installedByVehicle[mapVehicleId] ?? {})[posMenu];
+            const pick = (a: TireAction) => { const full = t ? tiresById[t.id] : undefined; setPosMenu(null); setAct({ action: a, tire: full, vehicleId: mapVehicleId, position: a === "instalacao" ? posMenu : undefined }); };
+            if (!t) return (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Posição vazia.</p>
+                <Button className="w-full" onClick={() => pick("instalacao")}>Instalar do estoque</Button>
+              </div>
+            );
+            return (
+              <div className="space-y-2">
+                <p className="text-sm">{t.brand} · <span className="font-mono">{t.size}</span> {t.serial ? `· ${t.serial}` : ""} · Sulco {t.tread ?? "—"} mm</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => pick("rodizio")}><ArrowRightLeft className="h-4 w-4 mr-1" />Rodízio</Button>
+                  <Button variant="outline" onClick={() => pick("remocao")}><PackageCheck className="h-4 w-4 mr-1" />Remover</Button>
+                  <Button variant="outline" onClick={() => pick("recapagem")}><RefreshCw className="h-4 w-4 mr-1" />Recapagem</Button>
+                  <Button variant="outline" className="text-destructive" onClick={() => pick("descarte")}><Ban className="h-4 w-4 mr-1" />Descartar</Button>
+                  <Button variant="ghost" className="col-span-2" onClick={() => { setPosMenu(null); openMove(tiresById[t.id], "inspecao"); }}><Activity className="h-4 w-4 mr-1" />Registrar medição</Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
       <TireDialog open={open} onOpenChange={setOpen} tire={editing} onSaved={load} />
       <TireMovementDialog
         open={moveOpen}
@@ -450,5 +545,20 @@ export default function Tires() {
         onSaved={load}
       />
     </div>
+  );
+}
+function TireQuickMenu({ t, onPick }: { t: any; onPick: (a: TireAction) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" aria-label={`Ações do pneu ${t.serial ?? t.brand}`}><Wrench className="h-3.5 w-3.5 mr-1" />Ações<MoreVertical className="h-3.5 w-3.5 ml-1" /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => onPick("rodizio")}>Rodízio</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onPick("remocao")}>Remover para estoque</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onPick("recapagem")}>Enviar para recapagem</DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onClick={() => onPick("descarte")}>Descartar</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
