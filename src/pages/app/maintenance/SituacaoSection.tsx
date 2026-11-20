@@ -190,6 +190,9 @@ export default function SituacaoSection() {
 
       const hasPrevScheduled = vSchs.some((x) => x.type === "preventiva") ||
         vRecs.some((x) => x.type === "preventiva" && x.status === "agendada");
+      const overdueDate = vSchs.some((x) => isMaintenanceOverdue(x.status, x.target_date, today)) ||
+        vRecs.some((x) => isMaintenanceOverdue(x.status, x.service_at, today)) ||
+        vWos.some((x) => isMaintenanceOverdue(x.execution_status, x.scheduled_date, today));
 
       // Bucket
       let bucket: VehicleState["bucket"] = "ok";
@@ -197,7 +200,10 @@ export default function SituacaoSection() {
       let bucketTone = "bg-success/15 text-success border-success/30";
       let rank = 5;
 
-      if (activeWO || inProgressRec || v.status === "manutencao") {
+      if (overdueDate) {
+        bucket = "overdue"; bucketLabel = "Vencida";
+        bucketTone = "bg-destructive/15 text-destructive border-destructive/30"; rank = 0;
+      } else if (activeWO || inProgressRec || v.status === "manutencao") {
         bucket = "in_maint"; bucketLabel = "Em manutenção";
         bucketTone = "bg-blue-500/15 text-blue-300 border-blue-500/30"; rank = 1;
       } else if (!hasPrevScheduled && remainingKm < 0) {
@@ -215,10 +221,10 @@ export default function SituacaoSection() {
         v, activeWO, inProgressRec, nextWO, nextSch, nextRec,
         openRequests: vReqs, lastDoneRec,
         baseKm, nextPrevKm, remainingKm,
-        bucket, bucketLabel, bucketTone, rank,
+        bucket, bucketLabel, bucketTone, rank, overdueDate,
       };
     }).sort((a, b) => a.rank - b.rank || a.remainingKm - b.remainingKm);
-  }, [vehicles, wos, recs, schs, reqs, intervalKm]);
+  }, [vehicles, wos, recs, schs, reqs, intervalKm, today]);
 
   const filtered = states.filter((s) => {
     if (bucketFilter !== "all" && s.bucket !== bucketFilter) return false;
@@ -319,7 +325,7 @@ export default function SituacaoSection() {
                     {s.bucket === "in_maint" ? (
                       <span className="text-xs text-muted-foreground">Aguardando conclusão</span>
                     ) : s.bucket === "overdue" ? (
-                      <span className="text-xs text-destructive">Agendar preventiva agora</span>
+                      <span className="text-xs text-destructive">{s.overdueDate ? "Regularizar agendamento vencido" : "Agendar preventiva agora"}</span>
                     ) : s.bucket === "due_soon" ? (
                       <span className="text-xs text-warning">Agendar preventiva</span>
                     ) : s.nextWO ? (
@@ -465,7 +471,8 @@ function Timeline({ state, workshops }: { state: VehicleState; workshops: Record
       <Step icon={ClipboardList} done={stepDone.wo} active={stepActive.wo}
         label="Ordem de Serviço"
         detail={state.activeWO || state.nextWO ? (() => {
-          const wo = state.activeWO ?? state.nextWO!;
+          const wo = state.activeWO ?? state.nextWO;
+          if (!wo) return null;
           const ws = wo.workshop_id ? workshops[wo.workshop_id] : null;
           return (
             <>

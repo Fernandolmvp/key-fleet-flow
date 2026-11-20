@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { loadDashboardDeadlines } from "@/lib/dashboard-deadlines";
+import { useLocalToday } from "@/hooks/useLocalToday";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
   ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip,
   BarChart, Bar, PieChart, Pie, Cell, Legend
@@ -42,7 +45,7 @@ type Summary = {
   vehicles: { total: number; active: number; maintenance: number; parado: number };
   drivers: { total: number; active: number; cnh_expiring: number };
   trips_running: number;
-  counts: { docs_expiring: number; maint_7d: number; fines_open: number; approvals_pending: number; critical_alerts: number };
+  counts: { docs_expiring: number; maint_7d: number; maint_overdue: number; trips_pending: number; fines_overdue: number; fines_open: number; approvals_pending: number; critical_alerts: number };
   month: {
     total: number; prev_total: number; km: number; prev_km: number;
     km_per_liter: number | null; prev_km_per_liter: number | null;
@@ -68,6 +71,7 @@ const fmtDate = (s: string) => {
 
 export default function Dashboard() {
   const { user, currentCompanyId, companies } = useAuth();
+  const today = useLocalToday();
   const currentCompany = companies.find((c) => c.id === currentCompanyId) ?? null;
   const [guideOverride, setGuideOverride] = useState<"auto" | "show" | "hide">("auto");
   const [isPersistingGuide, setIsPersistingGuide] = useState(false);
@@ -78,19 +82,37 @@ export default function Dashboard() {
   }, [currentCompanyId]);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["dashboard-summary", currentCompanyId],
+    queryKey: ["dashboard-summary", currentCompanyId, today],
     enabled: !!currentCompanyId,
     staleTime: 2 * 60 * 1000,
     refetchOnMount: "always",
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_get_summary", { p_company_id: currentCompanyId! });
+      if (!currentCompanyId) throw new Error("company required");
+      const [{ data, error }, deadlines] = await Promise.all([
+        supabase.rpc("dashboard_get_summary", { p_company_id: currentCompanyId }),
+        loadDashboardDeadlines(currentCompanyId, today),
+      ]);
       if (error) throw error;
       if (!data || (data as any).company_id !== currentCompanyId) {
         throw new Error("company mismatch");
       }
-      return data as unknown as Summary;
+      const summary = data as unknown as Summary;
+      return {
+        ...summary,
+        counts: {
+          ...summary.counts,
+          maint_7d: deadlines.maint_7d,
+          maint_overdue: deadlines.maint_overdue,
+          trips_pending: deadlines.trips_pending,
+          fines_overdue: deadlines.fines_overdue,
+          fines_open: deadlines.fines_open,
+          critical_alerts: summary.counts.critical_alerts - summary.counts.maint_7d + deadlines.maint_7d + deadlines.maint_overdue + deadlines.trips_pending + deadlines.fines_overdue,
+        },
+        alerts: [...deadlines.alerts, ...summary.alerts.filter((a) => !["maintenance", "trip", "fine"].includes(a.kind))],
+      };
     },
   });
+  useAutoRefresh(refetch, ["maintenance_schedules", "maintenance_records", "maintenance_work_orders", "trips", "traffic_fines"], { enabled: !!currentCompanyId });
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -400,9 +422,17 @@ function FullDashboard({
       icon: Wrench, tone: "warning" as const, count: counts.maint_7d,
       title: "manutenção(ões) nos próximos 7 dias", subtitle: "Programar serviço", to: "/app/maintenance",
     },
+    counts.maint_overdue > 0 && {
+      icon: Wrench, tone: "destructive" as const, count: counts.maint_overdue,
+      title: "manutenção(ões) vencida(s)", subtitle: "Regularizar agendamentos", to: "/app/maintenance",
+    },
+    counts.trips_pending > 0 && {
+      icon: Receipt, tone: "warning" as const, count: counts.trips_pending,
+      title: "viagem(ns) com acerto pendente", subtitle: "Conferir despesas e finalizar", to: "/app/viagens",
+    },
     counts.fines_open > 0 && {
       icon: AlertTriangle, tone: "destructive" as const, count: counts.fines_open,
-      title: "multa(s) em aberto", subtitle: "Requer providência", to: "/app/multas",
+      title: "multa(s) em aberto", subtitle: counts.fines_overdue > 0 ? `${counts.fines_overdue} vencida(s)` : "Requer providência", to: "/app/multas",
     },
     counts.approvals_pending > 0 && {
       icon: ClipboardCheck, tone: "primary" as const, count: counts.approvals_pending,
@@ -614,7 +644,7 @@ function FullDashboard({
               const toneCls = c.tone === "destructive" ? "text-destructive" :
                               c.tone === "warning" ? "text-warning" : "text-primary";
               return (
-                <Link key={c.to} to={c.to} className="surface-card rounded-xl p-5 hover:border-primary/40 transition-colors block">
+                <Link key={c.title} to={c.to} className="surface-card rounded-xl p-5 hover:border-primary/40 transition-colors block">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className={cn("font-display text-3xl font-bold", toneCls)}>{c.count}</p>
@@ -629,6 +659,26 @@ function FullDashboard({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {alerts.length > 0 && (
+        <div>
+          <h3 className="font-display font-semibold mb-3">Alertas</h3>
+          <ul className="divide-y divide-border/60">
+            {alerts.map((alert, i) => (
+              <li key={`${alert.kind}-${i}`}>
+                <Link to={alert.link} className="flex items-center gap-3 py-2.5 min-h-[44px] hover:opacity-90">
+                  <AlertTriangle className={cn("h-4 w-4 shrink-0", alert.severity === "high" ? "text-destructive" : "text-warning")} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{alert.title}</p>
+                    <p className="text-xs text-muted-foreground">{alert.subtitle} · {fmtDate(alert.date)}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
