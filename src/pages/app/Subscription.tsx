@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
-import { manualPaymentLabel, subscriptionBillingMode, type SubscriptionBilling } from "@/lib/subscription-billing";
+import { displayedPlan, displayedSubscriptionStatus, manualPaymentLabel, subscriptionBillingMode, type SubscriptionBilling } from "@/lib/subscription-billing";
 
 const fmtBRL = (v: number | null | undefined) =>
   v == null ? "a combinar" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -23,6 +23,7 @@ const statusTone: Record<string, string> = {
   ativa: "bg-success/20 text-success border-success/30",
   trial: "bg-primary/20 text-primary border-primary/30",
   aguardando_pagamento: "bg-warning/20 text-warning border-warning/30",
+  pagamento_pendente: "bg-warning/20 text-warning border-warning/30",
   atrasada: "bg-destructive/20 text-destructive border-destructive/30",
   suspensa: "bg-destructive/30 text-destructive border-destructive/40",
   cancelada: "bg-muted text-muted-foreground",
@@ -30,7 +31,7 @@ const statusTone: Record<string, string> = {
 };
 const statusLabel: Record<string, string> = {
   ativa: "Ativa", trial: "Trial 21 dias", aguardando_pagamento: "Aguardando pagamento",
-  atrasada: "Atrasada", suspensa: "Suspensa", cancelada: "Cancelada", expirada: "Trial expirado",
+  pagamento_pendente: "Pagamento pendente", atrasada: "Atrasada", suspensa: "Suspensa", cancelada: "Cancelada", expirada: "Trial expirado",
 };
 
 export default function Subscription() {
@@ -146,7 +147,9 @@ export default function Subscription() {
 
   const limit = data.vehicle_limit;
   const usagePct = limit ? Math.min(100, Math.round((data.vehicles_used / limit) * 100)) : 0;
-  const overdue = new Date(data.current_period_end) < new Date() && data.subscription_status !== "cancelada";
+  const shownStatus = displayedSubscriptionStatus(data.subscription_status, data.current_period_end);
+  const overdue = shownStatus.statusKey === "pagamento_pendente" && data.subscription_status !== "aguardando_pagamento";
+  const shownPlan = displayedPlan(data.plan_id, plans, data.plan_name);
   const hasStripeCustomer = !!data.stripe_customer_id || data.subscription_status === "ativa" || data.subscription_status === "atrasada";
   const billingMode = subscriptionBillingMode(billingSubscription);
   const lastPayment = payments.find((payment) => payment.subscription_id === data.subscription_id);
@@ -191,14 +194,14 @@ export default function Subscription() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Plano atual</div>
-            <div className="font-display text-2xl font-bold mt-1">{data.plan_name}</div>
+            <div className="font-display text-2xl font-bold mt-1">{shownPlan.name}</div>
             <div className="text-sm text-muted-foreground mt-1">
-              {fmtBRL(data.monthly_amount)} / mês
+              {shownPlan.priceLabel ?? "—"}
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Badge className={`border ${statusTone[data.subscription_status] ?? ""}`}>
-              {statusLabel[data.subscription_status] ?? data.subscription_status}
+            <Badge className={`border ${statusTone[shownStatus.statusKey] ?? ""}`}>
+              {statusLabel[shownStatus.statusKey] ?? shownStatus.statusKey}
             </Badge>
             {hasStripeCustomer && (
               <Button size="sm" variant="outline" onClick={handleManageCard} disabled={portalLoading}>
@@ -229,7 +232,7 @@ export default function Subscription() {
           </div>
         </div>
 
-        {(data.subscription_status === "aguardando_pagamento" || overdue || data.subscription_status === "suspensa") && (
+        {shownStatus.pending && (
           <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
