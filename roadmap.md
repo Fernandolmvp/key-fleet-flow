@@ -1,4 +1,6 @@
 # Status automáticos na leitura
+- [x] Paginar Documentação em 25 veículos com busca por placa, deduplicar CRLV e aplicar calendário da UF com SP como padrão.
+- [x] Testar paginação, deduplicação e UF: 16 testes aprovados; sem alterar dados ou publicar. Conferência autenticada aguarda login.
 - [x] Validar placa antiga/Mercosul e avisar placas parecidas; motorista obrigatório no abastecimento; aviso de razão social no motorista.
 - [x] Testar validações: 31 testes aprovados e prévia sem erros; validações de gravação instaladas sem modificar registros existentes ou publicar.
 - [x] Criar /app/alerts com alertas calculados, filtro por tipo e links de origem; retirar SOON.

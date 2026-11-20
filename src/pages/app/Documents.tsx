@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Plus, FileText, AlertTriangle, Search, Pencil, Trash2, ExternalLink,
-  ShieldAlert, Truck, User, Paperclip, FileWarning, CheckCircle2, ShieldCheck,
+  ShieldAlert, Truck, User, Paperclip, FileWarning, CheckCircle2, ShieldCheck, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import DocumentDialog, { DocFormDoc } from "@/components/dashboard/DocumentDialog";
 import {
@@ -17,13 +17,15 @@ import {
   documentationCnhExpiry,
 } from "@/lib/documents";
 import {
-  loadDetranCalendar, computeLicensingStatus, type DetranCalendar,
+  useDetranCalendar, computeLicensingStatus, type DetranCalendar,
   licensingBadgeClass, licensingTooltip,
 } from "@/lib/licensing";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useTabPermissions } from "@/lib/permissions";
 import { openStoredFile } from "@/lib/storage-url";
+import { currentVehicleDocuments, documentationVehiclePage } from "@/lib/documentation-list";
+import { readAll } from "@/lib/dashboard-deadlines";
 
 type DocRow = {
   id: string;
@@ -39,6 +41,7 @@ type DocRow = {
   file_url: string | null;
   validation_warning: string | null;
   ai_extracted: any;
+  created_at?: string;
 };
 
 type Vehicle = { id: string; plate: string; brand: string; model: string; year_model: number | null; licensing_year: number | null; licensing_uf: string | null; vehicle_type: string | null };
@@ -55,9 +58,7 @@ export default function Documents() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DocFormDoc | null>(null);
   const [prefill, setPrefill] = useState<Partial<DocFormDoc> | null>(null);
-  const [calendar, setCalendar] = useState<DetranCalendar>(() => new Map());
-
-  useEffect(() => { loadDetranCalendar().then(setCalendar); }, []);
+  const calendar = useDetranCalendar();
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
@@ -101,16 +102,20 @@ export default function Documents() {
   async function load() {
     if (!currentCompanyId) return;
     setLoading(true);
-    const [d, v, dr] = await Promise.all([
-      supabase.from("documents").select("*").eq("company_id", currentCompanyId).order("expires_at", { ascending: true, nullsFirst: false }),
-      supabase.from("vehicles").select("id,plate,brand,model,year_model,licensing_year,licensing_uf,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
-      supabase.from("drivers").select("id,full_name,cpf,cnh_number,cnh_expires_at,medical_exam_expires_at").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
-    ]);
-    if (d.error) toast.error(d.error.message);
-    setDocs((d.data as any[]) || []);
-    setVehicles((v.data as any[]) || []);
-    setDrivers((dr.data as any[]) || []);
-    setLoading(false);
+    try {
+      const [d, v, dr] = await Promise.all([
+        readAll((from, to) => supabase.from("documents").select("*").eq("company_id", currentCompanyId).order("expires_at", { ascending: true, nullsFirst: false }).order("id").range(from, to)),
+        readAll((from, to) => supabase.from("vehicles").select("id,plate,brand,model,year_model,licensing_year,licensing_uf,vehicle_type").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate").order("id").range(from, to)),
+        supabase.from("drivers").select("id,full_name,cpf,cnh_number,cnh_expires_at,medical_exam_expires_at").eq("company_id", currentCompanyId).eq("status", "ativo").order("full_name"),
+      ]);
+      setDocs(d as DocRow[]);
+      setVehicles(v);
+      setDrivers(dr.data || []);
+    } catch {
+      toast.error("Não foi possível carregar a documentação. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, [currentCompanyId]);
@@ -158,7 +163,7 @@ export default function Documents() {
 
       <div className="relative max-w-md">
         <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input className="pl-9" aria-label={tab === "vehicles" ? "Buscar por placa" : "Buscar motorista"} placeholder={tab === "vehicles" ? "Buscar por placa..." : "Buscar motorista..."} value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
@@ -187,6 +192,7 @@ export default function Documents() {
 
         <TabsContent value="vehicles" className="mt-4">
           <VehiclesTab
+            key={currentCompanyId}
             vehicles={vehicles}
             docs={docs.filter((x) => x.entity_type === "vehicle")}
             search={search}
@@ -238,11 +244,9 @@ function VehiclesTab({
   onEdit: (d: DocRow) => void;
   onDelete: (id: string) => void;
 }) {
-  const filtered = useMemo(() => vehicles.filter((v) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return [v.plate, v.brand, v.model].join(" ").toLowerCase().includes(q);
-  }), [vehicles, search]);
+  const [requestedPage, setRequestedPage] = useState(1);
+  useEffect(() => { setRequestedPage(1); }, [search]);
+  const pagination = useMemo(() => documentationVehiclePage(vehicles, search, requestedPage), [vehicles, search, requestedPage]);
 
   // KPIs
   const stats = useMemo(() => {
@@ -302,11 +306,11 @@ function VehiclesTab({
             </thead>
             <tbody>
               {loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Carregando…</td></tr>}
-              {!loading && filtered.length === 0 && (
+              {!loading && pagination.total === 0 && (
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Nenhum veículo cadastrado.</td></tr>
               )}
-              {filtered.map((v) => {
-                const vDocs = docs.filter((d) => d.entity_id === v.id);
+              {!loading && pagination.rows.map((v) => {
+                const vDocs = currentVehicleDocuments(docs.filter((d) => d.entity_id === v.id));
                 const crlv = vDocs.find((d) => d.doc_type === "crlv");
                 const lic = computeLicensingStatus({
                   licensing_year: v.licensing_year, plate: v.plate, uf: v.licensing_uf,
@@ -343,7 +347,7 @@ function VehiclesTab({
                         {licLabel}
                       </span>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {monthIdx && licYear ? `Prazo: ${MONTH_LABEL_PT[monthIdx]}/${licYear}` : v.licensing_year ? "—" : "Sem exercício informado"}
+                        {monthIdx && licYear ? `Prazo: ${MONTH_LABEL_PT[monthIdx]}/${licYear} · ${lic.uf}` : v.licensing_year ? `Calendário indisponível para ${lic.uf}` : "Sem exercício informado"}
                         {!crlv && lic.status !== "sem" && (
                           <span className="block text-amber-400">Baseado no calendário (sem CRLV anexado).</span>
                         )}
@@ -377,6 +381,16 @@ function VehiclesTab({
           </table>
         </div>
       </Card>
+      {!loading && (
+        <nav aria-label="Paginação de veículos" className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>{pagination.total === 0 ? "0 veículos" : `${pagination.start + 1}–${pagination.start + pagination.rows.length} de ${pagination.total} veículos`}</span>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="icon" aria-label="Página anterior" disabled={pagination.page === 1} onClick={() => setRequestedPage(pagination.page - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+            <span aria-live="polite">Página {pagination.page} de {pagination.pageCount}</span>
+            <Button variant="outline" size="icon" aria-label="Próxima página" disabled={pagination.page === pagination.pageCount} onClick={() => setRequestedPage(pagination.page + 1)}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

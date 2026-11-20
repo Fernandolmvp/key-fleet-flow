@@ -58,9 +58,10 @@ export async function loadDetranCalendar(force = false): Promise<DetranCalendar>
         const uf = String(row.estado).toUpperCase();
         const cat = ((row.categoria as string) || "leve").toLowerCase() as VehicleCategory;
         if (!map.has(uf)) map.set(uf, new Map());
-        const ufMap = map.get(uf)!;
+        const ufMap = map.get(uf);
+        if (!ufMap) continue;
         if (!ufMap.has(cat)) ufMap.set(cat, new Map());
-        ufMap.get(cat)!.set(Number(row.final_placa), Number(row.mes_vencimento));
+        ufMap.get(cat)?.set(Number(row.final_placa), Number(row.mes_vencimento));
       }
     }
     if (error || map.size === 0) {
@@ -132,8 +133,8 @@ export function computeLicensingStatus(opts: {
   vehicle_type?: string | null;
   category?: VehicleCategory;
 }): LicensingResult {
-  const uf = (opts.uf || DEFAULT_UF).toUpperCase();
-  const today = opts.today ?? new Date();
+  const uf = opts.uf?.trim().toUpperCase() || DEFAULT_UF;
+  const today = new Date(opts.today ?? new Date());
   today.setHours(0, 0, 0, 0);
 
   if (!opts.licensing_year) {
@@ -145,7 +146,7 @@ export function computeLicensingStatus(opts: {
   }
   const cat: VehicleCategory =
     opts.category ?? vehicleCategoryFromType(opts.vehicle_type);
-  const ufMap = opts.calendar.get(uf) ?? opts.calendar.get(DEFAULT_UF);
+  const ufMap = opts.calendar.get(uf);
   // Tenta categoria pedida; se não houver, cai para "leve" do banco.
   let mes: number | undefined =
     ufMap?.get(cat)?.get(final) ?? ufMap?.get("leve")?.get(final);
