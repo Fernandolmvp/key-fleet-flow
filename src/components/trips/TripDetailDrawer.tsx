@@ -7,6 +7,8 @@ import { TRIP_STATUS, EXPENSE_CATEGORIES, PAYMENT_METHODS, formatBRL, labelOf, p
 import AdvanceDialog from "./AdvanceDialog";
 import { Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { tripDisplayStatus } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
 
 export default function TripDetailDrawer({
   trip, drivers, vehicles, onClose, onChanged,
@@ -14,6 +16,7 @@ export default function TripDetailDrawer({
   const [expenses, setExpenses] = useState<any[]>([]);
   const [advances, setAdvances] = useState<any[]>([]);
   const [advOpen, setAdvOpen] = useState(false);
+  const today = useLocalToday();
 
   const load = async () => {
     const [exp, adv] = await Promise.all([
@@ -25,7 +28,7 @@ export default function TripDetailDrawer({
   };
   useEffect(() => { load(); }, [trip.id]);
 
-  const status = TRIP_STATUS.find((s) => s.value === trip.status);
+  const status = TRIP_STATUS.find((s) => s.value === tripDisplayStatus(trip, today));
   const driver = drivers.find((d) => d.id === trip.driver_id);
   const vehicle = vehicles.find((v) => v.id === trip.vehicle_id);
 

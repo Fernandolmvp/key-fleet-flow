@@ -15,9 +15,13 @@ import FinesReports from "@/components/fines/FinesReports";
 import {
   FINE_STATUS_LABEL, daysUntil, fmtBRL, type TrafficFine, type FineStatus,
 } from "@/lib/fines";
+import { fineDisplayStatus, isFineOpen } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 export default function Multas() {
   const { currentCompanyId } = useAuth();
+  const today = useLocalToday();
   const [fines, setFines] = useState<TrafficFine[]>([]);
   const [vehicles, setVehicles] = useState<Record<string, any>>({});
   const [drivers, setDrivers] = useState<Record<string, any>>({});
@@ -46,10 +50,11 @@ export default function Multas() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentCompanyId]);
+  useAutoRefresh(load, ["traffic_fines"]);
 
   const filtered = useMemo(() => fines.filter(f => {
     if (filterType !== "all" && f.record_type !== filterType) return false;
-    if (filterStatus !== "all" && f.status !== filterStatus) return false;
+    if (filterStatus !== "all" && fineDisplayStatus(f, today) !== filterStatus) return false;
     if (filterVehicle !== "all" && f.vehicle_id !== filterVehicle) return false;
     if (filterDriver !== "all" && f.driver_id !== filterDriver) return false;
     if (search) {
@@ -58,16 +63,16 @@ export default function Multas() {
       if (!haystack.includes(search.toLowerCase())) return false;
     }
     return true;
-  }), [fines, filterType, filterStatus, filterVehicle, filterDriver, search, vehicles]);
+  }), [fines, filterType, filterStatus, filterVehicle, filterDriver, search, vehicles, today]);
 
   const kpis = useMemo(() => {
     const avisosPend = fines.filter(f => f.record_type === "aviso" && f.status === "aviso_recebido").length;
-    const aVencer = fines.filter(f => f.record_type === "multa" && !f.paid_at && f.due_date && (daysUntil(f.due_date) ?? 999) <= 7 && (daysUntil(f.due_date) ?? -1) >= 0).length;
+    const aVencer = fines.filter(f => f.record_type === "multa" && isFineOpen(f) && f.due_date && (daysUntil(f.due_date) ?? 999) <= 7 && (daysUntil(f.due_date) ?? -1) >= 0).length;
     const emRecurso = fines.filter(f => f.status === "em_recurso").length;
-    const totalPendente = fines.filter(f => !f.paid_at && f.record_type === "multa" && !["recurso_deferido","arquivada","cancelada"].includes(f.status)).reduce((s, f) => s + Number(f.discount_amount ?? f.amount ?? 0), 0);
-    const pontosRisco = fines.filter(f => !f.paid_at && f.record_type === "multa" && !["recurso_deferido","arquivada","cancelada"].includes(f.status)).reduce((s, f) => s + (f.license_points || 0), 0);
+    const totalPendente = fines.filter(f => isFineOpen(f) && f.record_type === "multa").reduce((s, f) => s + Number(f.discount_amount ?? f.amount ?? 0), 0);
+    const pontosRisco = fines.filter(f => isFineOpen(f) && f.record_type === "multa").reduce((s, f) => s + (f.license_points || 0), 0);
     return { avisosPend, aVencer, emRecurso, totalPendente, pontosRisco };
-  }, [fines]);
+  }, [fines, today]);
 
   const vehicleList = Object.values(vehicles) as any[];
   const driverList = Object.values(drivers) as any[];

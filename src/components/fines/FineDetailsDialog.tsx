@@ -10,6 +10,8 @@ import {
 } from "@/lib/fines";
 import FineFormDialog from "./FineFormDialog";
 import { ConvertAvisoDialog, IndicateDriverDialog, RecourseDialog, PaymentDialog } from "./FineActionDialogs";
+import { fineDisplayStatus } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
 
 type Props = {
   open: boolean; onClose: () => void;
@@ -40,6 +42,7 @@ export default function FineDetailsDialog({ open, onClose, fine, companyId, vehi
   const [indicating, setIndicating] = useState(false);
   const [recourseOpen, setRecourseOpen] = useState<null | "open" | "result">(null);
   const [paying, setPaying] = useState(false);
+  const status = fineDisplayStatus(fine, useLocalToday());
 
   const isAviso = fine.record_type === "aviso";
   const fineTypeLabel = FINE_TYPES.find(t => t.value === fine.fine_type)?.label ?? fine.fine_type;
@@ -56,8 +59,8 @@ export default function FineDetailsDialog({ open, onClose, fine, companyId, vehi
             <DialogTitle className="flex items-center gap-2 flex-wrap">
               {isAviso ? <Mail className="h-5 w-5 text-info" /> : <AlertOctagon className="h-5 w-5 text-warning" />}
               {isAviso ? "Aviso de Infração" : "Multa de Trânsito"}
-              <Badge variant="outline" className={FINE_STATUS_TONE[fine.status]}>
-                {FINE_STATUS_LABEL[fine.status]}
+              <Badge variant="outline" className={FINE_STATUS_TONE[status]}>
+                {FINE_STATUS_LABEL[status]}
               </Badge>
               {fine.notification_number && <span className="text-sm font-mono text-muted-foreground">AIT {fine.notification_number}</span>}
             </DialogTitle>

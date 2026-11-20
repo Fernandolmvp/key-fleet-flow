@@ -20,6 +20,8 @@ import { EXEC_STATUS } from "@/lib/work-orders";
 import { MR_STATUS } from "@/lib/maintenance-requests";
 import { STATUS_TONE, fmtBRL } from "@/lib/maintenance";
 import { ALERT_THRESHOLD_KM, DEFAULT_INTERVAL_KM } from "@/lib/checklist";
+import { isMaintenanceClosed, isMaintenanceOverdue } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
 
 const IN_PROGRESS_EXEC = new Set([
   "em_execucao", "em_andamento", "iniciado", "iniciada", "aguardando_pecas",
@@ -81,6 +83,7 @@ type VehicleState = {
   bucketLabel: string;
   bucketTone: string;
   rank: number;
+  overdueDate: boolean;
 };
 
 const isDoneStr = (s?: string | null) =>
@@ -90,6 +93,7 @@ const isDoneStr = (s?: string | null) =>
 
 export default function SituacaoSection() {
   const { currentCompanyId } = useAuth();
+  const today = useLocalToday();
   const [vehicles, setVehicles] = useState<SitVehicle[]>([]);
   const [wos, setWos] = useState<WO[]>([]);
   const [recs, setRecs] = useState<Rec[]>([]);
@@ -150,11 +154,10 @@ export default function SituacaoSection() {
   ]);
 
   const states: VehicleState[] = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
     return vehicles.map((v) => {
       const vWos = wos.filter((x) => x.vehicle_id === v.id);
       const vRecs = recs.filter((x) => x.vehicle_id === v.id);
-      const vSchs = schs.filter((x) => x.vehicle_id === v.id);
+      const vSchs = schs.filter((x) => x.vehicle_id === v.id && !isMaintenanceClosed(x.status));
       const vReqs = reqs.filter((x) => x.vehicle_id === v.id);
 
       const activeWO = vWos.find((x) => IN_PROGRESS_EXEC.has(String(x.execution_status).toLowerCase()));

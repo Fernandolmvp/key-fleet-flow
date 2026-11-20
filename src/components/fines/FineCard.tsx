@@ -5,6 +5,8 @@ import {
   FINE_STATUS_LABEL, FINE_STATUS_TONE, FINE_TYPES,
   fmtBRL, fmtDate, daysUntil, type TrafficFine,
 } from "@/lib/fines";
+import { fineDisplayStatus, isFineOpen } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
 
 type Props = {
   fine: TrafficFine;
@@ -14,6 +16,7 @@ type Props = {
 };
 
 export default function FineCard({ fine, vehicle, driver, onOpen }: Props) {
+  const status = fineDisplayStatus(fine, useLocalToday());
   const isAviso = fine.record_type === "aviso";
   const fineTypeLabel = FINE_TYPES.find(t => t.value === fine.fine_type)?.label ?? fine.fine_type ?? "—";
   const dueDays = daysUntil(fine.due_date);
@@ -38,8 +41,8 @@ export default function FineCard({ fine, vehicle, driver, onOpen }: Props) {
               <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 {isAviso ? "AVISO" : "MULTA"}
               </span>
-              <Badge variant="outline" className={FINE_STATUS_TONE[fine.status]}>
-                {FINE_STATUS_LABEL[fine.status]}
+              <Badge variant="outline" className={FINE_STATUS_TONE[status]}>
+                {FINE_STATUS_LABEL[status]}
               </Badge>
               {fine.notification_number && (
                 <span className="text-xs text-muted-foreground font-mono">AIT {fine.notification_number}</span>
@@ -72,7 +75,7 @@ export default function FineCard({ fine, vehicle, driver, onOpen }: Props) {
       </div>
 
       <div className="flex flex-wrap gap-2 mt-3">
-        {!isAviso && dueDays != null && fine.paid_at == null && (
+        {!isAviso && dueDays != null && isFineOpen(fine) && (
           <Badge variant="outline" className={dueDays < 0 ? "bg-destructive/15 text-destructive border-destructive/30" : dueDays <= 7 ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-muted text-muted-foreground"}>
             <Clock className="h-3 w-3 mr-1" />
             {dueDays < 0 ? `Vencida há ${Math.abs(dueDays)}d` : `Vence em ${dueDays}d`}

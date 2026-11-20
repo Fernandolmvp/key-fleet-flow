@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { useTabPermissions } from "@/lib/permissions";
 import AgendaSection from "./maintenance/AgendaSection";
 import SituacaoSection from "./maintenance/SituacaoSection";
+import { isMaintenanceClosed, isMaintenanceOverdue, overdueMaintenanceVehicles, type MaintenanceDeadline } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
 
 interface MRec {
   id: string; vehicle_id: string; type: string; status: string; category: string | null;
@@ -36,6 +38,8 @@ export default function Maintenance() {
   const { currentCompanyId } = useAuth();
   const [records, setRecords] = useState<MRec[]>([]);
   const [schedules, setSchedules] = useState<Sched[]>([]);
+  const [workOrderDeadlines, setWorkOrderDeadlines] = useState<MaintenanceDeadline[]>([]);
+  const today = useLocalToday();
   const [vehicles, setVehicles] = useState<Record<string, { plate: string; current_km: number }>>({});
   const [lastFuelKm, setLastFuelKm] = useState<Record<string, { km: number; at: string }>>({});
   const [q, setQ] = useState("");
@@ -83,11 +87,12 @@ export default function Maintenance() {
   const load = async () => {
     if (!currentCompanyId) return;
     setLoading(true);
-    const [{ data: r }, { data: s }, { data: v }, { data: f }] = await Promise.all([
+    const [{ data: r }, { data: s }, { data: v }, { data: f }, { data: w }] = await Promise.all([
       supabase.from("maintenance_records").select("*").eq("company_id", currentCompanyId).order("service_at", { ascending: false }),
       supabase.from("maintenance_schedules").select("*").eq("company_id", currentCompanyId).neq("status", "concluida"),
-      supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId).eq("status", "ativo"),
+      supabase.from("vehicles").select("id,plate,current_km").eq("company_id", currentCompanyId).not("status", "in", "(vendido,inativo,leiloado,roubado_furtado,transferido)"),
       supabase.from("fuel_records").select("vehicle_id,km_at_fueling,fueled_at").eq("company_id", currentCompanyId).order("fueled_at", { ascending: false }),
+      supabase.from("maintenance_work_orders").select("vehicle_id,execution_status,scheduled_date").eq("company_id", currentCompanyId),
     ]);
     const map: Record<string, any> = {};
     (v ?? []).forEach((x: any) => { map[x.id] = { plate: x.plate, current_km: x.current_km }; });
@@ -95,23 +100,9 @@ export default function Maintenance() {
     setRecords(((r ?? []) as MRec[]).filter((x) => map[x.vehicle_id]));
     const sList = ((s ?? []) as Sched[]).filter((x) => map[x.vehicle_id]);
     setSchedules(sList);
-    // Reconcile: close open preventive schedules when a completed preventive record fulfills them
-    try {
-      const prevRecs = ((r ?? []) as MRec[]).filter((x) => x.type === "preventiva" && x.status === "concluida");
-      const toClose: string[] = [];
-      sList.filter((sc) => sc.type === "preventiva").forEach((sc) => {
-        const match = prevRecs.find((rec) => {
-          if (rec.vehicle_id !== sc.vehicle_id) return false;
-          if (sc.target_km != null && rec.km_at_service != null && rec.km_at_service >= sc.target_km) return true;
-          if (sc.target_date && rec.service_at && new Date(rec.service_at) >= new Date(sc.target_date)) return true;
-          return false;
-        });
-        if (match) toClose.push(sc.id);
-      });
-      if (toClose.length) {
-        await supabase.from("maintenance_schedules").update({ status: "concluida" } as any).in("id", toClose);
-      }
-    } catch {/* noop */}
+    setWorkOrderDeadlines((w ?? []).filter((x) => map[x.vehicle_id]).map((x) => ({
+      vehicle_id: x.vehicle_id, status: x.execution_status, date: x.scheduled_date,
+    })));
     const fuelMap: Record<string, { km: number; at: string }> = {};
     (f ?? []).forEach((row: any) => {
       if (!fuelMap[row.vehicle_id]) fuelMap[row.vehicle_id] = { km: row.km_at_fueling, at: row.fueled_at };
@@ -133,20 +124,21 @@ export default function Maintenance() {
 
   // Compute schedule status dynamically
   const enrichedSchedules = useMemo(() => {
-    const today = new Date();
     return schedules.map((s) => {
       const veh = vehicles[s.vehicle_id];
       let status: string = s.status;
       let progress = "";
       const remainingKm = s.target_km != null && veh ? s.target_km - veh.current_km : null;
-      const remainingDays = s.target_date ? Math.floor((new Date(s.target_date).getTime() - today.getTime()) / 86400000) : null;
-      if ((remainingKm !== null && remainingKm < 0) || (remainingDays !== null && remainingDays < 0)) status = "vencida";
-      else if ((remainingKm !== null && remainingKm <= 1000) || (remainingDays !== null && remainingDays <= 15)) status = "proxima";
+      const remainingDays = s.target_date ? Math.round((new Date(s.target_date.slice(0, 10) + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000) : null;
+      if (!isMaintenanceClosed(s.status)) {
+        if ((remainingKm !== null && remainingKm < 0) || isMaintenanceOverdue(s.status, s.target_date, today)) status = "vencida";
+        else if ((remainingKm !== null && remainingKm <= 1000) || (remainingDays !== null && remainingDays <= 15)) status = "proxima";
+      }
       if (remainingKm !== null) progress = `${remainingKm.toLocaleString("pt-BR")} km`;
       else if (remainingDays !== null) progress = `${remainingDays} dia(s)`;
       return { ...s, status, progress };
     });
-  }, [schedules, vehicles]);
+  }, [schedules, vehicles, today]);
 
   const overdue = enrichedSchedules.filter((s) => s.status === "vencida").length;
   const upcoming = enrichedSchedules.filter((s) => s.status === "proxima").length;
@@ -203,9 +195,19 @@ export default function Maintenance() {
   // Vehicles with an open preventive schedule already
   const hasOpenPreventive = useMemo(() => {
     const set = new Set<string>();
-    schedules.forEach((s) => { if (s.type === "preventiva" && s.status !== "concluida") set.add(s.vehicle_id); });
+    schedules.forEach((s) => { if (s.type === "preventiva" && !isMaintenanceClosed(s.status)) set.add(s.vehicle_id); });
+    records.forEach((r) => { if (r.type === "preventiva" && r.status === "agendada") set.add(r.vehicle_id); });
     return set;
-  }, [schedules]);
+  }, [schedules, records]);
+  const overdueVehicleIds = useMemo(() => {
+    const ids = overdueMaintenanceVehicles([
+      ...schedules.map((s) => ({ vehicle_id: s.vehicle_id, status: s.status, date: s.target_date })),
+      ...records.map((r) => ({ vehicle_id: r.vehicle_id, status: r.status, date: r.service_at })),
+      ...workOrderDeadlines,
+    ], today);
+    calendar.forEach((c) => { if (c.label === "Vencida" && !hasOpenPreventive.has(c.id)) ids.add(c.id); });
+    return ids;
+  }, [schedules, records, workOrderDeadlines, calendar, hasOpenPreventive, today]);
   const toDoNow = filteredCalendar.filter((c) => (c.label === "Fazer agora" || c.label === "Vencida") && !hasOpenPreventive.has(c.id));
 
   // Urgent pendencies for the Agenda tab (unscheduled near/over due preventives)
@@ -238,7 +240,7 @@ export default function Maintenance() {
         <KpiCard label="Gasto total" value={fmtBRL(totalSpent)} icon={DollarSign} tone="primary" />
         <KpiCard label="Últimos 30 dias" value={fmtBRL(last30)} icon={Activity} tone="success" />
         <KpiCard label="Validar urgente" value={String(urgentPendencies.length)} icon={BellRing} tone="warning" hint="sem agendamento aberto" />
-        <KpiCard label="Vencidas" value={String(calendar.filter((c)=>c.label==="Vencida" && !hasOpenPreventive.has(c.id)).length)} icon={AlertTriangle} tone="destructive" />
+        <KpiCard label="Vencidas" value={String(overdueVehicleIds.size)} icon={AlertTriangle} tone="destructive" />
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

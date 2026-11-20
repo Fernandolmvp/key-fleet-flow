@@ -9,9 +9,13 @@ import { TRIP_STATUS, TRIP_TYPES, formatBRL, labelOf } from "@/lib/trips";
 import TripDialog from "@/components/trips/TripDialog";
 import TripDetailDrawer from "@/components/trips/TripDetailDrawer";
 import { toast } from "sonner";
+import { tripDisplayStatus } from "@/lib/automatic-status";
+import { useLocalToday } from "@/hooks/useLocalToday";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 export default function Viagens() {
   const { currentCompanyId } = useAuth();
+  const today = useLocalToday();
   const [items, setItems] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
@@ -38,12 +42,13 @@ export default function Viagens() {
   };
 
   useEffect(() => { load(); }, [currentCompanyId]);
+  useAutoRefresh(load, ["trips"]);
 
   const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d.full_name])), [drivers]);
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, `${v.plate}${v.model ? " · " + v.model : ""}`])), [vehicles]);
 
   const filtered = items.filter((t) => {
-    if (statusF !== "all" && t.status !== statusF) return false;
+    if (statusF !== "all" && tripDisplayStatus(t, today) !== statusF) return false;
     if (driverF !== "all" && t.driver_id !== driverF) return false;
     if (q) {
       const hay = `${t.trip_code ?? ""} ${t.title ?? ""} ${t.destination_city ?? ""} ${t.destination_state ?? ""}`.toLowerCase();
@@ -53,11 +58,11 @@ export default function Viagens() {
   });
 
   const kpis = useMemo(() => {
-    const inProgress = items.filter((t) => t.status === "em_andamento").length;
-    const pending = items.filter((t) => ["aguardando_acerto", "acerto_pendente"].includes(t.status)).length;
+    const inProgress = items.filter((t) => tripDisplayStatus(t, today) === "em_andamento").length;
+    const pending = items.filter((t) => ["aguardando_acerto", "acerto_pendente"].includes(tripDisplayStatus(t, today))).length;
     const totalSpent = items.reduce((s, t) => s + Number(t.total_spent_cash ?? 0) + Number(t.total_spent_card ?? 0) + Number(t.total_spent_other ?? 0) + Number(t.total_reimbursable ?? 0), 0);
     return { inProgress, pending, totalSpent };
-  }, [items]);
+  }, [items, today]);
 
   return (
     <div className="p-6 space-y-6">
@@ -107,7 +112,7 @@ export default function Viagens() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((t) => {
-            const status = TRIP_STATUS.find((s) => s.value === t.status);
+            const status = TRIP_STATUS.find((s) => s.value === tripDisplayStatus(t, today));
             const totalSpent = Number(t.total_spent_cash ?? 0) + Number(t.total_spent_card ?? 0) + Number(t.total_spent_other ?? 0) + Number(t.total_reimbursable ?? 0);
             const pctBudget = t.budget_total ? Math.round((totalSpent / Number(t.budget_total)) * 100) : null;
             return (
