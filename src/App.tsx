@@ -12,6 +12,7 @@ import Signup from "./pages/auth/Signup";
 import PrimeiroAcesso from "./pages/auth/PrimeiroAcesso";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/app/Dashboard";
+import Alerts from "./pages/app/Alerts";
 import Vehicles from "./pages/app/Vehicles";
 import Drivers from "./pages/app/Drivers";
 import Fuel from "./pages/app/Fuel";
@@ -151,6 +152,7 @@ const App = () => (
               <Route element={<RequireActiveSubscription />}>
                 <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
+              <Route path="alerts" element={<Alerts />} />
               <Route path="vehicles" element={<Vehicles />} />
               <Route path="drivers" element={<Drivers />} />
               <Route path="fuel-stations" element={<FuelStations />} />
