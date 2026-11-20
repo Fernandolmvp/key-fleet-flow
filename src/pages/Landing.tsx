@@ -2,6 +2,7 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import WhatsappFloatingButton from "@/components/WhatsappFloatingButton";
+import { landingHighlights, landingPlans } from "@/lib/landing-plans";
 import {
   Truck,
   Gauge,
@@ -19,6 +20,7 @@ import {
   Receipt,
   AlertTriangle,
   History,
+  Check,
 } from "lucide-react";
 
 const features = [
@@ -32,13 +34,6 @@ const features = [
   { icon: Receipt, title: "Despesas Operacionais", desc: "IPVA, licenciamento, lavagem, pedágio e estacionamento centralizados.", soon: true },
   { icon: AlertTriangle, title: "Gestão Completa de Multas e Avisos", desc: "Cadastro via foto com IA, controle de prazos, indicação de motorista, recursos, alertas e relatórios por motorista e veículo." },
   { icon: History, title: "Histórico Completo do Veículo", desc: "Linha do tempo 360°: manutenções, combustível, sinistros e indicadores.", soon: true },
-];
-
-const metrics = [
-  { v: "−27%", l: "custo por km" },
-  { v: "+41%", l: "disponibilidade da frota" },
-  { v: "100%", l: "rastreabilidade fiscal" },
-  { v: "<2min", l: "para registrar abastecimento" },
 ];
 
 export default function Landing() {
@@ -68,6 +63,7 @@ export default function Landing() {
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#recursos" className="hover:text-foreground transition-colors">Recursos</a>
             <a href="#metricas" className="hover:text-foreground transition-colors">Resultados</a>
+            <a href="#planos" className="hover:text-foreground transition-colors">Planos</a>
           </nav>
           <div className="flex items-center gap-2">
             <Link to="/login">
@@ -117,13 +113,15 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Metrics */}
+      {/* Highlights */}
       <section id="metricas" className="border-y border-border/60 bg-background-elevated/40">
-        <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {metrics.map((m) => (
-            <div key={m.l} className="text-center lg:text-left">
-              <div className="font-display text-4xl lg:text-5xl font-bold text-primary glow-text">{m.v}</div>
-              <div className="text-sm text-muted-foreground mt-1">{m.l}</div>
+        <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {landingHighlights.map((h) => (
+            <div key={h} className="flex items-center gap-3 lg:justify-start justify-center">
+              <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/15 grid place-items-center text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+              <span className="font-display text-lg font-semibold leading-snug">{h}</span>
             </div>
           ))}
         </div>
@@ -175,6 +173,66 @@ export default function Landing() {
                 </div>
                 <h3 className="font-display text-xl font-semibold">{s.t}</h3>
                 <p className="text-muted-foreground">{s.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Plans */}
+      <section id="planos" className="border-t border-border/60">
+        <div className="max-w-7xl mx-auto px-6 py-24">
+          <div className="max-w-2xl mb-12">
+            <h2 className="font-display text-4xl font-bold leading-tight">
+              Planos que acompanham <span className="text-primary">o tamanho da sua frota</span>.
+            </h2>
+            <p className="text-muted-foreground mt-4">
+              Todos os planos incluem os módulos operacionais, alertas e relatórios. Fale com a
+              gente e veja a plataforma com os dados da sua operação.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+            {landingPlans.map((p) => (
+              <div
+                key={p.slug}
+                className={`surface-card rounded-2xl p-6 flex flex-col relative ${
+                  p.popular ? "border-primary/50 shadow-glow" : ""
+                }`}
+              >
+                {p.popular && (
+                  <span className="absolute -top-3 left-6 text-[10px] uppercase font-mono tracking-wider text-primary-foreground bg-gradient-primary px-2 py-0.5 rounded-full">
+                    Mais escolhido
+                  </span>
+                )}
+                <h3 className="font-display text-lg font-semibold">{p.name}</h3>
+                <div className="mt-3 flex items-baseline gap-1.5 flex-wrap">
+                  <span className="font-display text-3xl font-bold text-primary glow-text">
+                    {p.priceLabel}
+                  </span>
+                  {p.priceSuffix && (
+                    <span className="text-sm text-muted-foreground">{p.priceSuffix}</span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{p.limitLabel}</p>
+                <p className="text-sm text-muted-foreground mt-4 leading-relaxed">{p.blurb}</p>
+                <ul className="mt-5 space-y-2 text-sm text-muted-foreground flex-1">
+                  {p.highlights.map((h) => (
+                    <li key={h} className="flex items-start gap-2">
+                      <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <span>{h}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link to={p.demoPath} className="mt-6">
+                  <Button
+                    variant={p.popular ? "default" : "outline"}
+                    className={`w-full ${
+                      p.popular ? "bg-gradient-primary text-primary-foreground shadow-glow font-semibold" : ""
+                    }`}
+                  >
+                    Agendar demonstração
+                  </Button>
+                </Link>
               </div>
             ))}
           </div>
