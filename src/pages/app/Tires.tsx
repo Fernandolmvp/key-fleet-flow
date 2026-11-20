@@ -17,6 +17,7 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import TireDialog from "@/components/dashboard/TireDialog";
 import TireMovementDialog from "@/components/dashboard/TireMovementDialog";
 import TireAxleMap from "@/components/dashboard/TireAxleMap";
+import TreadMeasurementTab from "@/components/tires/TreadMeasurementTab";
 import {
   AXLE_LAYOUTS, AxleLayout, STATUS_TONE, KIND_TONE, getLayoutPositions,
   treadHealth, fmtBRL,
@@ -41,7 +42,7 @@ export default function Tires() {
   const [mapVehicleId, setMapVehicleId] = useState<string>("");
   const [tab, setTab] = useState<string>("list");
   const { canViewTab, isVisible, fallback } = useTabPermissions(
-    "tires", ["list", "map", "movements", "alerts"], tab,
+    "tires", ["list", "map", "tread", "movements", "alerts"], tab,
   );
   useEffect(() => {
     if (!isVisible && fallback) setTab(fallback);
@@ -52,7 +53,7 @@ export default function Tires() {
     setLoading(true);
     const [{ data: t }, { data: v }, { data: l }, { data: m }] = await Promise.all([
       supabase.from("tires").select("*").eq("company_id", currentCompanyId).order("created_at", { ascending: false }),
-      supabase.from("vehicles").select("id,plate,brand,model,current_km").eq("company_id", currentCompanyId).order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,current_km,vehicle_type").eq("company_id", currentCompanyId).order("plate"),
       supabase.from("vehicle_axle_layouts").select("*").eq("company_id", currentCompanyId),
       supabase.from("tire_movements").select("*").eq("company_id", currentCompanyId).order("occurred_at", { ascending: false }).limit(200),
     ]);
@@ -178,12 +179,17 @@ export default function Tires() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto justify-start">
           {canViewTab("list") && <TabsTrigger value="list">Pneus</TabsTrigger>}
           {canViewTab("map") && <TabsTrigger value="map">Mapa do veículo</TabsTrigger>}
+          {canViewTab("tread") && <TabsTrigger value="tread">Medição de sulco</TabsTrigger>}
           {canViewTab("movements") && <TabsTrigger value="movements">Movimentações</TabsTrigger>}
           {canViewTab("alerts") && <TabsTrigger value="alerts">Alertas {alerts > 0 && <Badge className="ml-2 bg-destructive/30 text-destructive">{alerts}</Badge>}</TabsTrigger>}
         </TabsList>
+
+        <TabsContent value="tread" className="mt-4">
+          <TreadMeasurementTab tires={tires} vehicles={vehicles} layouts={layouts} onSaved={load} />
+        </TabsContent>
 
         {/* LIST */}
         <TabsContent value="list" className="mt-4 space-y-4">
