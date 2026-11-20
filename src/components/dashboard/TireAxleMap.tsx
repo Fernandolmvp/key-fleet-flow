@@ -1,9 +1,10 @@
 import { CircleDot } from "lucide-react";
+import { tireStatus, TireStatusInput } from "@/lib/tire-status";
 import { cn } from "@/lib/utils";
 
 interface Props {
   positions: string[];
-  installed: Record<string, { id: string; brand: string; size: string; tread?: number | null }>;
+  installed: Record<string, TireStatusInput & { id: string; brand: string; size: string; serial?: string | null; last_pressure_psi?: number | null; target_pressure_psi?: number | null; tread?: number | null }>;
   selected?: string | null;
   onSelect?: (pos: string) => void;
 }
@@ -13,8 +14,12 @@ export default function TireAxleMap({ positions, installed, selected, onSelect }
   // Group by axle prefix (everything except last 2 chars), or by single character group.
   const groups: Record<string, string[]> = {};
   positions.forEach((p) => {
-    const m = p.match(/^([A-Z]?-?\d*[A-Z]*?)([DT])([DEI]{1,2})$/);
-    const key = m ? m[1] || m[2] : p.length <= 3 ? p[0] : p.slice(0, -2);
+    const [unit, code] = p.includes("-") ? p.split("-") : ["", p];
+    const axle = code === "EST" ? "Estepe" : /^\d/.test(code) ? code.match(/^\d+/)![0]
+      : ["DI", "DD", "DE"].includes(code) ? "Dianteiro"
+      : ["TR", "TD", "TE", "TDD", "TDE"].includes(code) ? "Traseiro"
+      : ["TTD", "TTE"].includes(code) ? "Traseiro 2" : code;
+    const key = unit ? `${unit} · ${axle}` : axle;
     (groups[key] ||= []).push(p);
   });
 
@@ -35,6 +40,7 @@ export default function TireAxleMap({ positions, installed, selected, onSelect }
             {pos.map((p) => {
               const tire = installed[p];
               const isSel = selected === p;
+              const status = tire ? tireStatus(tire) : null;
               return (
                 <button
                   key={p}
@@ -43,7 +49,7 @@ export default function TireAxleMap({ positions, installed, selected, onSelect }
                   className={cn(
                     "min-w-[88px] rounded-md border px-2 py-2 text-left transition-all",
                     tire
-                      ? "border-primary/40 bg-primary/10 hover:bg-primary/20"
+                      ? status?.level === "critico" ? "border-destructive/40 bg-destructive/10" : status?.level === "atencao" ? "border-warning/40 bg-warning/10" : "border-success/40 bg-success/10"
                       : "border-dashed border-border bg-muted/20 hover:bg-muted/40",
                     isSel && "ring-2 ring-primary"
                   )}
@@ -53,11 +59,14 @@ export default function TireAxleMap({ positions, installed, selected, onSelect }
                   </div>
                   {tire ? (
                     <div className="mt-1">
-                      <div className="text-[11px] font-medium truncate">{tire.brand}</div>
+                      <div className="text-[11px] font-medium truncate">{tire.serial ?? "Sem serial"}</div>
+                      <div className="text-[10px] text-muted-foreground">{tire.brand}</div>
                       <div className="text-[10px] text-muted-foreground">{tire.size}</div>
-                      {tire.tread != null && (
-                        <div className="text-[10px] font-mono">{tire.tread}mm</div>
-                      )}
+                      <div className="text-[10px] font-mono">Sulco: {tire.tread ?? "—"} mm</div>
+                      <div className="text-[10px] font-mono">Pressão: {tire.last_pressure_psi ?? "—"} PSI</div>
+                      <div className="text-[10px] text-muted-foreground">Alvo: {tire.target_pressure_psi ?? "—"} PSI</div>
+                      <div className="text-[10px]">Medição: {tire.last_measured_at ? new Date(tire.last_measured_at).toLocaleString("pt-BR") : "Nunca"}</div>
+                      {status?.reason && <div className="text-[10px] font-medium">{status.reason}</div>}
                     </div>
                   ) : (
                     <div className="text-[10px] text-muted-foreground mt-1">Vazio</div>

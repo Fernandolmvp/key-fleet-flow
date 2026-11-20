@@ -14,10 +14,16 @@ import { toast } from "sonner";
 import ChecklistTemplateBuilder from "@/components/dashboard/ChecklistTemplateBuilder";
 import ChecklistRunDialog from "@/components/dashboard/ChecklistRunDialog";
 import { RUN_STATUS_LABEL, RUN_STATUS_TONE, currentMonthRef, monthRefLabel } from "@/lib/checklists";
+import { useLocalToday } from "@/hooks/useLocalToday";
+import { CHECKLIST_VEHICLE_LABELS, classifyChecklistRun, checklistConformity, isVehicleRestricted, matchesChecklistVehicleType } from "@/lib/checklist-status";
 import { useTabPermissions } from "@/lib/permissions";
 
 export default function Checklists() {
   const { currentCompanyId } = useAuth();
+  const today = useLocalToday();
+  const [historyVehicleId, setHistoryVehicleId] = useState("todos");
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState<"pendentes" | "historico" | "modelos">("pendentes");
   const [templates, setTemplates] = useState<any[]>([]);
   const [runs, setRuns] = useState<any[]>([]);
@@ -44,20 +50,34 @@ export default function Checklists() {
   }, [isVisible, fallback]);
 
   const load = async () => {
-    if (!currentCompanyId) return;
+    if (!currentCompanyId) {
+      setTemplates([]); setRuns([]); setVehicles([]); setRequests([]); setLoading(false);
+      return;
+    }
     setLoading(true);
-    const [{ data: tpls }, { data: rs }, { data: vs }] = await Promise.all([
-      supabase.from("checklist_templates").select("*").eq("company_id", currentCompanyId).order("created_at", { ascending: false }),
+    setLoadError(false);
+    const [templateResult, runResult, vehicleResult, requestResult] = await Promise.all([
+      supabase.from("checklist_templates").select("*, questions:checklist_questions(is_critical)").eq("company_id", currentCompanyId).order("created_at", { ascending: false }),
       supabase
         .from("checklist_runs")
         .select("*, vehicle:vehicles(plate,brand,model), template:checklist_templates(name,frequency)")
         .eq("company_id", currentCompanyId)
         .order("created_at", { ascending: false }),
-      supabase.from("vehicles").select("id,plate,brand,model").eq("company_id", currentCompanyId).eq("status", "ativo").order("plate"),
+      supabase.from("vehicles").select("id,plate,brand,model,vehicle_type,status").eq("company_id", currentCompanyId).order("plate"),
+      supabase.from("maintenance_requests").select("vehicle_id,checklist_run_id,status").eq("company_id", currentCompanyId).not("checklist_run_id", "is", null),
     ]);
-    setTemplates(tpls ?? []);
-    setRuns(rs ?? []);
-    setVehicles(vs ?? []);
+    if ([templateResult, runResult, vehicleResult, requestResult].some((result) => result.error)) {
+      setLoadError(true);
+      setTemplates([]); setRuns([]); setVehicles([]); setRequests([]);
+      toast.error("Não foi possível carregar os checklists e as restrições. Tente novamente.");
+      setLoading(false);
+      return;
+    }
+    const requestRows = requestResult.data ?? [];
+    setRequests(requestRows);
+    setTemplates(templateResult.data ?? []);
+    setRuns((runResult.data ?? []).map((run) => ({ ...run, restricted: isVehicleRestricted(run.vehicle_id, requestRows) })));
+    setVehicles(vehicleResult.data ?? []);
     setLoading(false);
   };
 
@@ -66,6 +86,19 @@ export default function Checklists() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCompanyId]);
 
+  const availableTemplates = useMemo(() => {
+    const vehicle = vehicles.find((v) => v.id === startVehicleId);
+    return templates.filter((t) => t.active && (!vehicle || matchesChecklistVehicleType(t.vehicle_type, vehicle.vehicle_type)));
+  }, [templates, vehicles, startVehicleId]);
+
+  useEffect(() => {
+    if (startTplId && !availableTemplates.some((template) => template.id === startTplId)) setStartTplId("");
+  }, [availableTemplates, startTplId]);
+
+  const todayRuns = runs.filter((run) => classifyChecklistRun(run, today) === "hoje");
+  const overdueRuns = runs.filter((run) => classifyChecklistRun(run, today) === "atrasado");
+  const conformity = checklistConformity(runs, today, historyVehicleId === "todos" ? undefined : historyVehicleId);
+
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
     return runs.filter((r) => {
@@ -73,10 +106,12 @@ export default function Checklists() {
       const matches = !s || txt.includes(s);
       if (!matches) return false;
       if (tab === "pendentes") return r.status === "pendente" || r.status === "em_andamento";
-      if (tab === "historico") return r.status === "concluido" || r.status === "reprovado" || r.status === "cancelado";
+      if (tab === "historico") return historyVehicleId !== "todos"
+        ? r.vehicle_id === historyVehicleId
+        : ["concluido", "reprovado", "cancelado"].includes(r.status);
       return true;
     });
-  }, [runs, search, tab]);
+  }, [runs, search, tab, historyVehicleId]);
 
   const counts = useMemo(() => ({
     pendentes: runs.filter((r) => r.status === "pendente" || r.status === "em_andamento").length,
@@ -103,7 +138,12 @@ export default function Checklists() {
   const startRun = async () => {
     if (!currentCompanyId || !startTplId || !startVehicleId) return toast.error("Selecione modelo e veículo");
     setStartBusy(true);
-    const tpl = templates.find((t) => t.id === startTplId);
+    const tpl = availableTemplates.find((t) => t.id === startTplId);
+    const vehicle = vehicles.find((v) => v.id === startVehicleId && v.status === "ativo");
+    if (!tpl || !vehicle || !matchesChecklistVehicleType(tpl.vehicle_type, vehicle.vehicle_type)) {
+      setStartBusy(false);
+      return toast.error("Selecione um modelo ativo compatível com o veículo");
+    }
     // cria run
     const ref = currentMonthRef();
     const { data: runRow, error } = await supabase
@@ -178,6 +218,21 @@ export default function Checklists() {
         </div>
       </div>
 
+      {loadError && <div role="alert" className="text-destructive flex items-center gap-3">
+        Falha ao carregar dados e restrições. <Button variant="outline" onClick={load}>Tentar novamente</Button>
+      </div>}
+      {canViewTab("pendentes") && !loadError && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <section className="space-y-2">
+            <h2 className="font-display font-semibold">Pendentes de hoje · {todayRuns.length}</h2>
+            <RunsList runs={todayRuns} loading={loading} onOpen={(id) => { setRunId(id); setRunOpen(true); }} />
+          </section>
+          <section className="space-y-2">
+            <h2 className="font-display font-semibold text-destructive">Atrasados · {overdueRuns.length}</h2>
+            <RunsList runs={overdueRuns} loading={loading} onOpen={(id) => { setRunId(id); setRunOpen(true); }} />
+          </section>
+        </div>
+      )}
       {/* KPIs do mês */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
@@ -224,7 +279,24 @@ export default function Checklists() {
         <TabsContent value="pendentes" className="mt-4">
           <RunsList runs={filtered} loading={loading} onOpen={(id) => { setRunId(id); setRunOpen(true); }} />
         </TabsContent>
-        <TabsContent value="historico" className="mt-4">
+        <TabsContent value="historico" className="mt-4 space-y-4">
+          <Card><CardContent className="p-4 flex flex-wrap gap-4 items-end">
+            <div className="w-full sm:w-80 space-y-2">
+              <Label>Histórico por veículo</Label>
+              <Select value={historyVehicleId} onValueChange={setHistoryVehicleId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o veículo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os veículos</SelectItem>
+                  {vehicles.map((vehicle) => <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.plate} — {vehicle.brand} {vehicle.model}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Conformidade · últimos 30 dias (incluindo hoje)</p>
+              <p className="text-2xl font-display text-primary">{loading ? "…" : conformity === null ? "Sem respostas no período" : `${conformity}%`}</p>
+              <p className="text-xs text-muted-foreground">Itens conformes / (conformes + não conformes) de checklists finalizados.</p>
+            </div>
+          </CardContent></Card>
           <RunsList runs={filtered} loading={loading} onOpen={(id) => { setRunId(id); setRunOpen(true); }} />
         </TabsContent>
         <TabsContent value="modelos" className="mt-4">
@@ -251,13 +323,15 @@ export default function Checklists() {
                     <div className="flex flex-wrap gap-2 text-xs">
                       {t.auto_open_os && <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">OS automática</Badge>}
                       {!t.active && <Badge variant="outline" className="bg-muted/40">Arquivado</Badge>}
+                      <Badge variant="outline">{CHECKLIST_VEHICLE_LABELS[t.vehicle_type ?? "todos"] ?? "Todos"}</Badge>
                       <Badge variant="outline">v{t.version}</Badge>
+                      {t.questions?.some((q: { is_critical: boolean }) => q.is_critical) && <Badge variant="destructive">Itens críticos</Badge>}
                     </div>
                     <div className="flex gap-2 pt-2">
                       <Button size="sm" variant="outline" onClick={() => { setTplEditId(t.id); setTplOpen(true); }} className="gap-1">
                         <Pencil className="h-3 w-3" /> Editar
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setStartTplId(t.id); setStartOpen(true); }} className="gap-1">
+                      <Button size="sm" variant="outline" onClick={() => { setStartVehicleId(""); setStartTplId(t.id); setStartOpen(true); }} className="gap-1">
                         <Play className="h-3 w-3" /> Aplicar
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => deleteTemplate(t.id)} className="text-destructive hover:bg-destructive/10 ml-auto">
@@ -289,13 +363,13 @@ export default function Checklists() {
               <Select value={startTplId} onValueChange={setStartTplId}>
                 <SelectTrigger><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
                 <SelectContent>
-                  {templates.filter((t) => t.active).map((t) => (
+                  {availableTemplates.map((t) => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {templates.filter((t) => t.active).length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">Nenhum modelo ativo. Crie um na aba "Modelos".</p>
+              {availableTemplates.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">Nenhum modelo ativo compatível. Selecione outro veículo ou crie um modelo na aba "Modelos".</p>
               )}
             </div>
             <div>
@@ -303,8 +377,8 @@ export default function Checklists() {
               <Select value={startVehicleId} onValueChange={setStartVehicleId}>
                 <SelectTrigger><SelectValue placeholder="Selecione o veículo" /></SelectTrigger>
                 <SelectContent>
-                  {vehicles.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>{v.plate} — {v.brand} {v.model}</SelectItem>
+                  {vehicles.filter((v) => v.status === "ativo").map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.plate} — {v.brand} {v.model}{isVehicleRestricted(v.id, requests) ? " · Restrito" : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -312,7 +386,7 @@ export default function Checklists() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setStartOpen(false)}>Cancelar</Button>
-            <Button onClick={startRun} disabled={startBusy} className="bg-gradient-primary text-primary-foreground">
+            <Button onClick={startRun} disabled={startBusy || loading || loadError || !startTplId || !startVehicleId} className="bg-gradient-primary text-primary-foreground">
               {startBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Iniciar
             </Button>
           </DialogFooter>
@@ -340,10 +414,12 @@ function RunsList({ runs, loading, onOpen }: { runs: any[]; loading: boolean; on
             <div className="flex-1 min-w-[200px]">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-primary font-semibold">{r.vehicle?.plate}</span>
+                {r.restricted && <Badge variant="destructive">Restrito</Badge>}
                 <span className="text-sm text-muted-foreground">{r.vehicle?.brand} {r.vehicle?.model}</span>
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 {r.template?.name} · {r.reference_month ? monthRefLabel(r.reference_month) : "—"}
+                <div>{r.completed_at ? `Finalizado em ${new Date(r.completed_at).toLocaleDateString("pt-BR")}` : `Criado em ${new Date(r.created_at).toLocaleDateString("pt-BR")}`}{r.due_date && ` · Prazo: ${r.due_date.split("-").reverse().join("/")}`}</div>
               </div>
             </div>
             <div className="text-right text-xs">

@@ -9,6 +9,7 @@ import { Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { tripDisplayStatus } from "@/lib/automatic-status";
 import { useLocalToday } from "@/hooks/useLocalToday";
+import { tripSettlementBalance, settlementLabel, tripCostPerKm, tripResult, tripDrivenKm } from "@/lib/trip-finance";
 
 export default function TripDetailDrawer({
   trip, drivers, vehicles, onClose, onChanged,
@@ -38,6 +39,10 @@ export default function TripDetailDrawer({
   const spentOther = Number(trip.total_spent_other ?? 0);
   const reimbursable = Number(trip.total_reimbursable ?? 0);
   const balance = Number(trip.balance_to_return ?? 0);
+  const netBalance = tripSettlementBalance(trip);
+  const costKm = tripCostPerKm(trip);
+  const result = tripResult(trip);
+  const drivenKm = tripDrivenKm(trip);
 
   const byCategory = EXPENSE_CATEGORIES.map((c) => ({
     ...c, total: expenses.filter((e) => e.expense_category === c.value).reduce((s, e) => s + Number(e.amount), 0),
@@ -79,6 +84,17 @@ export default function TripDetailDrawer({
           <Stat label="Saldo a devolver" value={formatBRL(balance)} accent />
           <Stat label="Gasto total" value={formatBRL(totalSpent)} />
           <Stat label="A reembolsar" value={formatBRL(reimbursable)} accent />
+        </div>
+
+        <div className="mt-3 surface-card rounded-lg p-3 space-y-1.5 text-sm">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Acerto final</div>
+          <div className={`font-semibold ${netBalance < 0 ? "text-warning" : netBalance > 0 ? "text-primary" : ""}`}>{settlementLabel(netBalance, formatBRL)}</div>
+          <div className="text-xs text-muted-foreground">Adiantado {formatBRL(advanceCash)} − gasto em dinheiro {formatBRL(spentCash)} − a reembolsar {formatBRL(reimbursable)}</div>
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-xs">
+            <div><div className="text-muted-foreground">KM rodado</div><div className="font-mono">{drivenKm != null ? drivenKm.toLocaleString("pt-BR") : "—"}</div></div>
+            <div><div className="text-muted-foreground">Custo por km</div><div className="font-mono">{costKm != null ? formatBRL(costKm) : "—"}</div></div>
+            <div><div className="text-muted-foreground">Resultado</div><div className={`font-mono ${result != null && result < 0 ? "text-destructive" : ""}`}>{result != null ? formatBRL(result) : "Sem frete"}</div></div>
+          </div>
         </div>
 
         <div className="flex gap-2 mt-4">

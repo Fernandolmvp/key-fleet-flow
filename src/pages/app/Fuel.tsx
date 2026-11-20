@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,16 +9,18 @@ import { toast } from "sonner";
 import FuelDialog from "@/components/dashboard/FuelDialog";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ANOMALY_LABEL, SEVERITY_TONE, fmtMoney, fmtNum } from "@/lib/fuel";
+import { ANOMALY_LABEL, fmtMoney, fmtNum } from "@/lib/fuel";
+import { analyzeFuel, rankFuel } from "@/lib/fuel-anomalies";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 
 interface Row {
+  vehicle_id: string | null; driver_id: string | null; fuel_station_id: string | null;
+  reconciliation_status: string; reconciled_at: string | null; reconciliation_notes: string | null;
   id: string; fueled_at: string; station_name: string | null; city: string | null;
   fuel_type: string; liters: number; price_per_liter: number; total_value: number;
   km_at_fueling: number; km_per_liter: number | null; cost_per_km: number | null;
   anomalies: string[]; anomaly_severity: string | null;
-  vehicles: { plate: string; brand: string; model: string; expected_consumption_kml: number | null; consumption_tolerance_pct: number | null } | null;
+  vehicles: { tank_capacity: number | null; plate: string; brand: string; model: string; expected_consumption_kml: number | null; consumption_tolerance_pct: number | null } | null;
   drivers: { full_name: string } | null;
 }
 
@@ -30,46 +32,121 @@ export default function Fuel() {
   const [editing, setEditing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    if (!currentCompanyId) return;
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [vehicle, setVehicle] = useState("");
+  const [driver, setDriver] = useState("");
+  const [station, setStation] = useState("");
+  const [saving, setSaving] = useState<string | null>(null);
+  const request = useRef(0);
+  const invalidPeriod = !!(from && to && from > to);
+  const load = useCallback(async () => {
+    const token = ++request.current;
+    setRows([]);
+    if (!currentCompanyId || invalidPeriod) { setLoading(false); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("fuel_records")
-      .select("*, vehicles:vehicles!fuel_records_vehicle_id_fkey(plate,brand,model,expected_consumption_kml,consumption_tolerance_pct), drivers:drivers!fuel_records_driver_id_fkey(full_name)")
-      .eq("company_id", currentCompanyId)
-      .order("fueled_at", { ascending: false })
-      .limit(500);
-    if (error) toast.error(error.message);
-    setRows((data ?? []) as any);
-    setLoading(false);
-  };
+    try {
+      const collected: Row[] = [];
+      for (let offset = 0; ; offset += 500) {
+        let query = supabase.from("fuel_records")
+          .select("*, vehicles:vehicles!fuel_records_vehicle_id_fkey(plate,brand,model,tank_capacity,expected_consumption_kml,consumption_tolerance_pct), drivers:drivers!fuel_records_driver_id_fkey(full_name)")
+          .eq("company_id", currentCompanyId)
+          .order("fueled_at", { ascending: false }).order("id", { ascending: false });
+        if (from) query = query.gte("fueled_at", new Date(`${from}T00:00:00`).toISOString());
+        if (to) {
+          const nextDay = new Date(`${to}T00:00:00`);
+          nextDay.setDate(nextDay.getDate() + 1);
+          query = query.lt("fueled_at", nextDay.toISOString());
+        }
+        const { data, error } = await query.range(offset, offset + 499);
+        if (token !== request.current) return;
+        if (error) throw error;
+        collected.push(...(data ?? []) as Row[]);
+        if ((data?.length ?? 0) < 500) break;
+      }
+      if (token === request.current) setRows(collected);
+    } catch (error) {
+      if (token === request.current) toast.error(error instanceof Error ? error.message : "Não foi possível carregar os abastecimentos.");
+    } finally {
+      if (token === request.current) setLoading(false);
+    }
+  }, [currentCompanyId, from, to, invalidPeriod]);
 
-  useEffect(() => { load(); }, [currentCompanyId]);
+  useEffect(() => { void load(); return () => { request.current++; }; }, [load]);
   useAutoRefresh(load, ["fuel_records"]);
+
+  const reconcile = async (row: Row, status: string) => {
+    if (!currentCompanyId || saving) return;
+    const note = window.prompt("Observação da conciliação (opcional):", row.reconciliation_notes ?? "");
+    if (note === null) return;
+    setSaving(row.id);
+    try {
+      const { data, error } = await supabase.from("fuel_records").update({
+        reconciliation_status: status,
+        reconciled_at: status === "pendente" ? null : new Date().toISOString(),
+        reconciliation_notes: note.trim() || null,
+      }).eq("company_id", currentCompanyId).eq("id", row.id).select("id").single();
+      if (error || !data) throw error ?? new Error("Registro não atualizado.");
+      toast.success("Conciliação atualizada");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a conciliação.");
+    } finally { setSaving(null); }
+  };
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este abastecimento? Esta ação será registrada no histórico de auditoria.")) return;
-    const { error } = await supabase.from("fuel_records").delete().eq("id", id);
+    const { error } = await supabase.from("fuel_records").delete().eq("company_id", currentCompanyId).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Removido"); load();
   };
 
   const filtered = useMemo(() => rows.filter((r) => {
     const t = q.toLowerCase();
+    if (vehicle && r.vehicle_id !== vehicle) return false;
+    if (driver && r.driver_id !== driver) return false;
+    if (station && (r.fuel_station_id ? `id:${r.fuel_station_id}` : `name:${r.station_name ?? ""}`) !== station) return false;
     return [r.vehicles?.plate, r.vehicles?.model, r.drivers?.full_name, r.station_name, r.city]
       .filter(Boolean).join(" ").toLowerCase().includes(t);
-  }), [rows, q]);
+  }), [rows, q, vehicle, driver, station]);
+  // Price reference uses the entire selected period, not only one station/vehicle.
+  const alerts = useMemo(() => analyzeFuel(rows), [rows]);
+  const rankings = useMemo(() => ({ vehicles: rankFuel(filtered, "vehicle"), drivers: rankFuel(filtered, "driver") }), [filtered]);
+  const options = useMemo(() => {
+    const vehicles = new Map<string, string>();
+    const drivers = new Map<string, string>();
+    const stations = new Map<string, string>();
+    rows.forEach(row => {
+      if (row.vehicle_id) vehicles.set(row.vehicle_id, row.vehicles?.plate ?? row.vehicle_id);
+      if (row.driver_id) drivers.set(row.driver_id, row.drivers?.full_name ?? row.driver_id);
+      stations.set(row.fuel_station_id ? `id:${row.fuel_station_id}` : `name:${row.station_name ?? ""}`, row.station_name ?? "Posto não informado");
+    });
+    return { vehicles, drivers, stations };
+  }, [rows]);
+  const exportCsv = () => {
+    const number = (value: number | null) => value == null ? "" : value.toLocaleString("pt-BR", { useGrouping: false, maximumFractionDigits: 6 });
+    const cell = (value: unknown) => {
+      let text = String(value ?? "");
+      if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
+      return '"' + text.replace(/"/g, '""') + '"';
+    };
+    const table = [["Data", "Veículo", "Motorista", "Posto", "Combustível", "Litros", "Preço/L", "Total", "km/L", "Conciliação", "Conciliado em", "Observação", "Alertas"],
+      ...filtered.map(row => [new Date(row.fueled_at).toLocaleString("pt-BR"), row.vehicles?.plate, row.drivers?.full_name, row.station_name, row.fuel_type,
+        number(row.liters), number(row.price_per_liter), number(row.total_value), number(row.km_per_liter), row.reconciliation_status,
+        row.reconciled_at ? new Date(row.reconciled_at).toLocaleString("pt-BR") : "", row.reconciliation_notes,
+        (alerts.get(row.id) ?? []).map(a => a.explanation).join(" | ")])];
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + table.map(row => row.map(cell).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8;" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = "abastecimentos.csv"; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const stats = useMemo(() => {
-    const now = new Date();
-    const monthRows = rows.filter((r) => {
-      const d = new Date(r.fueled_at);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    });
+    const monthRows = filtered;
     const totalCost = monthRows.reduce((s, r) => s + Number(r.total_value), 0);
     const totalLiters = monthRows.reduce((s, r) => s + Number(r.liters), 0);
     // Consumo médio ponderado por litros, ignorando outliers/anomalias de KM
-    const valid = rows.filter(
+    const valid = filtered.filter(
       (r) =>
         r.km_per_liter != null &&
         Number(r.km_per_liter) > 0 &&
@@ -79,14 +156,14 @@ export default function Fuel() {
     const sumKm = valid.reduce((s, r) => s + Number(r.km_per_liter) * Number(r.liters), 0);
     const sumL = valid.reduce((s, r) => s + Number(r.liters), 0);
     const avgKml = sumL > 0 ? sumKm / sumL : 0;
-    const anomalies = rows.filter((r) => (r.anomalies?.length ?? 0) > 0).length;
+    const anomalies = filtered.filter((r) => (alerts.get(r.id)?.length ?? 0) > 0).length;
     return { totalCost, totalLiters, avgKml, anomalies, monthCount: monthRows.length, validCount: valid.length };
-  }, [rows]);
+  }, [filtered, alerts]);
 
   // gráfico: custo por mês (últimos 6)
   const monthly = useMemo(() => {
     const map = new Map<string, number>();
-    rows.forEach((r) => {
+    filtered.forEach((r) => {
       const d = new Date(r.fueled_at);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       map.set(key, (map.get(key) ?? 0) + Number(r.total_value));
@@ -96,21 +173,9 @@ export default function Fuel() {
       custo: Math.round(v),
     }));
     return arr;
-  }, [rows]);
+  }, [filtered]);
 
-  // gráfico: top 5 veículos por consumo
-  const topVehicles = useMemo(() => {
-    const map = new Map<string, { kml: number[]; plate: string }>();
-    rows.forEach((r) => {
-      if (r.km_per_liter && r.vehicles?.plate) {
-        const cur = map.get(r.vehicles.plate) ?? { kml: [], plate: r.vehicles.plate };
-        cur.kml.push(Number(r.km_per_liter)); map.set(r.vehicles.plate, cur);
-      }
-    });
-    return Array.from(map.values())
-      .map((x) => ({ placa: x.plate, kmL: +(x.kml.reduce((a, b) => a + b, 0) / x.kml.length).toFixed(1) }))
-      .sort((a, b) => b.kmL - a.kmL).slice(0, 6);
-  }, [rows]);
+  const topVehicles = rankings.vehicles.top.map(row => ({ placa: row.name, kmL: row.average }));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -125,8 +190,8 @@ export default function Fuel() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Custo do mês" value={fmtMoney(stats.totalCost)} icon={DollarSign} tone="primary" hint={`${stats.monthCount} abastecimentos`} />
-        <KpiCard label="Litros do mês" value={fmtNum(stats.totalLiters, { maximumFractionDigits: 1 })} icon={FuelIcon} hint="L" />
+        <KpiCard label="Custo no período" value={fmtMoney(stats.totalCost)} icon={DollarSign} tone="primary" hint={`${stats.monthCount} abastecimentos`} />
+        <KpiCard label="Litros no período" value={fmtNum(stats.totalLiters, { maximumFractionDigits: 1 })} icon={FuelIcon} hint="L" />
         <KpiCard
           label="Consumo médio"
           value={stats.avgKml > 0 ? `${stats.avgKml.toFixed(1)} km/L` : "—"}
@@ -173,7 +238,40 @@ export default function Fuel() {
         </div>
       )}
 
-      <div className="surface-card rounded-xl p-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {([['Veículos', rankings.vehicles], ['Motoristas', rankings.drivers]] as const).map(([title, ranking]) => (
+          <div key={title} className="surface-card rounded-xl p-4">
+            <h3 className="font-display font-semibold">Eficiência — {title}</h3>
+            <p className="text-xs text-muted-foreground">Média simples de km/L positivos no período filtrado.</p>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              {([['Mais eficientes', ranking.top], ['Menos eficientes', ranking.bottom]] as const).map(([label, list]) => (
+                <div key={label}><h4 className="text-sm font-semibold">{label}</h4>
+                  {list.length ? <ol>{list.map(item => <li key={item.id} className="text-sm">{item.name}: {fmtNum(item.average, { maximumFractionDigits: 2 })} km/L ({item.count})</li>)}</ol> : <p className="text-sm text-muted-foreground">Sem dados válidos</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="surface-card rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm">De<Input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>
+          <label className="text-sm">Até<Input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
+          {([
+            ['Veículo', vehicle, setVehicle, options.vehicles],
+            ['Motorista', driver, setDriver, options.drivers],
+            ['Posto', station, setStation, options.stations],
+          ] as const).map(([label, value, setter, choices]) => <label key={label} className="text-sm">{label}
+            <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={e => setter(e.target.value)}>
+              <option value="">Todos</option>
+              {value && !choices.has(value) && <option value={value}>Seleção sem registros no período</option>}
+              {[...choices].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>)}
+          <Button variant="outline" disabled={loading || invalidPeriod || !filtered.length} onClick={exportCsv}>Exportar CSV</Button>
+        </div>
+        {invalidPeriod && <p role="alert" className="text-sm text-destructive">A data inicial deve ser anterior ou igual à final.</p>}
         <div className="relative max-w-sm">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar por placa, motorista, posto..." value={q} onChange={(e) => setQ(e.target.value)} />
@@ -203,6 +301,7 @@ export default function Fuel() {
                   <th className="text-right px-4 py-3">Total</th>
                   <th className="text-right px-4 py-3">km/L</th>
                   <th className="text-left px-4 py-3">Alertas</th>
+                  <th className="text-left px-4 py-3">Conciliação</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -227,34 +326,21 @@ export default function Fuel() {
                     <td className="px-4 py-3 text-right font-mono">{r.km_per_liter ? `${r.km_per_liter}` : "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {r.anomalies?.map((a) => {
-                          const badge = (
-                            <Badge key={a} className={`text-[10px] border ${SEVERITY_TONE[r.anomaly_severity ?? "baixa"]}`}>
-                              {ANOMALY_LABEL[a] ?? a}
-                            </Badge>
-                          );
-                          const isExpectedAnom = a === "consumo_acima_esperado" || a === "consumo_abaixo_esperado";
-                          const expected = r.vehicles?.expected_consumption_kml;
-                          if (isExpectedAnom && expected != null && r.km_per_liter != null) {
-                            const real = Number(r.km_per_liter);
-                            const exp = Number(expected);
-                            const dev = exp > 0 ? Math.abs(real - exp) / exp * 100 : 0;
-                            return (
-                              <TooltipProvider key={a} delayDuration={150}>
-                                <UITooltip>
-                                  <TooltipTrigger asChild><span>{badge}</span></TooltipTrigger>
-                                  <TooltipContent className="text-xs">
-                                    <div>Esperado: <strong>{exp.toFixed(1)} km/L</strong></div>
-                                    <div>Real: <strong>{real.toFixed(1)} km/L</strong></div>
-                                    <div>Desvio: <strong>{dev.toFixed(0)}%</strong></div>
-                                  </TooltipContent>
-                                </UITooltip>
-                              </TooltipProvider>
-                            );
-                          }
-                          return badge;
-                        })}
+                        {(alerts.get(r.id) ?? []).map(a => (
+                          <details key={a.code} className="text-xs">
+                            <summary className="cursor-pointer"><Badge variant="outline" className="text-warning border-warning/40">{ANOMALY_LABEL[a.code] ?? a.code}</Badge></summary>
+                            <p className="mt-1 max-w-xs text-muted-foreground">{a.explanation}</p>
+                          </details>
+                        ))}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select aria-label={`Conciliação de ${r.vehicles?.plate ?? r.id}`} className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                        value={r.reconciliation_status ?? "pendente"} disabled={!!saving || loading} onChange={e => void reconcile(r, e.target.value)}>
+                        <option value="pendente">Pendente</option><option value="conferido">Conferido</option><option value="divergente">Divergente</option>
+                      </select>
+                      {r.reconciled_at && <p className="text-xs text-muted-foreground">{new Date(r.reconciled_at).toLocaleString("pt-BR")}</p>}
+                      {r.reconciliation_notes && <p className="text-xs text-muted-foreground max-w-xs">{r.reconciliation_notes}</p>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 justify-end">

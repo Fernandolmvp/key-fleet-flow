@@ -11,8 +11,8 @@ import { TRIP_TYPES } from "@/lib/trips";
 import { toast } from "sonner";
 
 export default function TripDialog({
-  open, onOpenChange, drivers, vehicles, onSaved,
-}: { open: boolean; onOpenChange: (v: boolean) => void; drivers: any[]; vehicles: any[]; onSaved: () => void }) {
+  open, onOpenChange, drivers, vehicles, onSaved, quick = false,
+}: { open: boolean; onOpenChange: (v: boolean) => void; drivers: any[]; vehicles: any[]; onSaved: () => void; quick?: boolean }) {
   const { currentCompanyId, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<any>({
@@ -21,21 +21,23 @@ export default function TripDialog({
     origin_city: "", origin_state: "", destination_city: "", destination_state: "",
     scheduled_start_date: new Date().toISOString().slice(0, 10),
     scheduled_end_date: "",
-    estimated_km: "", budget_total: "",
+    estimated_km: "", budget_total: "", freight_value: "",
   });
 
   useEffect(() => {
-    if (open) setF((p: any) => ({ ...p, title: "", destination_city: "", destination_state: "" }));
+    if (open) setF((p: any) => ({ ...p, title: "", destination_city: "", destination_state: "", freight_value: "" }));
   }, [open]);
 
   const save = async () => {
-    if (!currentCompanyId || !f.title || !f.driver_id || !f.scheduled_start_date) {
-      return toast.error("Preencha título, motorista e data de início.");
+    const title = f.title || (quick && (f.origin_city || f.destination_city)
+      ? `${f.origin_city || "?"} → ${f.destination_city || "?"}` : "");
+    if (!currentCompanyId || !title || !f.driver_id || !f.scheduled_start_date) {
+      return toast.error(quick ? "Preencha motorista, data e origem ou destino." : "Preencha título, motorista e data de início.");
     }
     setBusy(true);
     const { error } = await supabase.from("trips").insert({
       company_id: currentCompanyId,
-      title: f.title, description: f.description || null,
+      title, description: f.description || null,
       trip_type: f.trip_type,
       driver_id: f.driver_id, vehicle_id: f.vehicle_id || null,
       origin_city: f.origin_city || null, origin_state: f.origin_state || null,
@@ -44,6 +46,7 @@ export default function TripDialog({
       scheduled_end_date: f.scheduled_end_date || null,
       estimated_km: f.estimated_km ? Number(f.estimated_km) : null,
       budget_total: f.budget_total ? Number(f.budget_total) : null,
+      freight_value: f.freight_value !== "" ? Number(f.freight_value) : null,
       created_by: user?.id ?? null,
     });
     setBusy(false);
@@ -56,19 +59,19 @@ export default function TripDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Nova viagem</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{quick ? "Nova viagem rápida" : "Nova viagem"}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
+          {!quick && <div className="col-span-2">
             <Label>Título *</Label>
             <Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Ex: Entrega São Paulo" />
-          </div>
-          <div>
+          </div>}
+          {!quick && <div>
             <Label>Tipo</Label>
             <Select value={f.trip_type} onValueChange={(v) => setF({ ...f, trip_type: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{TRIP_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
             </Select>
-          </div>
+          </div>}
           <div>
             <Label>Motorista *</Label>
             <Select value={f.driver_id} onValueChange={(v) => setF({ ...f, driver_id: v })}>
@@ -76,7 +79,7 @@ export default function TripDialog({
               <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="col-span-2">
+          <div className={quick ? "" : "col-span-2"}>
             <Label>Veículo</Label>
             <Select value={f.vehicle_id} onValueChange={(v) => setF({ ...f, vehicle_id: v })}>
               <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
@@ -84,17 +87,18 @@ export default function TripDialog({
             </Select>
           </div>
           <div><Label>Origem (cidade)</Label><Input value={f.origin_city} onChange={(e) => setF({ ...f, origin_city: e.target.value })} /></div>
-          <div><Label>UF origem</Label><Input maxLength={2} value={f.origin_state} onChange={(e) => setF({ ...f, origin_state: e.target.value.toUpperCase() })} /></div>
+          {!quick && <div><Label>UF origem</Label><Input maxLength={2} value={f.origin_state} onChange={(e) => setF({ ...f, origin_state: e.target.value.toUpperCase() })} /></div>}
           <div><Label>Destino (cidade)</Label><Input value={f.destination_city} onChange={(e) => setF({ ...f, destination_city: e.target.value })} /></div>
-          <div><Label>UF destino</Label><Input maxLength={2} value={f.destination_state} onChange={(e) => setF({ ...f, destination_state: e.target.value.toUpperCase() })} /></div>
+          {!quick && <div><Label>UF destino</Label><Input maxLength={2} value={f.destination_state} onChange={(e) => setF({ ...f, destination_state: e.target.value.toUpperCase() })} /></div>}
           <div><Label>Início *</Label><Input type="date" value={f.scheduled_start_date} onChange={(e) => setF({ ...f, scheduled_start_date: e.target.value })} /></div>
-          <div><Label>Término previsto</Label><Input type="date" value={f.scheduled_end_date} onChange={(e) => setF({ ...f, scheduled_end_date: e.target.value })} /></div>
+          <div><Label>Valor do frete (R$)</Label><Input type="number" step="0.01" value={f.freight_value} onChange={(e) => setF({ ...f, freight_value: e.target.value })} placeholder="Opcional" /></div>
+          {!quick && <><div><Label>Término previsto</Label><Input type="date" value={f.scheduled_end_date} onChange={(e) => setF({ ...f, scheduled_end_date: e.target.value })} /></div>
           <div><Label>KM estimado</Label><Input type="number" value={f.estimated_km} onChange={(e) => setF({ ...f, estimated_km: e.target.value })} /></div>
           <div><Label>Orçamento total (R$)</Label><Input type="number" step="0.01" value={f.budget_total} onChange={(e) => setF({ ...f, budget_total: e.target.value })} /></div>
           <div className="col-span-2">
             <Label>Observações</Label>
             <Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
-          </div>
+          </div></>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

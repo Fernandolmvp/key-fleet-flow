@@ -4,7 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, MapPin, Calendar, Wallet, Loader2 } from "lucide-react";
+import { Plus, Search, MapPin, Calendar, Wallet, Loader2, Zap } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { tripTab, tripCostPerKm, tripResult, type TripTab } from "@/lib/trip-finance";
 import { TRIP_STATUS, TRIP_TYPES, formatBRL, labelOf } from "@/lib/trips";
 import TripDialog from "@/components/trips/TripDialog";
 import TripDetailDrawer from "@/components/trips/TripDetailDrawer";
@@ -24,6 +26,8 @@ export default function Viagens() {
   const [statusF, setStatusF] = useState("all");
   const [driverF, setDriverF] = useState("all");
   const [openCreate, setOpenCreate] = useState(false);
+  const [openQuick, setOpenQuick] = useState(false);
+  const [tab, setTab] = useState<TripTab | "todas">("todas");
   const [selected, setSelected] = useState<any | null>(null);
 
   const load = async () => {
@@ -47,7 +51,14 @@ export default function Viagens() {
   const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d.full_name])), [drivers]);
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, `${v.plate}${v.model ? " · " + v.model : ""}`])), [vehicles]);
 
+  const tabCounts = useMemo(() => {
+    const c: Record<string, number> = { todas: items.length };
+    for (const t of items) { const k = tripTab(tripDisplayStatus(t, today)); c[k] = (c[k] ?? 0) + 1; }
+    return c;
+  }, [items, today]);
+
   const filtered = items.filter((t) => {
+    if (tab !== "todas" && tripTab(tripDisplayStatus(t, today)) !== tab) return false;
     if (statusF !== "all" && tripDisplayStatus(t, today) !== statusF) return false;
     if (driverF !== "all" && t.driver_id !== driverF) return false;
     if (q) {
@@ -71,9 +82,14 @@ export default function Viagens() {
           <h1 className="text-2xl font-display font-bold">Viagens Programadas</h1>
           <p className="text-sm text-muted-foreground">Programe viagens, libere adiantamento, acompanhe despesas e faça o acerto final.</p>
         </div>
-        <Button onClick={() => setOpenCreate(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Nova viagem
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setOpenQuick(true)}>
+            <Zap className="h-4 w-4 mr-2" /> Viagem rápida
+          </Button>
+          <Button onClick={() => setOpenCreate(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Nova viagem
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -81,6 +97,14 @@ export default function Viagens() {
         <Kpi label="Aguardando acerto" value={kpis.pending} icon={<Calendar className="h-4 w-4" />} />
         <Kpi label="Total movimentado" value={formatBRL(kpis.totalSpent)} icon={<Wallet className="h-4 w-4" />} />
       </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <TabsList className="flex-wrap h-auto">
+          {([["todas","Todas"],["planejada","Planejada"],["em_andamento","Em andamento"],["concluida","Concluída"],["acerto_pendente","Acerto pendente"]] as const).map(([k, l]) => (
+            <TabsTrigger key={k} value={k}>{l} <span className="ml-1.5 text-xs text-muted-foreground font-mono">{tabCounts[k] ?? 0}</span></TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[240px]">
@@ -145,6 +169,14 @@ export default function Viagens() {
                     </div>
                   )}
                 </div>
+                {(tripCostPerKm(t) != null || tripResult(t) != null) && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{tripCostPerKm(t) != null ? `${formatBRL(tripCostPerKm(t)!)}/km` : ""}</span>
+                    {tripResult(t) != null && (
+                      <span className={tripResult(t)! < 0 ? "text-destructive" : "text-success"}>Resultado {formatBRL(tripResult(t)!)}</span>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -152,6 +184,7 @@ export default function Viagens() {
       )}
 
       <TripDialog open={openCreate} onOpenChange={setOpenCreate} drivers={drivers} vehicles={vehicles} onSaved={load} />
+      <TripDialog quick open={openQuick} onOpenChange={setOpenQuick} drivers={drivers} vehicles={vehicles} onSaved={load} />
       {selected && (
         <TripDetailDrawer trip={selected} drivers={drivers} vehicles={vehicles} onClose={() => setSelected(null)} onChanged={load} />
       )}

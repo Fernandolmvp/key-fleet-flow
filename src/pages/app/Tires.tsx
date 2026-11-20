@@ -19,8 +19,9 @@ import TireMovementDialog from "@/components/dashboard/TireMovementDialog";
 import TireAxleMap from "@/components/dashboard/TireAxleMap";
 import {
   AXLE_LAYOUTS, AxleLayout, STATUS_TONE, KIND_TONE, getLayoutPositions,
-  tireAlertLevel, treadHealth, fmtBRL,
+  treadHealth, fmtBRL,
 } from "@/lib/tires";
+import { tireAlerts, tireStatus as tireAlertLevel, tireCostPerKm } from "@/lib/tire-status";
 import { useTabPermissions } from "@/lib/permissions";
 
 export default function Tires() {
@@ -29,6 +30,7 @@ export default function Tires() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [layouts, setLayouts] = useState<Record<string, { id?: string; layout: AxleLayout; positions: string[] }>>({});
   const [movements, setMovements] = useState<any[]>([]);
+  const [costMovements, setCostMovements] = useState<{ tire_id: string; cost: number | null }[] | null>(null);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
@@ -54,6 +56,18 @@ export default function Tires() {
       supabase.from("vehicle_axle_layouts").select("*").eq("company_id", currentCompanyId),
       supabase.from("tire_movements").select("*").eq("company_id", currentCompanyId).order("occurred_at", { ascending: false }).limit(200),
     ]);
+    // Separate, paginated history: the 200-row display is NOT the cost basis.
+    const costs: { tire_id: string; cost: number | null }[] = [];
+    let costsFailed = false;
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.from("tire_movements")
+        .select("tire_id,cost").eq("company_id", currentCompanyId)
+        .order("id").range(offset, offset + 999);
+      if (error) { toast.error("Não foi possível carregar os custos dos pneus"); costsFailed = true; break; }
+      costs.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    setCostMovements(costsFailed ? null : costs);
     setTires(t ?? []);
     setVehicles(v ?? []);
     const map: Record<string, any> = {};
@@ -99,6 +113,13 @@ export default function Tires() {
   const inRecap = tires.filter((t) => t.status === "recapagem").length;
   const alerts = tires.filter((t) => tireAlertLevel(t).level !== "ok").length;
 
+  const costByTire = useMemo(() => {
+    const grouped: Record<string, { cost: number | null }[]> = {};
+    costMovements?.forEach(m => { (grouped[m.tire_id] ||= []).push(m); });
+    return Object.fromEntries(tires.map(t => [t.id,
+      costMovements === null ? null : tireCostPerKm(t, grouped[t.id] ?? [])]));
+  }, [tires, costMovements]);
+
   const filtered = tires.filter((t) =>
     [t.brand, t.model, t.size, t.dot, t.serial, t.supplier].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase())
   );
@@ -108,7 +129,7 @@ export default function Tires() {
     const m: Record<string, Record<string, any>> = {};
     tires.filter((t) => t.status === "instalado" && t.current_vehicle_id && t.current_position).forEach((t) => {
       (m[t.current_vehicle_id] ||= {})[t.current_position] = {
-        id: t.id, brand: t.brand, size: t.size, tread: t.current_tread_mm,
+        ...t, tread: t.current_tread_mm,
       };
     });
     return m;
@@ -148,6 +169,14 @@ export default function Tires() {
         <KpiCard label="Alertas" value={String(alerts)} icon={AlertTriangle} tone="destructive" />
       </div>
 
+      <div className="flex flex-wrap gap-2" aria-label="Resumo de alertas">
+        {["Sulco no limite", "Sulco próximo do limite", "Medição vencida"].map(reason => (
+          <Badge key={reason} variant="outline" className={reason === "Sulco no limite" ? "text-destructive" : "text-warning"}>
+            {reason}: {tires.filter(t => tireAlerts(t).some(a => a.reason === reason)).length}
+          </Badge>
+        ))}
+      </div>
+
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           {canViewTab("list") && <TabsTrigger value="list">Pneus</TabsTrigger>}
@@ -185,6 +214,8 @@ export default function Tires() {
                     <TableHead className="text-right">Sulco</TableHead>
                     <TableHead className="text-right">KM rodado</TableHead>
                     <TableHead className="text-right">Vida</TableHead>
+                    <TableHead className="text-right">R$/km</TableHead>
+                    <TableHead>Alertas</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -220,8 +251,11 @@ export default function Tires() {
                             <div className="text-[10px] font-mono mt-0.5">{health}%</div>
                           </div>
                         </TableCell>
+                        <TableCell className="text-right font-mono text-xs">{costByTire[t.id] == null ? "—" : costByTire[t.id].toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                        <TableCell><div className="flex flex-wrap gap-1">{tireAlerts(t).map(a => <Badge key={a.code} variant="outline" className={a.level === "critico" ? "text-destructive" : "text-warning"}>{a.reason}</Badge>)}</div></TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-end">
+                            <Button size="icon" variant="ghost" onClick={() => openMove(t, "inspecao")} title="Registrar medição" aria-label="Registrar medição"><Activity className="h-3.5 w-3.5" /></Button>
                             <Button size="icon" variant="ghost" onClick={() => openMove(t)} title="Movimentar">
                               <ArrowRightLeft className="h-3.5 w-3.5" />
                             </Button>
@@ -283,7 +317,7 @@ export default function Tires() {
               onSelect={(pos) => {
                 const installedTire = (installedByVehicle[mapVehicleId] ?? {})[pos];
                 if (installedTire) {
-                  openMove(tiresById[installedTire.id], "remocao");
+                  openMove(tiresById[installedTire.id], "inspecao");
                 } else {
                   // Choose a stock tire to install
                   const stock = tires.filter((t) => t.status === "estoque");

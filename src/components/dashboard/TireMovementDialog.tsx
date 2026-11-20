@@ -42,11 +42,11 @@ export default function TireMovementDialog({
   useEffect(() => {
     if (!open) return;
     setForm((f: any) => ({
-      ...f,
+      vehicle_km: "", pressure_psi: "", cost: "", reason: "", notes: "",
       movement_type: defaultMovement ?? "instalacao",
       vehicle_id: defaultVehicleId ?? tire?.current_vehicle_id ?? "",
       to_position: "",
-      tread_mm: tire?.current_tread_mm != null ? String(tire.current_tread_mm) : "",
+      tread_mm: "",
     }));
   }, [open, tire, defaultMovement, defaultVehicleId]);
 
@@ -65,7 +65,15 @@ export default function TireMovementDialog({
   }, [v?.id]); // eslint-disable-line
 
   const submit = async () => {
-    if (!currentCompanyId || !tire) return;
+    if (busy || !currentCompanyId || !tire) return;
+    const isMeasurement = ["calibragem", "inspecao"].includes(form.movement_type);
+    if (isMeasurement && form.tread_mm === "" && form.pressure_psi === "") return toast.error("Informe sulco ou pressão");
+    for (const field of ["vehicle_km", "tread_mm", "pressure_psi", "cost"]) {
+      if (form[field] !== "" && (!Number.isFinite(Number(form[field])) || Number(form[field]) < 0)) return toast.error("Informe valores numéricos não negativos");
+    }
+    if (form.movement_type === "rodizio" && (tire.status !== "instalado" || form.vehicle_id !== tire.current_vehicle_id)) return toast.error("O rodízio deve ocorrer no veículo atual do pneu");
+    if (needsPosition && !positions.includes(form.to_position)) return toast.error("Selecione uma posição válida");
+    if (form.movement_type === "rodizio" && form.to_position === tire.current_position) return toast.error("Selecione uma posição diferente da atual");
     if (needsVehicle && !form.vehicle_id) return toast.error("Selecione o veículo");
     if (needsPosition && !form.to_position) return toast.error("Selecione a posição");
 
@@ -87,7 +95,9 @@ export default function TireMovementDialog({
       if (endKm > startKm) extraKm = endKm - startKm;
     }
 
+    const occurredAt = new Date().toISOString();
     const payload: any = {
+      occurred_at: occurredAt,
       company_id: currentCompanyId,
       tire_id: tire.id,
       vehicle_id: form.vehicle_id || null,
@@ -106,10 +116,22 @@ export default function TireMovementDialog({
     const { error } = await supabase.from("tire_movements").insert(payload);
     if (error) { setBusy(false); return toast.error(error.message); }
 
-    if (extraKm > 0) {
-      await supabase.from("tires").update({
-        km_accumulated: (tire.km_accumulated ?? 0) + extraKm,
-      }).eq("id", tire.id);
+    // Installation, rotation and recap_count are already applied by the DB trigger.
+    const updates: { km_accumulated?: number; current_tread_mm?: number; last_pressure_psi?: number; last_measured_at?: string } = {};
+    if (extraKm > 0) updates.km_accumulated = (tire.km_accumulated ?? 0) + extraKm;
+    if (isMeasurement) {
+      if (payload.tread_mm != null) updates.current_tread_mm = payload.tread_mm;
+      if (payload.pressure_psi != null) updates.last_pressure_psi = payload.pressure_psi;
+      updates.last_measured_at = occurredAt;
+    }
+    if (Object.keys(updates).length) {
+      const { error: updateError } = await supabase.from("tires").update(updates)
+        .eq("id", tire.id).eq("company_id", currentCompanyId);
+      if (updateError) {
+        setBusy(false);
+        toast.error("Movimentação registrada, mas o resumo do pneu não foi atualizado: " + updateError.message);
+        onSaved(); onOpenChange(false); return;
+      }
     }
 
     setBusy(false);

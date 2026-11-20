@@ -18,6 +18,7 @@ const blank = () => ({
   serial: "", brand: "", model: "", size: "", dot: "",
   kind: "novo", status: "estoque",
   initial_tread_mm: "", current_tread_mm: "", min_tread_mm: "1.6",
+  target_pressure_psi: "", measurement_interval_days: "30",
   km_target: "60000", purchase_price: "", purchase_date: "",
   supplier: "", invoice_number: "", invoice_url: "", notes: "",
 });
@@ -38,6 +39,8 @@ export default function TireDialog({ open, onOpenChange, tire, onSaved }: Props)
         current_tread_mm: tire.current_tread_mm != null ? String(tire.current_tread_mm) : "",
         min_tread_mm: tire.min_tread_mm != null ? String(tire.min_tread_mm) : "1.6",
         km_target: tire.km_target != null ? String(tire.km_target) : "60000",
+        target_pressure_psi: tire.target_pressure_psi != null ? String(tire.target_pressure_psi) : "",
+        measurement_interval_days: String(tire.measurement_interval_days ?? 30),
         purchase_price: tire.purchase_price != null ? String(tire.purchase_price) : "",
       });
     } else setForm(blank());
@@ -77,6 +80,8 @@ export default function TireDialog({ open, onOpenChange, tire, onSaved }: Props)
 
   const submit = async () => {
     if (!currentCompanyId) return toast.error("Selecione uma empresa");
+    if (!Number.isInteger(Number(form.measurement_interval_days)) || Number(form.measurement_interval_days) <= 0) return toast.error("Informe um intervalo inteiro maior que zero");
+    if (form.target_pressure_psi !== "" && (!Number.isFinite(Number(form.target_pressure_psi)) || Number(form.target_pressure_psi) <= 0)) return toast.error("Informe uma pressão-alvo maior que zero");
     if (!form.brand || !form.size) return toast.error("Marca e medida são obrigatórias");
 
     setBusy(true);
@@ -89,6 +94,8 @@ export default function TireDialog({ open, onOpenChange, tire, onSaved }: Props)
       current_tread_mm: form.current_tread_mm ? Number(form.current_tread_mm) : (form.initial_tread_mm ? Number(form.initial_tread_mm) : null),
       min_tread_mm: form.min_tread_mm ? Number(form.min_tread_mm) : 1.6,
       km_target: form.km_target ? Number(form.km_target) : 60000,
+      target_pressure_psi: form.target_pressure_psi === "" ? null : Number(form.target_pressure_psi),
+      measurement_interval_days: Number(form.measurement_interval_days),
       purchase_price: form.purchase_price ? Number(form.purchase_price) : null,
       purchase_date: form.purchase_date || null,
       supplier: form.supplier || null,
@@ -162,6 +169,8 @@ export default function TireDialog({ open, onOpenChange, tire, onSaved }: Props)
           <div><Label>Sulco atual (mm)</Label><Input type="number" step="0.1" value={form.current_tread_mm} onChange={(e) => setForm((f: any) => ({ ...f, current_tread_mm: e.target.value }))} /></div>
 
           <div><Label>Sulco mínimo (mm)</Label><Input type="number" step="0.1" value={form.min_tread_mm} onChange={(e) => setForm((f: any) => ({ ...f, min_tread_mm: e.target.value }))} /></div>
+          <div><Label>Pressão-alvo (PSI)</Label><Input type="number" min="0.1" step="0.1" value={form.target_pressure_psi} onChange={(e) => setForm((f: any) => ({ ...f, target_pressure_psi: e.target.value }))} /></div>
+          <div><Label>Intervalo de medição (dias)</Label><Input type="number" min="1" step="1" value={form.measurement_interval_days} onChange={(e) => setForm((f: any) => ({ ...f, measurement_interval_days: e.target.value }))} /></div>
           <div><Label>KM alvo (vida útil)</Label><Input type="number" value={form.km_target} onChange={(e) => setForm((f: any) => ({ ...f, km_target: e.target.value }))} /></div>
           <div><Label>Preço (R$)</Label><Input type="number" step="0.01" value={form.purchase_price} onChange={(e) => setForm((f: any) => ({ ...f, purchase_price: e.target.value }))} /></div>
 

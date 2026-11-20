@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2, GripVertical, ListChecks, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { CHECKLIST_VEHICLE_LABELS } from "@/lib/checklist-status";
 import { FREQUENCIES, QUESTION_TYPES, DEFAULT_MONTHLY_TEMPLATE } from "@/lib/checklists";
 
 interface Props {
@@ -28,6 +29,7 @@ interface QRow {
   question_type: string;
   options: string[];
   required: boolean;
+  is_critical: boolean;
   require_photo_when_fail: boolean;
   require_note_when_fail: boolean;
   min_value?: number | null;
@@ -41,6 +43,7 @@ const newQuestion = (sort_order: number): QRow => ({
   question_type: "sim_nao",
   options: [],
   required: true,
+  is_critical: false,
   require_photo_when_fail: true,
   require_note_when_fail: true,
   sort_order,
@@ -50,6 +53,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
   const { currentCompanyId, user } = useAuth();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [vehicleType, setVehicleType] = useState("todos");
   const [frequency, setFrequency] = useState<string>("mensal");
   const [autoOpenOs, setAutoOpenOs] = useState(true);
   const [active, setActive] = useState(true);
@@ -67,6 +71,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
           supabase.from("checklist_questions").select("*").eq("template_id", templateId).order("sort_order"),
         ]);
         if (t) {
+          setVehicleType(t.vehicle_type ?? "todos");
           setName(t.name);
           setDescription(t.description ?? "");
           setFrequency(t.frequency);
@@ -82,6 +87,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
             question_type: q.question_type,
             options: Array.isArray(q.options) ? q.options : [],
             required: q.required,
+            is_critical: q.is_critical ?? false,
             require_photo_when_fail: q.require_photo_when_fail,
             require_note_when_fail: q.require_note_when_fail,
             min_value: q.min_value,
@@ -92,6 +98,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
         setLoading(false);
       })();
     } else {
+      setVehicleType("todos");
       setName("");
       setDescription("");
       setFrequency("mensal");
@@ -116,6 +123,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
     });
 
   const loadDefault = () => {
+    setVehicleType("todos");
     setName(DEFAULT_MONTHLY_TEMPLATE.name);
     setDescription(DEFAULT_MONTHLY_TEMPLATE.description);
     setFrequency(DEFAULT_MONTHLY_TEMPLATE.frequency);
@@ -127,6 +135,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
         question_type: q.question_type,
         options: (q as any).options ?? [],
         required: (q as any).required ?? true,
+        is_critical: false,
         require_photo_when_fail: true,
         require_note_when_fail: true,
         min_value: (q as any).min_value ?? null,
@@ -147,7 +156,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
     if (tplId) {
       const { error } = await supabase
         .from("checklist_templates")
-        .update({ name, description, frequency: frequency as any, auto_open_os: autoOpenOs, active })
+        .update({ vehicle_type: vehicleType === "todos" ? null : vehicleType, name, description, frequency: frequency as any, auto_open_os: autoOpenOs, active })
         .eq("id", tplId);
       if (error) {
         setBusy(false);
@@ -159,6 +168,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
         .from("checklist_templates")
         .insert({
           company_id: currentCompanyId,
+          vehicle_type: vehicleType === "todos" ? null : vehicleType,
           name,
           description,
           frequency: frequency as any,
@@ -183,6 +193,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
       question_type: q.question_type as any,
       options: q.options ?? [],
       required: q.required,
+      is_critical: q.is_critical,
       require_photo_when_fail: q.require_photo_when_fail,
       require_note_when_fail: q.require_note_when_fail,
       min_value: q.min_value ?? null,
@@ -225,6 +236,15 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
               <div className="md:col-span-2">
                 <Label>Descrição</Label>
                 <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+              </div>
+              <div>
+                <Label>Tipo de veículo</Label>
+                <Select value={vehicleType} onValueChange={setVehicleType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CHECKLIST_VEHICLE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Frequência</Label>
@@ -273,7 +293,7 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
                         <Input value={q.category} onChange={(e) => updateQuestion(idx, { category: e.target.value })} placeholder="Geral" />
                       </div>
                       <div className="md:col-span-6">
-                        <Label className="text-xs">Pergunta *</Label>
+                        <Label className="text-xs">Pergunta * {q.is_critical && <Badge variant="destructive">Crítico</Badge>}</Label>
                         <Input value={q.label} onChange={(e) => updateQuestion(idx, { label: e.target.value })} placeholder="Ex: Nível do óleo está adequado?" />
                       </div>
                       <div className="md:col-span-3">
@@ -310,6 +330,9 @@ export default function ChecklistTemplateBuilder({ open, onOpenChange, templateI
                       )}
 
                       <div className="md:col-span-12 flex flex-wrap gap-4 pt-1">
+                        <label className="flex items-center gap-2 text-xs">
+                          <Switch checked={q.is_critical} onCheckedChange={(v) => updateQuestion(idx, { is_critical: v })} /> Item crítico (falha abre solicitação e restringe o veículo ao finalizar)
+                        </label>
                         <label className="flex items-center gap-2 text-xs">
                           <Switch checked={q.required} onCheckedChange={(v) => updateQuestion(idx, { required: v })} /> Obrigatória
                         </label>

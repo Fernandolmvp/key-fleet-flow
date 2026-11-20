@@ -12,6 +12,7 @@ import { Loader2, ListChecks, Camera, X, Check, AlertTriangle, MinusCircle, File
 import { toast } from "sonner";
 import { ANSWER_STATUS_LABEL, ANSWER_STATUS_TONE } from "@/lib/checklists";
 import { getMaxVehicleKm, friendlyKmError } from "@/lib/km-validation";
+import { resolveStoredFileUrl, openStoredFile } from "@/lib/storage-url";
 import KmOverrideField from "@/components/dashboard/KmOverrideField";
 
 interface Props {
@@ -37,6 +38,7 @@ interface Answer {
   notes: string | null;
   options?: string[];
   required?: boolean;
+  is_critical?: boolean;
   require_photo_when_fail?: boolean;
   require_note_when_fail?: boolean;
 }
@@ -56,7 +58,7 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
     setLoading(true);
     const [{ data: r }, { data: a }] = await Promise.all([
       supabase.from("checklist_runs").select("*, vehicle:vehicles(plate,brand,model), template:checklist_templates(name)").eq("id", runId).maybeSingle(),
-      supabase.from("checklist_answers").select("*, question:checklist_questions(options,required,require_photo_when_fail,require_note_when_fail)").eq("run_id", runId).order("created_at"),
+      supabase.from("checklist_answers").select("*, question:checklist_questions(options,required,is_critical,require_photo_when_fail,require_note_when_fail)").eq("run_id", runId).order("created_at"),
     ]);
     setRun(r);
     setKmOverrideReason((r as any)?.km_override_reason ?? "");
@@ -78,6 +80,7 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
         notes: x.notes,
         options: x.question?.options ?? [],
         required: x.question?.required,
+        is_critical: x.question?.is_critical ?? false,
         require_photo_when_fail: x.question?.require_photo_when_fail,
         require_note_when_fail: x.question?.require_note_when_fail,
       })),
@@ -94,21 +97,28 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
     setAnswers((as) => as.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
 
   const onSelectPhoto = async (idx: number, files: FileList | null) => {
-    if (!files || !files.length || !currentCompanyId) return;
+    if (!files?.length || !currentCompanyId || !runId || uploadingIdx !== null || busy) return;
+    const answerId = answers[idx].id;
     setUploadingIdx(idx);
-    const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      const path = `${currentCompanyId}/${runId}/${idx}-${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from("checklist-media").upload(path, file, { upsert: true });
-      if (error) {
-        toast.error(error.message);
-        continue;
+    const paths: string[] = [];
+    try {
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("image/")) {
+          toast.error("Selecione apenas imagens");
+          continue;
+        }
+        const path = `${currentCompanyId}/${runId}/${answerId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error } = await supabase.storage.from("checklist-media").upload(path, file);
+        if (error) { toast.error(error.message); continue; }
+        paths.push(path);
       }
-      const { data } = supabase.storage.from("checklist-media").getPublicUrl(path);
-      urls.push(data.publicUrl);
+      setAnswers((current) => current.map((answer) => answer.id === answerId
+        ? { ...answer, photo_urls: [...answer.photo_urls, ...paths] } : answer));
+    } catch {
+      toast.error("Não foi possível enviar as fotos. Tente novamente.");
+    } finally {
+      setUploadingIdx(null);
     }
-    update(idx, { photo_urls: [...answers[idx].photo_urls, ...urls] });
-    setUploadingIdx(null);
   };
 
   const removePhoto = (idx: number, url: string) =>
@@ -140,7 +150,7 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
   };
 
   const saveProgress = async (final?: boolean) => {
-    if (!runId) return;
+    if (!runId || busy || uploadingIdx !== null) return;
     setBusy(true);
 
     // valida quando finalizando
@@ -204,7 +214,10 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
         setBusy(false);
         return toast.error(rErr.message);
       }
-      toast.success(nonConform > 0 ? "Checklist finalizado — OS aberta automaticamente" : "Checklist concluído com 100% de conformidade");
+      const criticalFailure = answers.some((answer) => answer.is_critical && evalStatus(answer) === "nao_conforme");
+      toast.success(criticalFailure
+        ? "Checklist finalizado. Uma solicitação de manutenção será aberta automaticamente e o veículo será exibido como restrito."
+        : "Checklist concluído");
     } else {
       await supabase.from("checklist_runs").update({ status: "em_andamento", started_at: run?.started_at ?? new Date().toISOString() }).eq("id", runId);
       toast.success("Progresso salvo");
@@ -244,15 +257,22 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
     update(idx, { signature_url: null });
   };
   const saveSig = async (idx: number) => {
-    const c = sigRef.current!;
-    if (!currentCompanyId) return;
-    const blob: Blob = await new Promise((res) => c.toBlob((b) => res(b!), "image/png"));
-    const path = `${currentCompanyId}/${runId}/sig-${idx}-${Date.now()}.png`;
-    const { error } = await supabase.storage.from("checklist-media").upload(path, blob, { upsert: true });
-    if (error) return toast.error(error.message);
-    const { data } = supabase.storage.from("checklist-media").getPublicUrl(path);
-    update(idx, { signature_url: data.publicUrl });
-    toast.success("Assinatura salva");
+    const c = sigRef.current;
+    if (!c || !currentCompanyId || !runId || busy || uploadingIdx !== null) return;
+    setUploadingIdx(idx);
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("Não foi possível salvar a assinatura");
+      const path = `${currentCompanyId}/${runId}/sig-${crypto.randomUUID()}.png`;
+      const { error } = await supabase.storage.from("checklist-media").upload(path, blob);
+      if (error) throw error;
+      update(idx, { signature_url: path });
+      toast.success("Assinatura salva");
+    } catch {
+      toast.error("Não foi possível salvar a assinatura");
+    } finally {
+      setUploadingIdx(null);
+    }
   };
 
   const grouped = answers.reduce<Record<string, { idx: number; a: Answer }[]>>((acc, a, idx) => {
@@ -341,12 +361,17 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div className="flex-1 min-w-[200px]">
                           <div className="text-sm font-medium">
-                            {a.question_label} {a.required && <span className="text-destructive">*</span>}
+                            {a.question_label} {a.required && <span className="text-destructive">*</span>} {a.is_critical && <Badge variant="destructive">Crítico</Badge>}
                           </div>
                         </div>
                         <Badge variant="outline" className={ANSWER_STATUS_TONE[status]}>{ANSWER_STATUS_LABEL[status]}</Badge>
                       </div>
 
+                      {a.is_critical && status === "nao_conforme" && (
+                        <p role="alert" className="text-sm text-destructive">
+                          Ao finalizar, uma solicitação de manutenção será aberta automaticamente para aprovação e o veículo será exibido como restrito até a conclusão, rejeição ou cancelamento da solicitação.
+                        </p>
+                      )}
                       {/* Inputs por tipo */}
                       {a.question_type === "sim_nao" && (
                         <div className="flex gap-2">
@@ -399,7 +424,7 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
                         <div className="space-y-2">
                           {a.signature_url ? (
                             <div className="flex items-center gap-3">
-                              <img src={a.signature_url} alt="assinatura" className="h-20 bg-muted rounded border border-border" />
+                              <ChecklistMedia path={a.signature_url} alt="Assinatura" className="h-20 bg-muted rounded border border-border" />
                               {!isFinal && (
                                 <Button type="button" variant="outline" size="sm" onClick={() => update(idx, { signature_url: null })}>Refazer</Button>
                               )}
@@ -430,14 +455,14 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
                       )}
 
                       {/* Fotos (sempre disponível para anexar evidência) */}
-                      {(a.question_type === "foto" || a.photo_urls.length > 0 || status === "nao_conforme") && (
+                      {(
                         <div className="space-y-2">
                           <div className="flex gap-2 flex-wrap">
                             {a.photo_urls.map((url) => (
                               <div key={url} className="relative">
-                                <img src={url} alt="" className="h-20 w-20 object-cover rounded border border-border" />
+                                <ChecklistMedia path={url} alt={`Evidência de ${a.question_label}`} className="h-20 w-20 object-cover rounded border border-border" />
                                 {!isFinal && (
-                                  <button type="button" onClick={() => removePhoto(idx, url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5">
+                                  <button type="button" disabled={busy || uploadingIdx !== null} aria-label="Remover foto" onClick={() => removePhoto(idx, url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5">
                                     <X className="h-3 w-3" />
                                   </button>
                                 )}
@@ -446,7 +471,7 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
                             {!isFinal && (
                               <label className="h-20 w-20 grid place-items-center border border-dashed border-border rounded cursor-pointer hover:bg-muted/40 text-muted-foreground">
                                 {uploadingIdx === idx ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                                <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={(e) => onSelectPhoto(idx, e.target.files)} />
+                                <input type="file" accept="image/*" multiple disabled={busy || uploadingIdx !== null} aria-label={`Anexar fotos: ${a.question_label}`} className="hidden" onChange={(e) => { void onSelectPhoto(idx, e.target.files); e.target.value = ""; }} />
                               </label>
                             )}
                           </div>
@@ -470,10 +495,10 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
 
         {!isFinal && (
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => saveProgress(false)} disabled={busy}>
+            <Button variant="outline" onClick={() => saveProgress(false)} disabled={busy || loading || uploadingIdx !== null}>
               {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Salvar progresso
             </Button>
-            <Button onClick={() => saveProgress(true)} disabled={busy} className="bg-gradient-primary text-primary-foreground gap-2">
+            <Button onClick={() => saveProgress(true)} disabled={busy || loading || uploadingIdx !== null} className="bg-gradient-primary text-primary-foreground gap-2">
               <CheckCircle2 className="h-4 w-4" /> Finalizar checklist
             </Button>
           </DialogFooter>
@@ -481,4 +506,26 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
       </DialogContent>
     </Dialog>
   );
+}
+function ChecklistMedia({ path, alt, className }: { path: string; alt: string; className: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const resolve = async () => {
+      try {
+        const signed = await resolveStoredFileUrl(path, 3600, "checklist-media");
+        if (active) { setUrl(signed); setFailed(!signed); }
+      } catch { if (active) setFailed(true); }
+    };
+    setUrl(null);
+    setFailed(false);
+    void resolve();
+    const timer = window.setInterval(() => { void resolve(); }, 50 * 60 * 1000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [path]);
+  if (!url) return <span className="text-xs text-muted-foreground" role="status">{failed ? "Mídia indisponível" : "Carregando mídia…"}</span>;
+  return <button type="button" aria-label={`Abrir ${alt}`} onClick={() => void openStoredFile(path, { bucket: "checklist-media" })}>
+    <img src={url} alt={alt} className={className} />
+  </button>;
 }
