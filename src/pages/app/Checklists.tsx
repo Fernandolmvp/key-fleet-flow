@@ -57,10 +57,10 @@ export default function Checklists() {
     setLoading(true);
     setLoadError(false);
     const [templateResult, runResult, vehicleResult, requestResult] = await Promise.all([
-      supabase.from("checklist_templates").select("*, questions:checklist_questions(is_critical)").eq("company_id", currentCompanyId).order("created_at", { ascending: false }),
+      supabase.from("checklist_templates").select("*, questions:checklist_questions!checklist_questions_template_id_fkey(is_critical)").eq("company_id", currentCompanyId).order("created_at", { ascending: false }),
       supabase
         .from("checklist_runs")
-        .select("*, vehicle:vehicles(plate,brand,model), template:checklist_templates(name,frequency)")
+        .select("*, vehicle:vehicles(plate,brand,model), template:checklist_templates!checklist_runs_template_id_fkey(name,frequency)")
         .eq("company_id", currentCompanyId)
         .order("created_at", { ascending: false }),
       supabase.from("vehicles").select("id,plate,brand,model,vehicle_type,status").eq("company_id", currentCompanyId).order("plate"),

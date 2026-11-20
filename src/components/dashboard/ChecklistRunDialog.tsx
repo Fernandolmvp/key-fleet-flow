@@ -57,8 +57,8 @@ export default function ChecklistRunDialog({ open, onOpenChange, runId, onSaved 
     if (!runId) return;
     setLoading(true);
     const [{ data: r }, { data: a }] = await Promise.all([
-      supabase.from("checklist_runs").select("*, vehicle:vehicles(plate,brand,model), template:checklist_templates(name)").eq("id", runId).maybeSingle(),
-      supabase.from("checklist_answers").select("*, question:checklist_questions(options,required,is_critical,require_photo_when_fail,require_note_when_fail)").eq("run_id", runId).order("created_at"),
+      supabase.from("checklist_runs").select("*, vehicle:vehicles(plate,brand,model), template:checklist_templates!checklist_runs_template_id_fkey(name)").eq("id", runId).maybeSingle(),
+      supabase.from("checklist_answers").select("*, question:checklist_questions!checklist_answers_question_id_fkey(options,required,is_critical,require_photo_when_fail,require_note_when_fail)").eq("run_id", runId).order("created_at"),
     ]);
     setRun(r);
     setKmOverrideReason((r as any)?.km_override_reason ?? "");
