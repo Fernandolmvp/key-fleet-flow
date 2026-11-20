@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
+import { manualPaymentLabel, subscriptionBillingMode, type SubscriptionBilling } from "@/lib/subscription-billing";
 
 const fmtBRL = (v: number | null | undefined) =>
   v == null ? "a combinar" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -47,10 +48,12 @@ export default function Subscription() {
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
   const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [billingSubscription, setBillingSubscription] = useState<SubscriptionBilling | null>(null);
 
   const reload = async () => {
     if (!currentCompanyId) return;
     setLoading(true);
+    setBillingSubscription(null);
     const [{ data: u, error: eu }, { data: p }, { data: pays }, { data: reds }] = await Promise.all([
       supabase.from("company_usage").select("*").eq("company_id", currentCompanyId).maybeSingle(),
       supabase.from("plans").select("*").eq("active", true).order("sort_order"),
@@ -61,6 +64,12 @@ export default function Subscription() {
         .order("redeemed_at", { ascending: false }),
     ]);
     if (eu) toast.error(eu.message);
+    if (u?.subscription_id) {
+      const { data: subscription } = await supabase.from("subscriptions")
+        .select("stripe_subscription_id,cancel_at_period_end,status")
+        .eq("id", u.subscription_id).eq("company_id", currentCompanyId).maybeSingle();
+      setBillingSubscription(subscription);
+    }
     setData(u);
     setPlans(p ?? []);
     setPayments(pays ?? []);
@@ -139,6 +148,21 @@ export default function Subscription() {
   const usagePct = limit ? Math.min(100, Math.round((data.vehicles_used / limit) * 100)) : 0;
   const overdue = new Date(data.current_period_end) < new Date() && data.subscription_status !== "cancelada";
   const hasStripeCustomer = !!data.stripe_customer_id || data.subscription_status === "ativa" || data.subscription_status === "atrasada";
+  const billingMode = subscriptionBillingMode(billingSubscription);
+  const lastPayment = payments.find((payment) => payment.subscription_id === data.subscription_id);
+  const manualMethod = manualPaymentLabel(lastPayment?.method);
+  const billingNotice = billingMode === "automatic_card"
+    ? "Cobrança automática mensal no cartão. Em upgrade, você paga só a diferença proporcional do mês corrente."
+    : billingMode === "manual"
+      ? `Renovação manual via ${manualMethod}. Entre em contato para combinar o pagamento e renovar sua assinatura.`
+      : billingMode === "ending"
+        ? "A renovação automática desta assinatura está cancelada."
+        : null;
+  const pendingPaymentNotice = billingMode === "automatic_card"
+    ? "Confira o cartão e as faturas para regularizar a cobrança da assinatura."
+    : billingMode === "manual"
+      ? `Entre em contato para regularizar via ${manualMethod}. Após o pagamento sua assinatura será renovada manualmente.`
+      : "Entre em contato para confirmar a forma de pagamento e regularizar sua assinatura.";
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl">
@@ -212,7 +236,7 @@ export default function Subscription() {
               <div>
                 <div className="font-medium text-warning">Pagamento pendente</div>
                 <div className="text-muted-foreground mt-1">
-                  Entre em contato para regularizar via Pix ou boleto. Após o pagamento sua assinatura será renovada manualmente.
+                  {pendingPaymentNotice}
                 </div>
               </div>
             </div>
@@ -311,9 +335,7 @@ export default function Subscription() {
             );
           })}
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          Cobrança automática mensal no cartão. Em upgrade, você paga só a diferença proporcional do mês corrente.
-        </p>
+        {billingNotice && <p className="text-xs text-muted-foreground mt-3">{billingNotice}</p>}
       </div>
 
       {/* Histórico de pagamentos */}
