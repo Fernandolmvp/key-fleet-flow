@@ -3,3 +3,4 @@
 - Use the local calendar day, refreshed at midnight and on focus, for deadline-based presentation rules so today's deadlines never expire early.
 - Enrich Dashboard summaries with company-scoped, paginated read queries using the same deadline helpers as list views; avoid database migrations or writes for presentation-only statuses.
 - Derive preventive odometer deadlines through one shared helper using completed services, explicit next-service KM, open schedule targets and the company interval; use the registered current odometer consistently across maintenance and Dashboard.
+- Dashboard document counts mirror Documentation's active-entity scope and licensing calendar, deduplicating licensing/CRLV per vehicle and CNH per driver; driver cards share active-status and CNH helpers with Drivers, while month costs use bounded company-scoped reads and the same categories for previous-month comparisons.

@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Users, Pencil, Trash2, Loader2, Upload, AlertTriangle, Sparkles, FileText, CheckCircle2, XCircle, LayoutGrid, List } from "lucide-react";
 import { extractDocument } from "@/lib/ai-extract";
-import { daysUntil } from "@/lib/documents";
+import { isActiveDriver, cnhStatus as getCnhStatus } from "@/lib/documents";
+import { useLocalToday } from "@/hooks/useLocalToday";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,6 +66,7 @@ const INACTIVATION_REASONS = [
 
 export default function Drivers() {
   const { currentCompanyId, refreshCompanies } = useAuth();
+  const today = useLocalToday();
   const [items, setItems] = useState<Driver[]>([]);
   const [docsByDriver, setDocsByDriver] = useState<Record<string, DriverDoc[]>>({});
   const [managers, setManagers] = useState<{ user_id: string; name: string }[]>([]);
@@ -303,7 +305,7 @@ export default function Drivers() {
 
   const byTab = items.filter((d) => {
     if (tab === "todos") return true;
-    if (tab === "ativos") return d.status === "ativo" || d.status === "ferias";
+    if (tab === "ativos") return isActiveDriver(d.status);
     if (tab === "inativos") return INACTIVE_STATUSES.includes(d.status);
     return true;
   });
@@ -311,20 +313,12 @@ export default function Drivers() {
     [d.full_name, d.cpf, d.cnh_number].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase())
   );
   const counts = {
-    ativos: items.filter(d => d.status === "ativo" || d.status === "ferias").length,
+    ativos: items.filter(d => isActiveDriver(d.status)).length,
     inativos: items.filter(d => INACTIVE_STATUSES.includes(d.status)).length,
     todos: items.length,
   };
 
-  type CnhStatus = { kind: "vencida" | "vencendo" | "valida" | "sem_data"; days: number | null; label: string };
-  const cnhStatus = (date: string | null): CnhStatus => {
-    if (!date) return { kind: "sem_data", days: null, label: "Sem validade" };
-    const dl = daysUntil(date);
-    if (dl === null) return { kind: "sem_data", days: null, label: "Sem validade" };
-    if (dl < 0) return { kind: "vencida", days: dl, label: `Vencida há ${Math.abs(dl)} dias` };
-    if (dl <= 30) return { kind: "vencendo", days: dl, label: `Vence em ${dl} dias` };
-    return { kind: "valida", days: dl, label: `Válida (${dl} dias)` };
-  };
+  const cnhStatus = (date: string | null) => getCnhStatus(date, new Date(today + "T00:00:00"));
 
   const findCnhDoc = (driverId: string) =>
     (docsByDriver[driverId] ?? []).find((d) => d.doc_type === "cnh" && d.file_url);

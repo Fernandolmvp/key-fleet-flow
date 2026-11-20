@@ -3,7 +3,7 @@ import { fineDisplayStatus, isFineOpen, isMaintenanceClosed, isPastDay, overdueM
 import { preventiveKmState } from "./preventive-status";
 
 // PostgREST caps each page; dashboard totals must include every accessible company record.
-async function readAll<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+export async function readAll<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await query(from, from + 999);

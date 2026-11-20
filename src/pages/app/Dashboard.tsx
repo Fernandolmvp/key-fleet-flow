@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { loadDashboardDeadlines } from "@/lib/dashboard-deadlines";
+import { loadDashboardMetrics } from "@/lib/dashboard-metrics";
 import { useLocalToday } from "@/hooks/useLocalToday";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
@@ -88,9 +89,10 @@ export default function Dashboard() {
     refetchOnMount: "always",
     queryFn: async () => {
       if (!currentCompanyId) throw new Error("company required");
-      const [{ data, error }, deadlines] = await Promise.all([
+      const [{ data, error }, deadlines, metrics] = await Promise.all([
         supabase.rpc("dashboard_get_summary", { p_company_id: currentCompanyId }),
         loadDashboardDeadlines(currentCompanyId, today),
+        loadDashboardMetrics(currentCompanyId, today),
       ]);
       if (error) throw error;
       if (!data || (data as any).company_id !== currentCompanyId) {
@@ -99,20 +101,23 @@ export default function Dashboard() {
       const summary = data as unknown as Summary;
       return {
         ...summary,
+        drivers: { ...summary.drivers, active: metrics.drivers_active, cnh_expiring: metrics.cnh_expiring },
+        month: { ...summary.month, total: metrics.total, prev_total: metrics.prev_total, breakdown: metrics.breakdown },
         counts: {
           ...summary.counts,
+          docs_expiring: metrics.docs_expiring,
           maint_7d: deadlines.maint_7d,
           maint_overdue: deadlines.maint_overdue,
           trips_pending: deadlines.trips_pending,
           fines_overdue: deadlines.fines_overdue,
           fines_open: deadlines.fines_open,
-          critical_alerts: summary.counts.critical_alerts - summary.counts.maint_7d + deadlines.maint_7d + deadlines.maint_overdue + deadlines.trips_pending + deadlines.fines_overdue,
+          critical_alerts: metrics.docs_expiring + deadlines.maint_7d + deadlines.maint_overdue + deadlines.trips_pending + deadlines.fines_overdue,
         },
-        alerts: [...deadlines.alerts, ...summary.alerts.filter((a) => !["maintenance", "trip", "fine"].includes(a.kind))],
+        alerts: [...deadlines.alerts, ...metrics.alerts, ...summary.alerts.filter((a) => !["maintenance", "trip", "fine", "document", "cnh"].includes(a.kind))],
       };
     },
   });
-  useAutoRefresh(refetch, ["vehicles", "companies", "maintenance_schedules", "maintenance_records", "maintenance_work_orders", "trips", "traffic_fines"], { enabled: !!currentCompanyId });
+  useAutoRefresh(refetch, ["vehicles", "drivers", "documents", "detran_calendar", "companies", "fuel_records", "vehicle_expenses", "trip_expenses", "maintenance_schedules", "maintenance_records", "maintenance_work_orders", "trips", "traffic_fines"], { enabled: !!currentCompanyId });
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -416,7 +421,7 @@ function FullDashboard({
   const attentionCards = [
     counts.docs_expiring > 0 && {
       icon: FileWarning, tone: "warning" as const, count: counts.docs_expiring,
-      title: "documento(s) vencendo", subtitle: "Próximos 30 dias", to: "/app/documents",
+      title: "documento(s) vencendo", subtitle: "Vencidos e a vencer em 30 dias", to: "/app/documents",
     },
     counts.maint_7d > 0 && {
       icon: Wrench, tone: "warning" as const, count: counts.maint_7d,
@@ -471,7 +476,7 @@ function FullDashboard({
           value={counts.docs_expiring}
           icon={FileWarning}
           tone={counts.docs_expiring > 0 ? "warning" : "default"}
-          hint="Em até 30 dias"
+          hint="Vencidos e a vencer em 30 dias"
         />
         <KpiCard
           label="Alertas críticos"

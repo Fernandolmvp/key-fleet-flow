@@ -14,6 +14,7 @@ import DocumentDialog, { DocFormDoc } from "@/components/dashboard/DocumentDialo
 import {
   DOC_TYPE_LABELS, STATUS_COLOR, STATUS_LABEL, daysUntil, DocStatus,
   plateLastDigit, MONTH_LABEL_PT,
+  documentationCnhExpiry,
 } from "@/lib/documents";
 import {
   loadDetranCalendar, computeLicensingStatus, type DetranCalendar,
@@ -80,7 +81,7 @@ export default function Documents() {
     let count = 0;
     drivers.forEach((dr) => {
       const cnhDoc = dDocs.find((x) => x.entity_id === dr.id && x.doc_type === "cnh");
-      const cnhExp = cnhDoc?.expires_at || dr.cnh_expires_at;
+      const cnhExp = documentationCnhExpiry(dr, dDocs);
       if (!dr.cnh_number && !cnhDoc) {
         count++;
       } else if (cnhExp) {
@@ -405,7 +406,7 @@ function DriversTab({
       const dDocs = docs.filter((x) => x.entity_id === dr.id);
       if (dDocs.length === 0) semDoc++;
       const cnh = dDocs.find((x) => x.doc_type === "cnh");
-      const cnhExp = cnh?.expires_at || dr.cnh_expires_at;
+      const cnhExp = documentationCnhExpiry(dr, dDocs);
       const dl = daysUntil(cnhExp);
       if (dl !== null) {
         if (dl < 0) vencidos++;
@@ -460,7 +461,7 @@ function DriversTab({
               {filtered.map((dr) => {
                 const dDocs = docs.filter((x) => x.entity_id === dr.id);
                 const cnh = dDocs.find((x) => x.doc_type === "cnh");
-                const cnhExp = cnh?.expires_at || dr.cnh_expires_at;
+                const cnhExp = documentationCnhExpiry(dr, dDocs);
                 const dl = daysUntil(cnhExp);
                 let cnhStatus: { label: string; cls: string } = { label: "Sem informação", cls: "bg-muted/30 text-muted-foreground border-border" };
                 if (dl !== null) {

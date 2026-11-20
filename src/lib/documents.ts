@@ -40,12 +40,31 @@ export const STATUS_COLOR: Record<DocStatus, string> = {
   sem_validade: "bg-muted/30 text-muted-foreground border-border",
 };
 
-export function daysUntil(dateISO: string | null | undefined): number | null {
+export function daysUntil(dateISO: string | null | undefined, today = new Date()): number | null {
   if (!dateISO) return null;
-  const d = new Date(dateISO + "T00:00:00");
-  const now = new Date();
+  const d = new Date(dateISO.slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date(today);
   now.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function isActiveDriver(status: string): boolean {
+  return status === "ativo" || status === "ferias";
+}
+
+export type CnhStatus = { kind: "vencida" | "vencendo" | "valida" | "sem_data"; days: number | null; label: string };
+
+export function cnhStatus(date: string | null | undefined, today = new Date()): CnhStatus {
+  const days = daysUntil(date, today);
+  if (days === null) return { kind: "sem_data", days, label: "Sem validade" };
+  if (days < 0) return { kind: "vencida", days, label: `Vencida há ${Math.abs(days)} dias` };
+  if (days <= 30) return { kind: "vencendo", days, label: `Vence em ${days} dias` };
+  return { kind: "valida", days, label: `Válida (${days} dias)` };
+}
+
+export function documentationCnhExpiry(driver: { id: string; cnh_expires_at: string | null }, docs: { entity_id: string; doc_type: string; expires_at: string | null }[]): string | null {
+  return docs.find((d) => d.entity_id === driver.id && d.doc_type === "cnh")?.expires_at || driver.cnh_expires_at;
 }
 
 /**
