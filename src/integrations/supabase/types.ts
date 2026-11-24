@@ -14,6 +14,191 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_actions_log: {
+        Row: {
+          action: string
+          company_id: string
+          contexto: Json
+          created_at: string
+          error: string | null
+          id: string
+          ok: boolean
+          params: Json
+        }
+        Insert: {
+          action: string
+          company_id: string
+          contexto?: Json
+          created_at?: string
+          error?: string | null
+          id?: string
+          ok: boolean
+          params?: Json
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          contexto?: Json
+          created_at?: string
+          error?: string | null
+          id?: string
+          ok?: boolean
+          params?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_actions_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_actions_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      agent_api_keys: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_api_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_api_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      agent_rate_limits: {
+        Row: {
+          key_id: string
+          request_count: number
+          window_started_at: string
+        }
+        Insert: {
+          key_id: string
+          request_count: number
+          window_started_at: string
+        }
+        Update: {
+          key_id?: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_rate_limits_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: true
+            referencedRelation: "agent_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_runtime_status: {
+        Row: {
+          claude_ok: boolean | null
+          company_id: string
+          estatisticas: Json
+          last_seen_at: string | null
+          pending_command: string | null
+          telegram_bot: string | null
+          updated_at: string
+          versao: string | null
+          whatsapp_erro: string | null
+          whatsapp_numero: string | null
+          whatsapp_qr: string | null
+          whatsapp_status: string
+        }
+        Insert: {
+          claude_ok?: boolean | null
+          company_id: string
+          estatisticas?: Json
+          last_seen_at?: string | null
+          pending_command?: string | null
+          telegram_bot?: string | null
+          updated_at?: string
+          versao?: string | null
+          whatsapp_erro?: string | null
+          whatsapp_numero?: string | null
+          whatsapp_qr?: string | null
+          whatsapp_status?: string
+        }
+        Update: {
+          claude_ok?: boolean | null
+          company_id?: string
+          estatisticas?: Json
+          last_seen_at?: string | null
+          pending_command?: string | null
+          telegram_bot?: string | null
+          updated_at?: string
+          versao?: string | null
+          whatsapp_erro?: string | null
+          whatsapp_numero?: string | null
+          whatsapp_qr?: string | null
+          whatsapp_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_runtime_status_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_runtime_status_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "company_usage"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       ai_feature_routing: {
         Row: {
           active: boolean
@@ -612,6 +797,7 @@ export type Database = {
           question_type: Database["public"]["Enums"]["checklist_question_type"]
           run_id: string
           signature_url: string | null
+          source: string
           status: Database["public"]["Enums"]["checklist_answer_status"]
           updated_at: string
           value_bool: boolean | null
@@ -633,6 +819,7 @@ export type Database = {
           question_type: Database["public"]["Enums"]["checklist_question_type"]
           run_id: string
           signature_url?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["checklist_answer_status"]
           updated_at?: string
           value_bool?: boolean | null
@@ -654,6 +841,7 @@ export type Database = {
           question_type?: Database["public"]["Enums"]["checklist_question_type"]
           run_id?: string
           signature_url?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["checklist_answer_status"]
           updated_at?: string
           value_bool?: boolean | null
@@ -723,6 +911,7 @@ export type Database = {
           require_photo_when_fail: boolean
           required: boolean
           sort_order: number
+          source: string
           template_id: string
           updated_at: string
         }
@@ -742,6 +931,7 @@ export type Database = {
           require_photo_when_fail?: boolean
           required?: boolean
           sort_order?: number
+          source?: string
           template_id: string
           updated_at?: string
         }
@@ -761,6 +951,7 @@ export type Database = {
           require_photo_when_fail?: boolean
           required?: boolean
           sort_order?: number
+          source?: string
           template_id?: string
           updated_at?: string
         }
@@ -816,6 +1007,7 @@ export type Database = {
           score: number | null
           signature_url: string | null
           signed_by_name: string | null
+          source: string
           started_at: string | null
           status: Database["public"]["Enums"]["checklist_run_status"]
           template_id: string
@@ -843,6 +1035,7 @@ export type Database = {
           score?: number | null
           signature_url?: string | null
           signed_by_name?: string | null
+          source?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["checklist_run_status"]
           template_id: string
@@ -870,6 +1063,7 @@ export type Database = {
           score?: number | null
           signature_url?: string | null
           signed_by_name?: string | null
+          source?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["checklist_run_status"]
           template_id?: string
@@ -940,6 +1134,7 @@ export type Database = {
           frequency: Database["public"]["Enums"]["checklist_frequency"]
           id: string
           name: string
+          source: string
           updated_at: string
           vehicle_type: string | null
           version: number
@@ -954,6 +1149,7 @@ export type Database = {
           frequency?: Database["public"]["Enums"]["checklist_frequency"]
           id?: string
           name: string
+          source?: string
           updated_at?: string
           vehicle_type?: string | null
           version?: number
@@ -968,6 +1164,7 @@ export type Database = {
           frequency?: Database["public"]["Enums"]["checklist_frequency"]
           id?: string
           name?: string
+          source?: string
           updated_at?: string
           vehicle_type?: string | null
           version?: number
@@ -1533,6 +1730,7 @@ export type Database = {
           issuer: string | null
           mime_type: string | null
           notes: string | null
+          source: string
           status: Database["public"]["Enums"]["document_status"]
           title: string | null
           updated_at: string
@@ -1557,6 +1755,7 @@ export type Database = {
           issuer?: string | null
           mime_type?: string | null
           notes?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["document_status"]
           title?: string | null
           updated_at?: string
@@ -1581,6 +1780,7 @@ export type Database = {
           issuer?: string | null
           mime_type?: string | null
           notes?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["document_status"]
           title?: string | null
           updated_at?: string
@@ -1845,6 +2045,7 @@ export type Database = {
           phone: string | null
           phone_verified_at: string | null
           photo_url: string | null
+          source: string
           state: string | null
           status: Database["public"]["Enums"]["driver_status"]
           termination_date: string | null
@@ -1882,6 +2083,7 @@ export type Database = {
           phone?: string | null
           phone_verified_at?: string | null
           photo_url?: string | null
+          source?: string
           state?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
           termination_date?: string | null
@@ -1919,6 +2121,7 @@ export type Database = {
           phone?: string | null
           phone_verified_at?: string | null
           photo_url?: string | null
+          source?: string
           state?: string | null
           status?: Database["public"]["Enums"]["driver_status"]
           termination_date?: string | null
@@ -2229,6 +2432,7 @@ export type Database = {
           receipt_total: number | null
           requested_at: string
           requested_by: string
+          source: string
           station_name: string | null
           status: Database["public"]["Enums"]["fuel_auth_status"]
           updated_at: string
@@ -2265,6 +2469,7 @@ export type Database = {
           receipt_total?: number | null
           requested_at?: string
           requested_by: string
+          source?: string
           station_name?: string | null
           status?: Database["public"]["Enums"]["fuel_auth_status"]
           updated_at?: string
@@ -2301,6 +2506,7 @@ export type Database = {
           receipt_total?: number | null
           requested_at?: string
           requested_by?: string
+          source?: string
           station_name?: string | null
           status?: Database["public"]["Enums"]["fuel_auth_status"]
           updated_at?: string
@@ -2431,6 +2637,7 @@ export type Database = {
           reconciled_at: string | null
           reconciliation_notes: string | null
           reconciliation_status: string
+          source: string
           source_origin: string
           state: string | null
           station_cnpj: string | null
@@ -2475,6 +2682,7 @@ export type Database = {
           reconciled_at?: string | null
           reconciliation_notes?: string | null
           reconciliation_status?: string
+          source?: string
           source_origin?: string
           state?: string | null
           station_cnpj?: string | null
@@ -2519,6 +2727,7 @@ export type Database = {
           reconciled_at?: string | null
           reconciliation_notes?: string | null
           reconciliation_status?: string
+          source?: string
           source_origin?: string
           state?: string | null
           station_cnpj?: string | null
@@ -3442,6 +3651,7 @@ export type Database = {
           parts_value: number
           service_at: string
           service_provider_rating: number | null
+          source: string
           state: string | null
           status: Database["public"]["Enums"]["maintenance_status"]
           total_value: number
@@ -3477,6 +3687,7 @@ export type Database = {
           parts_value?: number
           service_at?: string
           service_provider_rating?: number | null
+          source?: string
           state?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"]
           total_value?: number
@@ -3512,6 +3723,7 @@ export type Database = {
           parts_value?: number
           service_at?: string
           service_provider_rating?: number | null
+          source?: string
           state?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"]
           total_value?: number
@@ -3587,6 +3799,7 @@ export type Database = {
           scheduled_date: string | null
           scheduled_workshop_id: string | null
           severity_self_assessment: string
+          source: string
           status: string
           updated_at: string
           vehicle_id: string
@@ -3617,6 +3830,7 @@ export type Database = {
           scheduled_date?: string | null
           scheduled_workshop_id?: string | null
           severity_self_assessment: string
+          source?: string
           status?: string
           updated_at?: string
           vehicle_id: string
@@ -3647,6 +3861,7 @@ export type Database = {
           scheduled_date?: string | null
           scheduled_workshop_id?: string | null
           severity_self_assessment?: string
+          source?: string
           status?: string
           updated_at?: string
           vehicle_id?: string
@@ -3710,6 +3925,7 @@ export type Database = {
           interval_km: number | null
           scheduled_time: string | null
           scheduled_workshop_id: string | null
+          source: string
           status: Database["public"]["Enums"]["schedule_status"]
           target_date: string | null
           target_km: number | null
@@ -3729,6 +3945,7 @@ export type Database = {
           interval_km?: number | null
           scheduled_time?: string | null
           scheduled_workshop_id?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["schedule_status"]
           target_date?: string | null
           target_km?: number | null
@@ -3748,6 +3965,7 @@ export type Database = {
           interval_km?: number | null
           scheduled_time?: string | null
           scheduled_workshop_id?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["schedule_status"]
           target_date?: string | null
           target_km?: number | null
@@ -3857,6 +4075,7 @@ export type Database = {
           scheduled_date: string
           scheduled_time: string | null
           services_performed: Json
+          source: string
           title: string
           updated_at: string
           updated_by: string | null
@@ -3920,6 +4139,7 @@ export type Database = {
           scheduled_date: string
           scheduled_time?: string | null
           services_performed?: Json
+          source?: string
           title: string
           updated_at?: string
           updated_by?: string | null
@@ -3983,6 +4203,7 @@ export type Database = {
           scheduled_date?: string
           scheduled_time?: string | null
           services_performed?: Json
+          source?: string
           title?: string
           updated_at?: string
           updated_by?: string | null
@@ -4927,6 +5148,7 @@ export type Database = {
           occurred_at: string
           pressure_psi: number | null
           reason: string | null
+          source: string
           tire_id: string
           to_position: string | null
           tread_mm: number | null
@@ -4946,6 +5168,7 @@ export type Database = {
           occurred_at?: string
           pressure_psi?: number | null
           reason?: string | null
+          source?: string
           tire_id: string
           to_position?: string | null
           tread_mm?: number | null
@@ -4965,6 +5188,7 @@ export type Database = {
           occurred_at?: string
           pressure_psi?: number | null
           reason?: string | null
+          source?: string
           tire_id?: string
           to_position?: string | null
           tread_mm?: number | null
@@ -5031,6 +5255,7 @@ export type Database = {
           recap_count: number
           serial: string | null
           size: string
+          source: string
           status: Database["public"]["Enums"]["tire_status"]
           supplier: string | null
           target_pressure_psi: number | null
@@ -5064,6 +5289,7 @@ export type Database = {
           recap_count?: number
           serial?: string | null
           size: string
+          source?: string
           status?: Database["public"]["Enums"]["tire_status"]
           supplier?: string | null
           target_pressure_psi?: number | null
@@ -5097,6 +5323,7 @@ export type Database = {
           recap_count?: number
           serial?: string | null
           size?: string
+          source?: string
           status?: Database["public"]["Enums"]["tire_status"]
           supplier?: string | null
           target_pressure_psi?: number | null
@@ -5173,6 +5400,7 @@ export type Database = {
           recourse_result: string | null
           recourse_result_date: string | null
           severity: string | null
+          source: string
           state: string | null
           status: string
           updated_at: string
@@ -5225,6 +5453,7 @@ export type Database = {
           recourse_result?: string | null
           recourse_result_date?: string | null
           severity?: string | null
+          source?: string
           state?: string | null
           status?: string
           updated_at?: string
@@ -5277,6 +5506,7 @@ export type Database = {
           recourse_result?: string | null
           recourse_result_date?: string | null
           severity?: string | null
+          source?: string
           state?: string | null
           status?: string
           updated_at?: string
@@ -5448,6 +5678,7 @@ export type Database = {
           reimbursement_rejection_reason: string | null
           reimbursement_status: string
           requires_reimbursement: boolean
+          source: string
           state: string | null
           supplier_document: string | null
           supplier_name: string | null
@@ -5489,6 +5720,7 @@ export type Database = {
           reimbursement_rejection_reason?: string | null
           reimbursement_status?: string
           requires_reimbursement?: boolean
+          source?: string
           state?: string | null
           supplier_document?: string | null
           supplier_name?: string | null
@@ -5530,6 +5762,7 @@ export type Database = {
           reimbursement_rejection_reason?: string | null
           reimbursement_status?: string
           requires_reimbursement?: boolean
+          source?: string
           state?: string | null
           supplier_document?: string | null
           supplier_name?: string | null
@@ -5934,6 +6167,7 @@ export type Database = {
           id: string
           paid: boolean
           receipt_url: string | null
+          source: string
           updated_at: string
           vehicle_id: string
         }
@@ -5949,6 +6183,7 @@ export type Database = {
           id?: string
           paid?: boolean
           receipt_url?: string | null
+          source?: string
           updated_at?: string
           vehicle_id: string
         }
@@ -5964,6 +6199,7 @@ export type Database = {
           id?: string
           paid?: boolean
           receipt_url?: string | null
+          source?: string
           updated_at?: string
           vehicle_id?: string
         }
@@ -6271,6 +6507,7 @@ export type Database = {
           sale_payment_method: string | null
           sale_state: string | null
           sale_value: number | null
+          source: string
           status: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity: number | null
           updated_at: string
@@ -6333,6 +6570,7 @@ export type Database = {
           sale_payment_method?: string | null
           sale_state?: string | null
           sale_value?: number | null
+          source?: string
           status?: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity?: number | null
           updated_at?: string
@@ -6395,6 +6633,7 @@ export type Database = {
           sale_payment_method?: string | null
           sale_state?: string | null
           sale_value?: number | null
+          source?: string
           status?: Database["public"]["Enums"]["vehicle_status"]
           tank_capacity?: number | null
           updated_at?: string
@@ -6646,6 +6885,7 @@ export type Database = {
           preferred: boolean
           rating: number | null
           simples_nacional: boolean | null
+          source: string
           specialties: string[]
           state: string | null
           state_registration: string | null
@@ -6710,6 +6950,7 @@ export type Database = {
           preferred?: boolean
           rating?: number | null
           simples_nacional?: boolean | null
+          source?: string
           specialties?: string[]
           state?: string | null
           state_registration?: string | null
@@ -6774,6 +7015,7 @@ export type Database = {
           preferred?: boolean
           rating?: number | null
           simples_nacional?: boolean | null
+          source?: string
           specialties?: string[]
           state?: string | null
           state_registration?: string | null
@@ -6828,6 +7070,11 @@ export type Database = {
         Args: { _company_id: string; _tokens: number }
         Returns: undefined
       }
+      agent_api_rate_limit: {
+        Args: { p_key_id: string; p_limit?: number }
+        Returns: boolean
+      }
+      agent_dashboard_summary: { Args: { p_company_id: string }; Returns: Json }
       apply_stripe_subscription: {
         Args: {
           _cancel_at_period_end: boolean

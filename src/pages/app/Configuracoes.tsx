@@ -1,16 +1,31 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { Settings, Users, Shield, Building2, Loader2, Sparkles } from "lucide-react";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { Settings, Users, Shield, Building2, Loader2, Sparkles, Bot } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MembersTab from "./configuracoes/MembersTab";
 import PermissionsTab from "./configuracoes/PermissionsTab";
 import CompanyTab from "./configuracoes/CompanyTab";
 import CreditosIATab from "./configuracoes/CreditosIATab";
+import AgenteIATab from "./configuracoes/AgenteIATab";
+
+const SETTINGS_TABS = ["members", "permissions", "company", "credits", "agente-ia"];
 
 export default function Configuracoes() {
   const { roles, currentCompanyId, loading } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = roles.includes("admin");
+  const requestedTab = searchParams.get("tab") ?? "members";
+  const selectedTab = SETTINGS_TABS.includes(requestedTab) ? requestedTab : "members";
+
+  const selectTab = (value: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value === "members") next.delete("tab");
+      else next.set("tab", value);
+      return next;
+    }, { replace: true });
+  };
 
   if (loading) {
     return (
@@ -54,8 +69,8 @@ export default function Configuracoes() {
         </div>
       </div>
 
-      <Tabs defaultValue="members" className="space-y-4">
-        <TabsList>
+      <Tabs value={selectedTab} onValueChange={selectTab} className="space-y-4">
+        <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="members" className="gap-2">
             <Users className="h-4 w-4" /> Membros & Perfis
           </TabsTrigger>
@@ -68,11 +83,15 @@ export default function Configuracoes() {
           <TabsTrigger value="credits" className="gap-2">
             <Sparkles className="h-4 w-4" /> Créditos IA
           </TabsTrigger>
+          <TabsTrigger value="agente-ia" className="gap-2">
+            <Bot className="h-4 w-4" /> Agente de IA
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="members"><MembersTab companyId={currentCompanyId} /></TabsContent>
         <TabsContent value="permissions"><PermissionsTab companyId={currentCompanyId} /></TabsContent>
         <TabsContent value="company"><CompanyTab companyId={currentCompanyId} /></TabsContent>
         <TabsContent value="credits"><CreditosIATab companyId={currentCompanyId} /></TabsContent>
+        <TabsContent value="agente-ia"><AgenteIATab companyId={currentCompanyId} /></TabsContent>
       </Tabs>
     </div>
   );

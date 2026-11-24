@@ -23,3 +23,8 @@
 - [x] Pneus: mapa por eixo, sulco/pressão/medição, alertas, rodízio/recapagem, custo/km
 - [x] Abastecimentos: filtros, anomalias explicadas, conferência, CSV, ranking
 - [x] Viagens: abas por status, criação rápida, despesas/adiantamento/acerto, custo/km, resultado
+## API e painel do Agente
+- [ ] Criar chaves, histórico de ações, status do motor e origem `agente`, com acesso por empresa.
+- [ ] Implementar `agent-api`, autenticação por chave, limite por minuto e todas as ações contratadas.
+- [ ] Criar aba Agente de IA, QR/status/comandos, teste de chave e atalho Agente WhatsApp.
+- [ ] Testar contrato, permissões, ações principais, telas e typecheck; não publicar.

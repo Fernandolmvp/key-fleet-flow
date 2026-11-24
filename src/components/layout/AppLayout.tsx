@@ -32,6 +32,7 @@ import {
   CarFront,
   Package,
   Route as RouteIcon,
+  Bot,
 } from "lucide-react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { TrialBanner } from "@/components/TrialBanner";
 import { NewCompanyDialog } from "@/components/NewCompanyDialog";
+import { useAgentRuntimeStatus } from "@/hooks/useAgentRuntimeStatus";
+import { agentStatusMeta } from "@/lib/agent";
 
 type NavItem = {
   to: string;
@@ -58,6 +61,8 @@ type NavItem = {
   soon?: boolean;
   module?: PermModule;
   isNew?: boolean;
+  adminOnly?: boolean;
+  statusKey?: "whatsappAgent";
 };
 type NavGroup = { type: "group"; key: string; label: string; icon: any; items: NavItem[] };
 type NavEntry = NavItem | NavGroup;
@@ -99,6 +104,7 @@ const nav: NavEntry[] = [
     ],
   },
   { to: "/app/assinatura", label: "Assinatura", icon: CreditCard },
+  { to: "/app/configuracoes?tab=agente-ia", label: "Agente WhatsApp", icon: Bot, adminOnly: true, statusKey: "whatsappAgent" },
   { to: "/app/configuracoes", label: "Configurações da Empresa", icon: Settings, module: "settings" },
   { to: "/app/alerts", label: "Alertas", icon: AlertTriangle },
   { to: "/app/reports", label: "Relatórios", icon: BarChart3, module: "reports" },
@@ -118,6 +124,8 @@ export default function AppLayout() {
   const [insurancePending, setInsurancePending] = useState(0);
   const [openGroup, setOpenGroup] = useState<string | null>("cadastros");
   const [showNewCompany, setShowNewCompany] = useState(false);
+  const agentRuntimeQuery = useAgentRuntimeStatus(currentCompanyId, isAdmin);
+  const agentStatus = agentStatusMeta(agentRuntimeQuery.data?.whatsapp_status);
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -217,11 +225,12 @@ export default function AppLayout() {
     return out;
   };
 
+  const adminFilteredNav = nav.filter((entry) => !("adminOnly" in entry) || !entry.adminOnly || isAdmin);
   const visibleNav: NavEntry[] = isDriverOnly
     ? [{ to: "/app/colaborador", label: "Abastecimento", icon: ShieldCheck }]
     : permsLoading
-      ? nav
-      : filterByPerm(nav);
+      ? adminFilteredNav
+      : filterByPerm(adminFilteredNav);
 
   const renderItem = (it: NavItem, opts: { indent?: boolean; primary?: boolean } = {}) => {
     const { indent = false, primary = false } = opts;
@@ -230,20 +239,26 @@ export default function AppLayout() {
         key={it.to}
         to={it.to}
         end={it.end}
-        className={({ isActive }) =>
-          cn(
+        className={({ isActive }) => {
+          const onAgentTab = loc.pathname === "/app/configuracoes" && loc.search.includes("tab=agente-ia");
+          const active = it.statusKey === "whatsappAgent"
+            ? onAgentTab
+            : it.to === "/app/configuracoes"
+              ? loc.pathname === "/app/configuracoes" && !onAgentTab
+              : isActive;
+          return cn(
             "group flex items-center gap-3 rounded-lg transition-all",
             primary ? "px-2.5 py-2.5 text-[13px] font-semibold tracking-wide uppercase" : "px-3 py-2 text-sm",
             indent && "ml-4 pl-3 border-l border-sidebar-border/60",
-            isActive
+            active
               ? primary
                 ? "bg-gradient-to-r from-primary/15 to-transparent text-sidebar-accent-foreground border border-primary/40 shadow-glow"
                 : "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
               : primary
                 ? "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground border border-transparent"
                 : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-          )
-        }
+          );
+        }}
       >
         <span
           className={cn(
@@ -254,6 +269,12 @@ export default function AppLayout() {
           <it.icon className={cn(primary ? "h-4 w-4" : "h-4 w-4")} />
         </span>
         <span className="flex-1">{it.label}</span>
+        {it.statusKey === "whatsappAgent" && (
+          <span title={`WhatsApp: ${agentStatus.label}`} className="inline-flex items-center">
+            <span className={cn("h-2.5 w-2.5 rounded-full", agentStatus.dot)} aria-hidden="true" />
+            <span className="sr-only">WhatsApp: {agentStatus.label}</span>
+          </span>
+        )}
         {it.badgeKey === "documents" && docPending > 0 && (
           <span className="text-[10px] font-mono bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
             {docPending}
