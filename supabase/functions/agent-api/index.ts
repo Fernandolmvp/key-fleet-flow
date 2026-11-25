@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   const hash = await sha256Hex(rawKey);
   const { data: key, error: keyError } = await admin
     .from("agent_api_keys")
-    .select("id,company_id")
+    .select("id,company_id,created_by")
     .eq("key_hash", hash)
     .is("revoked_at", null)
     .maybeSingle();
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const data = await handler({ admin, keyId: key.id, companyId: key.company_id, contexto: body.contexto }, body.params);
+    const data = await handler({ admin, keyId: key.id, companyId: key.company_id, contexto: body.contexto, actorId: key.created_by }, body.params);
     if (body.action !== "agente_status") {
       await admin.from("agent_actions_log").insert({ company_id: key.company_id, action: body.action, params: body.params, contexto: body.contexto, ok: true });
     }
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
         : "Não foi possível concluir a ação. Revise os dados e tente novamente.";
     if (!(cause instanceof ActionError)) console.error(`agent-api ${body.action}`, translated.message);
     if (body.action !== "agente_status") {
-      await admin.from("agent_actions_log").insert({ company_id: key.company_id, action: body.action, params: body.params, contexto: body.contexto, ok: false, error });
+      await admin.from("agent_actions_log").insert({ company_id: key.company_id, action: body.action, params: body.params, contexto: body.contexto, ok: false, error: cause instanceof ActionError ? error : cause instanceof Error ? cause.message : translated.message });
     }
     return failure(error);
   }

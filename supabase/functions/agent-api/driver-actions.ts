@@ -64,7 +64,7 @@ export async function registrarAbastecimento(ctx: AgentContext, params: Record<s
     notes: contactNote(ctx, optionalString(params, "observacao", "observação")),
     created_by: actor,
     source: "agente",
-    source_origin: "agente",
+    source_origin: "manual",
   }).select("*").single();
   if (error) throw error;
   await updateVehicleKm(ctx, vehicle, km);
@@ -171,9 +171,14 @@ export async function registrarChecklist(ctx: AgentContext, params: Record<strin
   if (completed.error) throw completed.error;
   const request = await ctx.admin.from("maintenance_requests").select("*").eq("company_id", ctx.companyId).eq("checklist_run_id", run.id).maybeSingle();
   if (request.error) throw request.error;
-  if (request.data) await ctx.admin.from("maintenance_requests").update({ source: "agente" }).eq("company_id", ctx.companyId).eq("id", request.data.id);
+  let maintenanceAlert = request.data;
+  if (request.data) {
+    const marked = await ctx.admin.from("maintenance_requests").update({ source: "agente" }).eq("company_id", ctx.companyId).eq("id", request.data.id).select("*").single();
+    if (marked.error) throw marked.error;
+    maintenanceAlert = marked.data;
+  }
   await updateVehicleKm(ctx, vehicle, km);
-  return { ...completed.data, itens: answers.data ?? [], alerta_manutencao: request.data ?? null };
+  return { ...completed.data, itens: answers.data ?? [], alerta_manutencao: maintenanceAlert ?? null };
 }
 
 export async function registrarMedicaoPneus(ctx: AgentContext, params: Record<string, unknown>) {

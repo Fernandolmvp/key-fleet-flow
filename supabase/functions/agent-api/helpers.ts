@@ -201,6 +201,7 @@ export async function fetchAll(queryPage: (from: number, to: number) => Promise<
 export function databaseError(error: any): Error {
   const message = String(error?.message ?? "");
   if (error?.code === "23505") return new ActionError("Já existe um registro com esses dados.");
+  if (/TRIAL_EXPIRED/i.test(message)) return new ActionError("A assinatura ou o período de avaliação da empresa está inativo. Regularize antes de lançar dados pelo agente.");
   if (/quilometr|odometr|\bkm\b/i.test(message)) return new ActionError("O KM informado é menor que o último KM registrado para este veículo. Confira o valor.");
   if (error?.code === "23514") return new ActionError("Um dos valores informados não é aceito pelo sistema. Revise os dados.");
   if (error?.code === "23503") return new ActionError("Um cadastro relacionado não foi encontrado nesta empresa.");

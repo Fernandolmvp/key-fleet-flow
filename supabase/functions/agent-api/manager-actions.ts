@@ -6,7 +6,6 @@ import {
   dateOrToday,
   dateValue,
   enumValue,
-  findDriver,
   findTrip,
   findVehicle,
   normalizePlate,
@@ -94,7 +93,7 @@ export async function concluirManutencao(ctx: AgentContext, params: Record<strin
   const numericReference = onlyDigits(reference);
   let order: any = null;
   if (numericReference) {
-    const found = await ctx.admin.from("maintenance_work_orders").select("*").eq("company_id", ctx.companyId).eq("os_number", Number(numericReference)).limit(1).maybeSingle();
+    const found = await ctx.admin.from("maintenance_work_orders").select("*").eq("company_id", ctx.companyId).eq("os_number", reference).limit(1).maybeSingle();
     if (found.error) throw found.error;
     order = found.data;
   }
@@ -293,7 +292,6 @@ export async function cadastrarMotorista(ctx: AgentContext, params: Record<strin
   requireManager(ctx);
   const cpf = onlyDigits(requiredString(params, "cpf", "o CPF", 20));
   if (cpf.length !== 11) throw new ActionError("CPF deve conter 11 dígitos.");
-  const actor = await actorId(ctx);
   const { data, error } = await ctx.admin.from("drivers").insert({
     company_id: ctx.companyId,
     full_name: requiredString(params, "nome", "o nome", 180),
@@ -322,7 +320,6 @@ export async function cadastrarVeiculo(ctx: AgentContext, params: Record<string,
   const { data, error } = await ctx.admin.from("vehicles").insert({
     company_id: ctx.companyId,
     plate,
-    normalized_plate: plate,
     brand: optionalString(params, "marca", "marca", 100) ?? "Não informada",
     model: requiredString(params, "modelo", "o modelo", 140),
     year_manufacture: optionalNumber(params, "ano", "ano", { integer: true, min: 1900, max: 2100 }),

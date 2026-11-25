@@ -24,7 +24,8 @@
 - [x] Abastecimentos: filtros, anomalias explicadas, conferência, CSV, ranking
 - [x] Viagens: abas por status, criação rápida, despesas/adiantamento/acerto, custo/km, resultado
 ## API e painel do Agente
-- [ ] Criar chaves, histórico de ações, status do motor e origem `agente`, com acesso por empresa.
-- [ ] Implementar `agent-api`, autenticação por chave, limite por minuto e todas as ações contratadas.
-- [ ] Criar aba Agente de IA, QR/status/comandos, teste de chave e atalho Agente WhatsApp.
-- [ ] Testar contrato, permissões, ações principais, telas e typecheck; não publicar.
+- [x] Criar chaves, histórico de ações, status do motor e origem `agente`, com acesso por empresa.
+- [x] Implementar `agent-api`, autenticação por chave, limite por minuto e todas as ações contratadas.
+- [x] Criar aba Agente de IA, QR/status/comandos, teste de chave e atalho Agente WhatsApp.
+- [x] Testar contrato, permissões, consultas e lançamentos em empresa temporária, 144 testes e typecheck; dados temporários removidos, sem publicar.
+- [ ] Conferir a aba autenticada na prévia — a conta do usuário ainda não existe no aplicativo e a criação de usuário temporário foi recusada.
